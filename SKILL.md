@@ -92,14 +92,22 @@ Correct mode (MUST DO):
 ### 0.2 Pre-Batch Quota Check
 
 ```
-Before ANY batch of billed API calls:
+Before ANY batch of API calls:
   1. GET /v4/account?apiKey=KEY → returns request_limit, request_count
-  2. Calculate: remaining = request_limit - request_count
-  3. IF remaining < planned_calls:
+  2. Record: quota_before = request_count, quota_total = request_limit
+  3. Calculate: remaining = request_limit - request_count
+  4. IF remaining < planned_calls:
      → Warn user: "Only X quota remaining, need Y. Continue? (y/n)"
      → Wait for user confirmation before proceeding
-  4. IF remaining >= planned_calls:
+  5. IF remaining >= planned_calls:
      → Proceed with serial calls
+
+After all calls complete:
+  6. GET /v4/account → get quota_after = request_count
+  7. Calculate: session_used = quota_after - quota_before
+  8. Report in output: "本次消耗: {session_used} · 累计: {quota_after}/{quota_total}"
+  
+  → quota_total always sourced from API, never hardcoded as 250.
 ```
 
 ### 0.3 Retry Rules (Rigid)
@@ -190,12 +198,14 @@ BILLED (1 request = 1 quota, MUST confirm with user FIRST):
    Official docs: "无论响应是否成功或返回错误，请求都会在端点完成处理之后被计数"
 
 Confirmation format:
-  "Analysis needs billed calls:
-   /v4/fixtures × 1 = 1 quota (one-time cache init)
-   Current: [remaining]/[limit]. Proceed? (yes/no)"
+  "需要计费调用:
+   /v4/fixtures × 1 = 1 配额（一次性缓存初始化）
+   本次预计消耗: 1 · 累计: [count]/[limit] · 剩余: [remaining]
+   是否继续？(是/否)"
 
   → NEVER assume "yes". Wait for explicit "yes" or "确认".
-  → After any batch of billed calls: report actual vs planned.
+  → Calls complete → GET /v4/account → 本次实际消耗 = quota_after - quota_before
+  → Report: "本次消耗: [session] · 累计: [now]/[total]" (累计+总数均来自 /v4/account)
   → /v4/historical-odds (free) calls do NOT need confirmation.
 ```
 
@@ -926,7 +936,7 @@ assets/report-template.html — 完整 HTML 模板（~41KB）
 |:---|:---|
 | 页面标题 / .header h1 | 比赛日日期 |
 | .header .meta | 生成时间 + 数据源 |
-| .header .quota | 实际配额消耗（免费 = 0，计费 = N） |
+| .header .quota | 双配额显示: "✅ 本次消耗: N 配额 · 累计: X/总（来源 /v4/account）"<br>本次消耗 = 从 `/v4/account` 调用前 snapshot 计算差值<br>累计/总均从 `/v4/account` 实时获取 |
 | .summary-grid ×4 | 对阵、预测比分、置信度标签 (conf-high/conf-mid/conf-low) |
 | #m1-#m4 → Step 1 | 数据源详情（端点、博彩商、数据点数） |
 | #m1-#m4 → Step 2 | 基本面表格（战绩、伤停、交锋、关键因素） |
