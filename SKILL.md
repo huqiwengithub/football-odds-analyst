@@ -317,19 +317,20 @@ After yes: GET /v4/fixtures?tournamentId=16&from=2026-06-11&to=2026-07-19&apiKey
 ### Core Execution Rule: Tournament-Wide Outcome ID Cache
 
 ```
-💰 核心策略: 首次分析任意一场比赛 → 立刻缓存整赛季所有比赛的 outcome ID
-   例: 用户说"分析捷克vs南非" → 调 /v4/odds-by-tournaments?tournamentIds=16
+💰 核心策略: 首次分析任意一场比赛 → 立刻缓存同一 tournament 下所有比赛的 outcome ID
+   适配所有联赛/赛事，不限于世界杯。通过 /v4/fixtures 返回的 tournamentId 自动匹配。
+   例: 用户说"分析捷克vs南非" → 调 /v4/odds-by-tournaments?tournamentIds={tournamentId}
        → 47 场世界杯比赛的全部 outcome ID 一次性缓存
        → 之后再分析"墨西哥vs韩国" → 0 配额，直接从缓存读
 
    官方建议: "尽可能批量请求"
    数据量: ~2.4MB，实测 20s 内完成，不会截断
 
-Outcome ID cache: ../.cache/oddspapi_outcome_ids_16.json (全赛事共享)
+Outcome ID cache: ../.cache/oddspapi_outcome_ids_{tournamentId}.json (全赛事共享)
 
 首次运行（全赛事一次，1 配额）:
   ① 🔴 ask user: "/v4/odds-by-tournaments × 1 = 1 配额。是否继续？"
-  ② GET /v4/odds-by-tournaments?bookmaker=pinnacle&tournamentIds=16&apiKey=KEY
+  ② GET /v4/odds-by-tournaments?bookmaker=pinnacle&tournamentIds={tournamentId}&apiKey=KEY
      → ~2.4MB, 返回全部 47 个 fixture 的 pinnacle 市场元数据
      → 为每个 fixtureId 提取:
        a. 1X2: moneyline → outcomes 101/102/103
@@ -337,10 +338,10 @@ Outcome ID cache: ../.cache/oddspapi_outcome_ids_16.json (全赛事共享)
        c. OU main: "line/.../totals"   → mainLine=true 的 outcome IDs
        d. CS: "correct_score" (if available) → all outcome IDs
        e. TG: "exact_goals" (if available) → all outcome IDs
-     → 保存: ../.cache/oddspapi_outcome_ids_16.json
+     → 保存: ../.cache/oddspapi_outcome_ids_{tournamentId}.json
 
 后续所有查询（0 配额，秒级）:
-  ③ 读 ../.cache/oddspapi_outcome_ids_16.json → 获取目标 fixture 的 outcome ID
+  ③ 读 ../.cache/oddspapi_outcome_ids_{tournamentId}.json → 获取目标 fixture 的 outcome ID
   ④ Call A: /v4/historical-odds?outcomeId=101,102,103 (1X2, 3家, ~510KB)
   ⑤ Wait ≥5s
   ⑥ Call B: /v4/historical-odds?outcomeId={cached_AH_OU_CS_TG} (pinnacle, ~200KB)
@@ -498,7 +499,7 @@ Phase 0 ─ One-time initialization (⚠️ BILLED — MUST confirm with user fi
   → future analyses read from cache at 0 quota
 
 Phase 0 ─ One-time outcome ID cache (⚠️ 1 quota, user confirmed)
-  /v4/odds-by-tournaments → ../.cache/oddspapi_outcome_ids_16.json
+  /v4/odds-by-tournaments → ../.cache/oddspapi_outcome_ids_{tournamentId}.json
 
 Phase 1 ─ Morning (subsequent queries, 0 quota)
   Read outcome IDs from ../.cache/oddspapi_outcome_ids_{fixtureId}.json
@@ -649,7 +650,7 @@ Response excerpt:
 ### /v4/odds-by-tournaments — Batch Fixtures (1 quota)
 
 ```
-GET /v4/odds-by-tournaments?bookmaker=pinnacle&tournamentIds=16&apiKey=KEY
+GET /v4/odds-by-tournaments?bookmaker=pinnacle&tournamentIds={tournamentId}&apiKey=KEY
 → Returns odds for ALL fixtures in specified tournament(s)
 → Limited to 1 bookmaker per call
 → Great for morning batch check: 1 call = all 4 matches
