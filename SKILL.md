@@ -299,7 +299,7 @@ On receiving analysis request:
 
 2. For each match, SERIALLY (one at a time):
    ├─ > 1h before kickoff → /historical-odds only (free, no confirmation)
-   │   → GET /v4/historical-odds?fixtureId=X&bookmakers=pinnacle,bet365,betfair-ex&outcomeId=101,102,103&apiKey=KEY
+   │   → GET /v4/historical-odds?fixtureId=X&bookmakers=pinnacle,bet365,williamhill&outcomeId=101,102,103&apiKey=KEY
    │   → Parse on-the-fly: extract only 1X2 + main AH + main O/U per bookmaker (3 each)
    │   → 0 quota consumed, slim output ~2.5KB (discard raw 2-5MB)
    │   → Wait ≥5s before next call (rate limit: 5000ms)
@@ -325,9 +325,19 @@ On receiving analysis request:
 
 > **Bookmaker selection: 3 major**（`bookmakers` 必填，上限 3 — 官方文档）
 > ```
-> bookmakers=pinnacle,bet365,betfair-ex
+> bookmakers=pinnacle,bet365,williamhill
 > ```
 > 备选池：优先交易量最大的 3 家。
+
+> **三家机构标准研究分工**:
+>
+> | 阶段 | 机构 | 角色 | 判定规则 |
+> |:---:|:---|:---|:---|
+> | **初盘** | Pinnacle + William Hill | 开盘一致性 | 两者开盘吻合度高 → 机构初始共识强，初盘参考价值大<br>两者初盘深浅差异明显 → 不同派系从开局就存在分歧，本场陷阱概率升高 |
+> | **中期** | bet365 | 散户热度追踪 | 观察 bet365 单边拉低某方赔率，但 Pinnacle、William Hill 纹丝不动 → 散户热捧、机构不认可的诱盘信号<br>三者同步变动 → 真实资金驱动 |
+> | **临场** | 三家全部 | 离散度校验 | 三家赔率离散度越小 → 机构共识越强，正路可信度越高<br>离散突然放大 → 资金分歧加剧，冷门风险上升 |
+
+> **分析时必须按此分工报告**：Step 5（开盘定位）用 Pinnacle+William Hill 对比，Step 6（走势）单独追踪 bet365 与另两家的背离，Step 7（六维评分）的维度 6 用三家离散度。
 
 > ⚠️ **`outcomeId` 过滤（官方文档中的可选参数，实测验证通过）**:
 >
@@ -342,7 +352,7 @@ On receiving analysis request:
 
 > **调用格式**:
 > ```
-> GET /v4/historical-odds?fixtureId=X&bookmakers=pinnacle,bet365,betfair-ex&outcomeId=101,102,103&apiKey=KEY
+> GET /v4/historical-odds?fixtureId=X&bookmakers=pinnacle,bet365,williamhill&outcomeId=101,102,103&apiKey=KEY
 > → 仅 market["101"] → outcomes 101(H)/102(D)/103(A) → players["0"] timeline
 > → 3家 × 3结果 × {open,now,changes} = 27 数据点，~1KB
 > ```
@@ -376,7 +386,7 @@ Phase 0 ─ One-time initialization (⚠️ BILLED — MUST confirm with user fi
 
 Phase 1 ─ Morning (>1h → historical-odds only, FREE)
   Serial loop (match 1 → extract+discard → match 2 → ...), ≥5s apart:
-  GET /v4/historical-odds?fixtureId=X&bookmakers=pinnacle,bet365,betfair-ex&outcomeId=101,102,103
+  GET /v4/historical-odds?fixtureId=X&bookmakers=pinnacle,bet365,williamhill&outcomeId=101,102,103
   → Parse on-the-fly → extract ONLY 1X2 + main AH + main O/U per bookmaker
   → Discard raw response → output ~2.5KB per match
   Focus: opening odds positioning + 3-bookmaker dispersion + full-day strategy framework
@@ -541,7 +551,7 @@ GET /v4/odds-by-tournaments?bookmaker=pinnacle&tournamentIds=16&apiKey=KEY
 ### /v4/historical-odds — Free Historical Timeline
 
 ```
-GET /v4/historical-odds?fixtureId=X&bookmakers=pinnacle,bet365,betfair-ex&outcomeId=101,102,103&apiKey=KEY
+GET /v4/historical-odds?fixtureId=X&bookmakers=pinnacle,bet365,williamhill&outcomeId=101,102,103&apiKey=KEY
 → ALWAYS FREE. Never counts toward quota.
 → bookmakers: REQUIRED, max 3 comma-separated slugs (official docs: "最多 3 个")
 → Rate limit: 5000ms (≥5 seconds between serial calls)
@@ -1000,7 +1010,7 @@ User: Analyze today's 4 World Cup matches
 
 You (morning phase):
 1. fixtureIds cached → 0 quota
-2. MATCH 1 (serial): GET /v4/historical-odds?...&bookmakers=pinnacle,bet365,betfair-ex
+2. MATCH 1 (serial): GET /v4/historical-odds?...&bookmakers=pinnacle,bet365,williamhill
    → parse on-the-fly → extract ONLY market 101 prices → ~2-5KB slim output
 3. MATCH 2 (serial): same pattern → ok
 4. MATCH 3 (serial): same pattern → ok
@@ -1019,7 +1029,7 @@ You:
 1. GET /v4/account → check quota
 2. Read fixture from cache → match at 19:00, current 10:00 = 9h before
 3. 9h > 1h → /historical-odds only (free, 3 major bookmakers, cap=max 3)
-4. GET /v4/historical-odds?fixtureId=X&bookmakers=pinnacle,bet365,betfair-ex&outcomeId=101,102,103 → FREE
+4. GET /v4/historical-odds?fixtureId=X&bookmakers=pinnacle,bet365,williamhill&outcomeId=101,102,103 → FREE
 5. Parse on-the-fly → extract only market 101: {open, now, changes} per bookmaker
 6. Discard raw response (no file save needed)
 7. WebSearch fundamentals
@@ -1056,7 +1066,7 @@ You:
 2. Check /tmp/oddspapi_fixtures_16.json → exists → read from cache (0 quota)
 3. Calculate time-to-kickoff for all 4 → all >1h → /historical-odds only
 
-4. MATCH 1 (serial): GET /v4/historical-odds?...&bookmakers=pinnacle,bet365,betfair-ex
+4. MATCH 1 (serial): GET /v4/historical-odds?...&bookmakers=pinnacle,bet365,williamhill
    → parse on-the-fly → extract only market 101 → ~2-5KB → ok
 5. MATCH 2 (serial): same → ok
 6. MATCH 3 (serial): same → ok
