@@ -893,21 +893,50 @@ RULES:
 
 ## Section 6: Output Format
 
-```
-# Match Analysis Report
+**所有分析报告必须生成为 HTML 文件，使用内置模板。**
 
-## 1. Data Source
-## 2. Fundamentals Summary
-## 3. European Odds Probability Calculation
-## 4. Euro-Asian Handicap Match + Divergence Check
-## 5. Opening Odds Positioning
-## 6. Late Movement & Water Level
-## 7. Six-Dimension Scoring
-## 8. Risk Checklist
-## 9. Comprehensive Summary
-## 10. Predicted Score + Probability Projection
-## 11. Disclaimer
+### 模板位置
+
 ```
+assets/report-template.html — 完整 HTML 模板（~41KB）
+```
+
+模板包含：
+- 响应式 CSS（卡片、表格、概率条、颜色主题）
+- 顶部汇总卡片（4 场比赛一览 + 置信度标签）
+- 每场比赛 10 步框架（Step 1-10 HTML 结构）
+- Step 11 免責声明
+- 中国股市红涨绿跌配色（主胜降赔 = 绿色标记, 客胜升赔 = 红色标记）
+
+### 使用方式
+
+```
+1. 读取 assets/report-template.html，理解 CSS 变量和 DOM 结构
+2. 用实际分析数据填充：
+   - 标题中的日期和配额信息
+   - 4 张 summary-card（对阵、比分、置信度）
+   - 每场比赛的 step 内容（基本面表格、赔率表格、六维评分、风险清单、比分预测）
+3. 输出到当前工作目录，命名为 worldcup_YYYY-MM-DD_analysis.html
+4. 调用 present_files 展示结果
+```
+
+### 模板占位符替换清单
+
+| 替换区域 | 具体内容 |
+|:---|:---|
+| 页面标题 / .header h1 | 比赛日日期 |
+| .header .meta | 生成时间 + 数据源 |
+| .header .quota | 实际配额消耗（免费 = 0，计费 = N） |
+| .summary-grid ×4 | 对阵、预测比分、置信度标签 (conf-high/conf-mid/conf-low) |
+| #m1-#m4 → Step 1 | 数据源详情（端点、博彩商、数据点数） |
+| #m1-#m4 → Step 2 | 基本面表格（战绩、伤停、交锋、关键因素） |
+| #m1-#m4 → Step 3 | 欧赔计算表（开盘/即时/真实概率 + 返还率） |
+| #m1-#m4 → Step 4-6 | 欧亚匹配 + 三家博彩商对比表 + 变动分析 |
+| #m1-#m4 → Step 7 | 六维评分（6 行通过/未通过 + 总分 badge） |
+| #m1-#m4 → Step 8 | 风险清单（highlight-box 黄色/红色标注） |
+| #m1-#m4 → Step 9 | 综合总结（绿色/红色结论框 + 一句话 + 可执行判断） |
+| #m1-#m4 → Step 10 | 概率条 + 比分预测卡片（主比分 + 备选比分） |
+| .disclaimer | 数据源、配额消耗、模型说明 |
 
 ---
 
