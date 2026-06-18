@@ -445,7 +445,7 @@ Outcome ID cache: ../.cache/oddspapi_outcome_ids_{tournamentId}.json (全赛事�
 >   const ml = {};
 >   for (const [oid, label] of [["101","H"],["102","D"],["103","A"]]) {
 >     const tl = m101.outcomes[oid]?.players?.["0"] || [];
->     ml[label] = dailySample(tl); // [{date, price}, ...]
+>     const r = dailySample(tl); ml[label] = { series: r.series, changes: r.totalChanges };
 >   }
 >   out.bookmakers[bm].ml = ml;
 > }
