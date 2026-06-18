@@ -155,8 +155,8 @@ After every API call, BEFORE proceeding to next call:
 ⚠️ 所有缓存文件放在项目工作目录下，禁止用 /tmp。
    /tmp 重启即丢 → 缓存丢失 → 重新拉取 → 浪费配额。
 
-缓存目录: ~/.workbuddy/skills/football-odds-analy~/.workbuddy/skills/football-odds-analyst/.cache/oddspapi/
-  创建: mkdir -p ~/.workbuddy/skills/football-odds-analy~/.workbuddy/skills/football-odds-analyst/.cache/oddspapi/
+缓存目录: ~/.workbuddy/skills/football-odds-analyst/.cache/oddspapi/
+  创建: mkdir -p ~/.workbuddy/skills/football-odds-analyst/.cache/oddspapi/
 
 缓存永生规则:
   - 只要文件存在且为有效 JSON → 使用缓存，不重新拉取
@@ -169,7 +169,7 @@ After every API call, BEFORE proceeding to next call:
 ### 0.5a Fixtures Cache Reuse
 
 ```
-Fixtures file: ~/.workbuddy/skills/football-odds-analy~/.workbuddy/skills/football-odds-analyst/.cache/oddspapi_fixtures_{tournamentId}.json
+Fixtures file: ~/.workbuddy/skills/football-odds-analyst/.cache/oddspapi_fixtures_{tournamentId}.json
 
 Before calling /v4/fixtures:
   1. Check if cache file exists
@@ -512,7 +512,7 @@ Phase 0 ─ One-time outcome ID cache (⚠️ 3 quota, user confirmed, 3×/v4/od
   /v4/odds-by-tournaments → ~/.workbuddy/skills/football-odds-analyst/.cache/oddspapi_outcome_ids_{tournamentId}.json
 
 Phase 1 ─ Morning (subsequent queries, 0 quota)
-  Read outcome IDs from ~/.workbuddy/skills/football-odds-analyst/.cache/oddspapi_outcome_ids_{fixtureId}.json
+  Read outcome IDs from ~/.workbuddy/skills/football-odds-analyst/.cache/oddspapi_outcome_ids_{tournamentId}.json
   Call A (/v4/historical-odds + outcomeId=101,102,103, 3家) → Wait ≥5s → Call B (cached IDs, pinnacle)
   Daily sampling → ~8KB output per match
   Focus: opening odds positioning + 3-bookmaker dispersion + daily trend
@@ -542,7 +542,7 @@ fixtures cache(1) + outcome IDs cache(3) = 4 (全赛事一次性)
 
 > When user requests "predict this match" or "pre-match analysis":
 > 1. GET /v4/account → check quota
-> 2. Check ~/.workbuddy/skills/football-odds-analyst/.cache/oddspapi_outcome_ids_{fixtureId}.json exists
+> 2. Check ~/.workbuddy/skills/football-odds-analyst/.cache/oddspapi_outcome_ids_{tournamentId}.json exists
 > 3. If NOT: ask user "/v4/odds-by-tournaments × 3 = 3 quota. Proceed?" → cache all outcomes IDs
 > 4. If EXISTS: 0 quota → Call A + Call B with cached IDs + WebSearch → 11-step analysis
 > 5. ALL calls strictly serial, validated between each
