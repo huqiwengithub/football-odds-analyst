@@ -149,10 +149,27 @@ After every API call, BEFORE proceeding to next call:
   5. Only proceed to next call after validation passes
 ```
 
-### 0.5 Fixtures Cache Reuse
+### 0.5 Cache Persistence（缓存必须持久化）
 
 ```
-Fixtures file: /tmp/oddspapi_fixtures_{tournamentId}.json
+⚠️ 所有缓存文件放在项目工作目录下，禁止用 /tmp。
+   /tmp 重启即丢 → 缓存丢失 → 重新拉取 → 浪费配额。
+
+缓存目录: {workspace}/.cache/oddspapi/
+  创建: mkdir -p {workspace}/.cache/oddspapi/
+
+缓存永生规则:
+  - 只要文件存在且为有效 JSON → 使用缓存，不重新拉取
+  - 不设过期时间，不自动清理
+  - outcome ID 和 fixtures 是静态数据，永不过期
+  - 历史赔率数据每次拉取都是最新的（实时变动），无需缓存
+  - 仅当用户明确要求刷新时，才删除缓存重新拉取
+```
+
+### 0.5a Fixtures Cache Reuse
+
+```
+Fixtures file: {workspace}/.cache/oddspapi_fixtures_{tournamentId}.json
 
 Before calling /v4/fixtures:
   1. Check if cache file exists
@@ -254,10 +271,10 @@ BILLED (1 request = 1 quota, MUST confirm with user FIRST):
 
 ```
 First time a league/tournament is used:
-  1. Check if /tmp/oddspapi_fixtures_{tournamentId}.json exists
+  1. Check if ../.cache/oddspapi_fixtures_{tournamentId}.json exists
   2. If NOT:
      GET /v4/fixtures?tournamentId=X&from=SEASON_START&to=SEASON_END&apiKey=KEY
-     → 1 quota → save response to /tmp/oddspapi_fixtures_{tournamentId}.json
+     → 1 quota → save response to ../.cache/oddspapi_fixtures_{tournamentId}.json
   3. If EXISTS: read from file (0 quota)
 
   4. Determine target date in **user's local timezone**:
@@ -287,7 +304,7 @@ First time a league/tournament is used:
 
 **World Cup 2026 example:**
 ```
-Cache file: /tmp/oddspapi_fixtures_16.json
+Cache file: ../.cache/oddspapi_fixtures_16.json
 If missing → ask user: "/v4/fixtures × 1 = 1 quota. Proceed?"
 After yes: GET /v4/fixtures?tournamentId=16&from=2026-06-11&to=2026-07-19&apiKey=KEY
 → 1 quota → caches all 103 matches → never refetch (0 quota thereafter)
@@ -303,7 +320,7 @@ After yes: GET /v4/fixtures?tournamentId=16&from=2026-06-11&to=2026-07-19&apiKey
 💰 配额最大化: /v4/odds-by-tournaments (1配额) 批量获取全赛事outcome ID
    官方建议: "尽可能批量请求 — 使用带过滤器的/v4/fixtures而非多次单独调用"
 
-Outcome ID cache: /tmp/oddspapi_outcome_ids_16.json (全赛事共享)
+Outcome ID cache: ../.cache/oddspapi_outcome_ids_16.json (全赛事共享)
 
 首次运行（全赛事一次，1 配额）:
   ① 🔴 ask user: "/v4/odds-by-tournaments × 1 = 1 配额。是否继续？"
@@ -315,10 +332,10 @@ Outcome ID cache: /tmp/oddspapi_outcome_ids_16.json (全赛事共享)
        c. OU main: "line/.../totals"   → mainLine=true 的 outcome IDs
        d. CS: "correct_score" (if available) → all outcome IDs
        e. TG: "exact_goals" (if available) → all outcome IDs
-     → 保存: /tmp/oddspapi_outcome_ids_16.json
+     → 保存: ../.cache/oddspapi_outcome_ids_16.json
 
 后续所有查询（0 配额，秒级）:
-  ③ 读 /tmp/oddspapi_outcome_ids_16.json → 获取目标 fixture 的 outcome ID
+  ③ 读 ../.cache/oddspapi_outcome_ids_16.json → 获取目标 fixture 的 outcome ID
   ④ Call A: /v4/historical-odds?outcomeId=101,102,103 (1X2, 3家, ~510KB)
   ⑤ Wait ≥5s
   ⑥ Call B: /v4/historical-odds?outcomeId={cached_AH_OU_CS_TG} (pinnacle, ~200KB)
@@ -471,15 +488,15 @@ Outcome ID cache: /tmp/oddspapi_outcome_ids_16.json (全赛事共享)
 Phase 0 ─ One-time initialization (⚠️ BILLED — MUST confirm with user first)
   Before: ask user "Need /v4/fixtures × 1 = 1 quota to cache tournament. Proceed?"
   After confirmed: GET /v4/fixtures?tournamentId=16&from=START&to=END
-  → save to /tmp/oddspapi_fixtures_16.json
+  → save to ../.cache/oddspapi_fixtures_16.json
   → 1 quota (once only, never refetch — subsequent reads from cache are 0 quota)
   → future analyses read from cache at 0 quota
 
 Phase 0 ─ One-time outcome ID cache (⚠️ 1 quota, user confirmed)
-  /v4/odds-by-tournaments → /tmp/oddspapi_outcome_ids_16.json
+  /v4/odds-by-tournaments → ../.cache/oddspapi_outcome_ids_16.json
 
 Phase 1 ─ Morning (subsequent queries, 0 quota)
-  Read outcome IDs from /tmp/oddspapi_outcome_ids_{fixtureId}.json
+  Read outcome IDs from ../.cache/oddspapi_outcome_ids_{fixtureId}.json
   Call A (/v4/historical-odds + outcomeId=101,102,103, 3家) → Wait ≥5s → Call B (cached IDs, pinnacle)
   Daily sampling → ~8KB output per match
   Focus: opening odds positioning + 3-bookmaker dispersion + daily trend
@@ -509,7 +526,7 @@ fixtures cache(1) + outcome IDs cache(1) = 2 (全赛事一次性)
 
 > When user requests "predict this match" or "pre-match analysis":
 > 1. GET /v4/account → check quota
-> 2. Check /tmp/oddspapi_outcome_ids_{fixtureId}.json exists
+> 2. Check ../.cache/oddspapi_outcome_ids_{fixtureId}.json exists
 > 3. If NOT: ask user "/v4/odds-by-tournaments × 1 = 1 quota. Proceed?" → cache all outcomes IDs
 > 4. If EXISTS: 0 quota → Call A + Call B with cached IDs + WebSearch → 11-step analysis
 > 5. ALL calls strictly serial, validated between each
@@ -1146,7 +1163,7 @@ User: Analyze today's 4 World Cup matches
 
 You:
 1. GET /v4/account → check remaining ≥ 1 (fixtures) + 0 (historical)
-2. Check /tmp/oddspapi_fixtures_16.json → exists → read from cache (0 quota)
+2. Check ../.cache/oddspapi_fixtures_16.json → exists → read from cache (0 quota)
 3. Calculate time-to-kickoff for all 4 → all >1h → /historical-odds only
 
 4. MATCH 1 (serial): GET /v4/historical-odds?...&bookmakers=pinnacle,bet365,sbobet
