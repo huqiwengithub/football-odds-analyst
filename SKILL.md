@@ -51,7 +51,11 @@ Commands:
 3. **Output requirement**: Every analysis includes math calculation, pattern identification, risk warnings, scoring. Logic must be verifiable
 4. **Business boundary**: Skill is for sports data logic education only. **Never constitutes betting advice**
 5. **Data prerequisite**: Identify selected data mode immediately, pull odds/handicap/fundamentals accordingly. **No data = no analysis**
-6. **Result output**: Allow **directional probability assessment** (based on 6-dimension scoring + true probability + opening positioning + divergence signals). NOT exact score prediction. Must include confidence interval and reverse risk note
+6. **Result output**: **Required: output predicted score + probability projection.** Predict the most likely final score(s) using the weighted probability synthesis model, combined with Asian handicap lines and over/under data. Must include:
+   - Most likely exact score (e.g. 2-1)
+   - Alternative score lines (e.g. 1-1, 1-0)
+   - Confidence level for each score
+   - Confidence interval and reverse risk note
 7. **Disclaimer**: Vig/drake mechanism means long-term mathematical expectation is negative. Odds analysis only improves data discernment, cannot guarantee profit
 
 ---
@@ -460,7 +464,44 @@ Normalize if sum ≠ 100%
 
 **Direction rules**: home-away diff >25% = high confidence, 15-25% = medium, 5-15% = low, <5% = no direction.
 
-**Output requires**: Show calculation process, confidence interval, reverse risk note. Always conclude: this is data probability projection, not match prediction.
+**Score prediction logic** (always required):
+
+```
+Step A — Estimate expected goals (xG) for each side:
+  1. Extract Asian handicap line from /odds response
+     e.g. Home -0.5 → market expects home to win by ~1 goal
+     e.g. Home -0.75 → ~1.5 goal advantage
+     e.g. PK (0) → ~0 goal difference
+  2. Extract Over/Under total line:
+     e.g. O/U 2.5 → match expected total = ~2.5 goals
+  3. Apply correction from weighted probability:
+     home_xG = (over_under_line / 2) + (handicap_line × 0.5)
+     away_xG = (over_under_line / 2) - (handicap_line × 0.5)
+  4. Adjust by home/away win probability ratio:
+     home_xG ×= (predicted_home / 50%)
+     away_xG ×= (predicted_away / 50%)
+
+Step B — Derive most likely scores using Poisson distribution:
+  For each score (home_goals, away_goals) in range [0,5]:
+    P(home=n) = (home_xG^n × e^-home_xG) / n!
+    P(away=m) = (away_xG^m × e^-away_xG) / m!
+    P(score) = P(home=n) × P(away=m)
+  
+  Rank all scores by probability → Top 3 are the predicted scores.
+
+Step C — Score confidence modifiers:
+  - If 6D score ≥4: final scores are more reliable
+  - If trap pattern detected: widen the score range
+  - If movement is clean + fundamentals aligned: narrow confidence
+```
+
+**Output requires**:
+- Show full calculation process (base probability → correction factors → xG → Poisson scores)
+- List top 3 most likely exact scores with percentage
+- List alternative scores (next 3-5) 
+- Confidence interval for primary score
+- Reverse risk note (e.g. "if home xG overestimated, 1-1 draw is plausible at ~XX%")
+- Always conclude: this is data probability projection, not guaranteed result
 
 ---
 
@@ -475,7 +516,20 @@ Normalize if sum ≠ 100%
 ### Step 7: Six-Dimension Scoring
 ### Step 8: Risk/Trap Checklist
 ### Step 9: Comprehensive Summary
-### Step 10: Weighted Probability Projection
+### Step 10: Weighted Probability Projection + Score Prediction
+
+1. Take true 3-way probabilities from Step 3 as base
+2. Apply correction factors one by one:
+   - Euro-Asian divergence signal → ±10%
+   - Opening odds law hit → ±8%
+   - Late movement type → ±7%
+   - Fundamental alignment → ±5%
+   - 6D score confidence → ±5%
+3. Synthesize corrected probabilities, normalize
+4. Map to expected goals (xG) using handicap line + over/under line
+5. Apply Poisson distribution to derive most likely exact scores
+6. List top 3 predicted scores with confidence percentages
+7. Include reverse risk and alternative score lines
 ### Step 11: Disclaimer
 
 (Each step follows the rules defined in Section 4 above.)
@@ -496,7 +550,7 @@ Normalize if sum ≠ 100%
 ## 7. Six-Dimension Scoring
 ## 8. Risk Checklist
 ## 9. Comprehensive Summary
-## 10. Directional Probability Projection
+## 10. Predicted Score + Probability Projection
 ## 11. Disclaimer
 ```
 
@@ -562,9 +616,14 @@ You:
 2. GET /v4/odds?fixtureId=X → 1 quota → 350+ bookmaker snapshot
 3. GET /v4/historical-odds × 4 → free
 4. WebSearch fundamentals
-5. Execute 11-step analysis (focus: full dispersion + final probability)
-6. Output final report with score projection
-```
+5. Execute 11-step analysis:
+   - True probabilities: Home 52.5% / Draw 26.7% / Away 20.8%
+   - AH line: -0.5 → home expected to win by ~0.5-1 goal
+   - O/U line: 2.5 → total expected goals ~2.5
+   - xG calculation: home_xG ≈ 1.45, away_xG ≈ 1.05
+   - Poisson top 3 scores: 1-1 (14%), 1-0 (12%), 2-1 (8%)
+   - After correction: **Predicted: 2-1** (most likely), alt: 1-1, 1-0
+6. Output final report with score projection + confidence
 
 ### Web Mode (no API key fallback)
 
