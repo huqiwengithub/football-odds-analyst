@@ -232,7 +232,7 @@ Confirmation format:
    - Confidence level for each score
    - Confidence interval and reverse risk note
 7. **Disclaimer**: Vig/drake mechanism means long-term mathematical expectation is negative. Odds analysis only improves data discernment, cannot guarantee profit
-8. **Team name display**: ALL output (HTML report, summary cards, tables, score predictions) MUST use Chinese domestic names. /v4/fixtures returns English names (e.g. "Korea Republic", "Bosnia and Herzegovina") — these MUST be converted to Chinese names (e.g. "韩国", "波黑") using the mapping table in Section 6A before any display output.
+8. **Team name display**: ALL output MUST use Chinese domestic names (e.g. "Korea Republic" → "韩国", "Bosnia and Herzegovina" → "波黑"). Use model's built-in knowledge to translate. Only fall back to WebSearch if a team name is unrecognized.
 
 ---
 
@@ -299,7 +299,7 @@ On receiving analysis request:
 
 2. For each match, SERIALLY (one at a time):
    ├─ > 1h before kickoff → /historical-odds only (free, no confirmation)
-   │   → GET /v4/historical-odds?fixtureId=X&bookmakers=pinnacle,bet365,williamhill&outcomeId=101,102,103&apiKey=KEY
+   │   → GET /v4/historical-odds?fixtureId=X&bookmakers=pinnacle,bet365,betfair-ex&outcomeId=101,102,103&apiKey=KEY
    │   → Parse on-the-fly: extract only 1X2 + main AH + main O/U per bookmaker (3 each)
    │   → 0 quota consumed, slim output ~2.5KB (discard raw 2-5MB)
    │   → Wait ≥5s before next call (rate limit: 5000ms)
@@ -325,7 +325,7 @@ On receiving analysis request:
 
 > **Bookmaker selection: 3 major**（`bookmakers` 必填，上限 3 — 官方文档）
 > ```
-> bookmakers=pinnacle,bet365,williamhill
+> bookmakers=pinnacle,bet365,betfair-ex
 > ```
 > 备选池：优先交易量最大的 3 家。
 
@@ -342,7 +342,7 @@ On receiving analysis request:
 
 > **调用格式**:
 > ```
-> GET /v4/historical-odds?fixtureId=X&bookmakers=pinnacle,bet365,williamhill&outcomeId=101,102,103&apiKey=KEY
+> GET /v4/historical-odds?fixtureId=X&bookmakers=pinnacle,bet365,betfair-ex&outcomeId=101,102,103&apiKey=KEY
 > → 仅 market["101"] → outcomes 101(H)/102(D)/103(A) → players["0"] timeline
 > → 3家 × 3结果 × {open,now,changes} = 27 数据点，~1KB
 > ```
@@ -376,7 +376,7 @@ Phase 0 ─ One-time initialization (⚠️ BILLED — MUST confirm with user fi
 
 Phase 1 ─ Morning (>1h → historical-odds only, FREE)
   Serial loop (match 1 → extract+discard → match 2 → ...), ≥5s apart:
-  GET /v4/historical-odds?fixtureId=X&bookmakers=pinnacle,bet365,williamhill&outcomeId=101,102,103
+  GET /v4/historical-odds?fixtureId=X&bookmakers=pinnacle,bet365,betfair-ex&outcomeId=101,102,103
   → Parse on-the-fly → extract ONLY 1X2 + main AH + main O/U per bookmaker
   → Discard raw response → output ~2.5KB per match
   Focus: opening odds positioning + 3-bookmaker dispersion + full-day strategy framework
@@ -541,7 +541,7 @@ GET /v4/odds-by-tournaments?bookmaker=pinnacle&tournamentIds=16&apiKey=KEY
 ### /v4/historical-odds — Free Historical Timeline
 
 ```
-GET /v4/historical-odds?fixtureId=X&bookmakers=pinnacle,bet365,williamhill&outcomeId=101,102,103&apiKey=KEY
+GET /v4/historical-odds?fixtureId=X&bookmakers=pinnacle,bet365,betfair-ex&outcomeId=101,102,103&apiKey=KEY
 → ALWAYS FREE. Never counts toward quota.
 → bookmakers: REQUIRED, max 3 comma-separated slugs (official docs: "最多 3 个")
 → Rate limit: 5000ms (≥5 seconds between serial calls)
@@ -918,68 +918,6 @@ RULES:
 
 ---
 
-## Section 6A: Team Name Mapping（中英文对照表）
-
-> /v4/fixtures 和 /v4/odds 返回英文队名。输出报告必须全部替换为中文名。
-
-### 2026 世界杯 48 队中文名映射
-
-| API 返回名 | 中文显示名 |
-|:---|:---|
-| Mexico | 墨西哥 |
-| South Africa | 南非 |
-| Korea Republic | 韩国 |
-| Czechia | 捷克 |
-| Canada | 加拿大 |
-| Bosnia and Herzegovina | 波黑 |
-| Qatar | 卡塔尔 |
-| Switzerland | 瑞士 |
-| USA | 美国 |
-| Paraguay | 巴拉圭 |
-| Australia | 澳大利亚 |
-| Turkiye | 土耳其 |
-| Brazil | 巴西 |
-| Morocco | 摩洛哥 |
-| Haiti | 海地 |
-| Scotland | 苏格兰 |
-| Germany | 德国 |
-| Curacao | 库拉索 |
-| Netherlands | 荷兰 |
-| Japan | 日本 |
-| Ivory Coast | 科特迪瓦 |
-| Ecuador | 厄瓜多尔 |
-| Sweden | 瑞典 |
-| Tunisia | 突尼斯 |
-| Spain | 西班牙 |
-| Cape Verde Islands | 佛得角 |
-| Saudi Arabia | 沙特阿拉伯 |
-| Uruguay | 乌拉圭 |
-| Belgium | 比利时 |
-| Egypt | 埃及 |
-| Iran | 伊朗 |
-| New Zealand | 新西兰 |
-| France | 法国 |
-| Senegal | 塞内加尔 |
-| Iraq | 伊拉克 |
-| Norway | 挪威 |
-| Argentina | 阿根廷 |
-| Algeria | 阿尔及利亚 |
-| Austria | 奥地利 |
-| Jordan | 约旦 |
-| Portugal | 葡萄牙 |
-| Congo DR | 刚果民主共和国 |
-| England | 英格兰 |
-| Croatia | 克罗地亚 |
-| Ghana | 加纳 |
-| Panama | 巴拿马 |
-| Uzbekistan | 乌兹别克斯坦 |
-| Colombia | 哥伦比亚 |
-
-> 使用方式：每处显示队名时，用此表查 API 返回的 `participant1Name`/`participant2Name` → 取中文名。
-> 未知队名：保留英文原名并标注 "(name unknown)"。
-
----
-
 ## Section 6: Output Format
 
 **所有分析报告必须生成为 HTML 文件，使用内置模板。**
@@ -1062,7 +1000,7 @@ User: Analyze today's 4 World Cup matches
 
 You (morning phase):
 1. fixtureIds cached → 0 quota
-2. MATCH 1 (serial): GET /v4/historical-odds?...&bookmakers=pinnacle,bet365,williamhill
+2. MATCH 1 (serial): GET /v4/historical-odds?...&bookmakers=pinnacle,bet365,betfair-ex
    → parse on-the-fly → extract ONLY market 101 prices → ~2-5KB slim output
 3. MATCH 2 (serial): same pattern → ok
 4. MATCH 3 (serial): same pattern → ok
@@ -1081,7 +1019,7 @@ You:
 1. GET /v4/account → check quota
 2. Read fixture from cache → match at 19:00, current 10:00 = 9h before
 3. 9h > 1h → /historical-odds only (free, 3 major bookmakers, cap=max 3)
-4. GET /v4/historical-odds?fixtureId=X&bookmakers=pinnacle,bet365,williamhill&outcomeId=101,102,103 → FREE
+4. GET /v4/historical-odds?fixtureId=X&bookmakers=pinnacle,bet365,betfair-ex&outcomeId=101,102,103 → FREE
 5. Parse on-the-fly → extract only market 101: {open, now, changes} per bookmaker
 6. Discard raw response (no file save needed)
 7. WebSearch fundamentals
@@ -1118,7 +1056,7 @@ You:
 2. Check /tmp/oddspapi_fixtures_16.json → exists → read from cache (0 quota)
 3. Calculate time-to-kickoff for all 4 → all >1h → /historical-odds only
 
-4. MATCH 1 (serial): GET /v4/historical-odds?...&bookmakers=pinnacle,bet365,williamhill
+4. MATCH 1 (serial): GET /v4/historical-odds?...&bookmakers=pinnacle,bet365,betfair-ex
    → parse on-the-fly → extract only market 101 → ~2-5KB → ok
 5. MATCH 2 (serial): same → ok
 6. MATCH 3 (serial): same → ok
