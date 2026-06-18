@@ -9,7 +9,7 @@ agent_created: true
 
 Professional football odds and Asian handicap data analyst Skill. Designed for match odds logic study, data decomposition, and trap identification. Suitable for overseas match analysis.
 
-Built-in complete odds analysis system. **Only needs OddsPapi** — single `/v4/odds?fixtureId=X` (1 quota) returns all 350+ bookmakers with all markets (1X2 + Asian Handicap + Over/Under). `/v4/historical-odds` is permanently free and unlimited. Web search fallback when no API key.
+Built-in complete odds analysis system. **Only needs OddsPapi** — 3-bookmaker golden triangle: Pinnacle (Sharp定价基准) + SBOBet (亚洲让球盘之王) + bet365 (零售热度标尺). `/v4/odds` (1 quota) returns all markets. `/v4/historical-odds` is permanently free with `outcomeId=101,102,103` filter. Web search fallback when no API key.
 
 ---
 
@@ -299,7 +299,7 @@ On receiving analysis request:
 
 2. For each match, SERIALLY (one at a time):
    ├─ > 1h before kickoff → /historical-odds only (free, no confirmation)
-   │   → GET /v4/historical-odds?fixtureId=X&bookmakers=pinnacle,bet365,williamhill&outcomeId=101,102,103&apiKey=KEY
+   │   → GET /v4/historical-odds?fixtureId=X&bookmakers=pinnacle,bet365,sbobet&outcomeId=101,102,103&apiKey=KEY
    │   → Parse on-the-fly: extract only 1X2 + main AH + main O/U per bookmaker (3 each)
    │   → 0 quota consumed, slim output ~2.5KB (discard raw 2-5MB)
    │   → Wait ≥5s before next call (rate limit: 5000ms)
@@ -325,19 +325,41 @@ On receiving analysis request:
 
 > **Bookmaker selection: 3 major**（`bookmakers` 必填，上限 3 — 官方文档）
 > ```
-> bookmakers=pinnacle,bet365,williamhill
+> bookmakers=pinnacle,bet365,sbobet
 > ```
 > 备选池：优先交易量最大的 3 家。
 
-> **三家机构标准研究分工**:
+> **三家机构标准化分工（Pinnacle + bet365 + SBOBet）** — 欧亚双Sharp+零售热度黄金三角:
 >
-> | 阶段 | 机构 | 角色 | 判定规则 |
-> |:---:|:---|:---|:---|
-> | **初盘** | Pinnacle + William Hill | 开盘一致性 | 两者开盘吻合度高 → 机构初始共识强，初盘参考价值大<br>两者初盘深浅差异明显 → 不同派系从开局就存在分歧，本场陷阱概率升高 |
-> | **中期** | bet365 | 散户热度追踪 | 观察 bet365 单边拉低某方赔率，但 Pinnacle、William Hill 纹丝不动 → 散户热捧、机构不认可的诱盘信号<br>三者同步变动 → 真实资金驱动 |
-> | **临场** | 三家全部 | 离散度校验 | 三家赔率离散度越小 → 机构共识越强，正路可信度越高<br>离散突然放大 → 资金分歧加剧，冷门风险上升 |
-
-> **分析时必须按此分工报告**：Step 5（开盘定位）用 Pinnacle+William Hill 对比，Step 6（走势）单独追踪 bet365 与另两家的背离，Step 7（六维评分）的维度 6 用三家离散度。
+> | 机构 | 核心定位 | 不可替代价值 | 核心负责 |
+> |:---|:---|:---|:---|
+> | **Pinnacle** | 全球Sharp定价总基准 | 抽水2-3%，赔率最接近真实概率；终盘相关性全行业最高 | 欧赔真实概率基准、亚盘合理档位校准、初盘客观定位 |
+> | **SBOBet** | 亚洲让球盘定价之王 | 亚盘抽水1.8-2%，全档位精细盘口；亚洲大额专业资金态度 | 亚盘深浅判断、水位结构分析、亚洲资金流向追踪、欧亚背离校验 |
+> | **bet365** | 全球大众市场风向标 | 散户资金占比最高；与Sharp庄的赔率差值=经典冷热差 | 市场大众热度判断、散户资金流向观察、大热造诱盘识别 |
+>
+> **三阶段分工**:
+>
+> **初盘（开盘→赛前72h）**:
+> - Pinnacle（主基准）：计算初始真实概率、理论合理亚盘档位，"初盘四大定律"判断依据
+> - SBOBet（亚盘对照）：与Pinnacle亚盘档位对比，档位差≥0.25球/水位差>0.1 → 初盘欧亚分歧，陷阱风险升级
+> - bet365（热度辅助）：初盘偏离度，若开盘就明显偏向某方 → 天然大众热度倾向，提前标记
+>
+> **中期走势（赛前24h→12h）**:
+> - bet365（核心观察）：跟踪变动方向与幅度，确定散户资金流向，锁定大热方
+> - Pinnacle（真实性校验）：同步同向→真实资金；bet365单边大幅变动、Pinnacle纹丝不动甚至反向→纯散户热捧，诱盘嫌疑
+> - SBOBet（亚洲验证）：亚盘先动→亚洲专业资金提前布局，高可信度信号；仅bet365变动、SBO不动→纯零售情绪
+>
+> **临场终盘（赛前1h内）**:
+> - Pinnacle（终盘概率锚）：终盘欧赔计算最终真实胜负概率
+> - SBOBet（终盘亚盘锚）：终盘亚盘档位、水位完成欧亚匹配最终校验
+> - bet365（终盘热度锚）：与Pinnacle终盘差值=冷热偏离度，差值越大冷门风险越高
+>
+> **离散度定级**:
+> - 三家离散<0.05：机构共识极强，正路可信度高
+> - 0.05-0.1：机构存在分歧，需结合基本面判断
+> - >0.1：机构内部分歧严重，冷门风险显著升高
+>
+> **分析绑定**：Step 5 用 Pinnacle+SBOBet 对比初盘，Step 6 追踪 bet365 背离，Step 7 维度 6 用三家离散度。
 
 > ⚠️ **`outcomeId` 过滤（官方文档中的可选参数，实测验证通过）**:
 >
@@ -352,7 +374,7 @@ On receiving analysis request:
 
 > **调用格式**:
 > ```
-> GET /v4/historical-odds?fixtureId=X&bookmakers=pinnacle,bet365,williamhill&outcomeId=101,102,103&apiKey=KEY
+> GET /v4/historical-odds?fixtureId=X&bookmakers=pinnacle,bet365,sbobet&outcomeId=101,102,103&apiKey=KEY
 > → 仅 market["101"] → outcomes 101(H)/102(D)/103(A) → players["0"] timeline
 > → 3家 × 3结果 × {open,now,changes} = 27 数据点，~1KB
 > ```
@@ -386,7 +408,7 @@ Phase 0 ─ One-time initialization (⚠️ BILLED — MUST confirm with user fi
 
 Phase 1 ─ Morning (>1h → historical-odds only, FREE)
   Serial loop (match 1 → extract+discard → match 2 → ...), ≥5s apart:
-  GET /v4/historical-odds?fixtureId=X&bookmakers=pinnacle,bet365,williamhill&outcomeId=101,102,103
+  GET /v4/historical-odds?fixtureId=X&bookmakers=pinnacle,bet365,sbobet&outcomeId=101,102,103
   → Parse on-the-fly → extract ONLY 1X2 + main AH + main O/U per bookmaker
   → Discard raw response → output ~2.5KB per match
   Focus: opening odds positioning + 3-bookmaker dispersion + full-day strategy framework
@@ -551,7 +573,7 @@ GET /v4/odds-by-tournaments?bookmaker=pinnacle&tournamentIds=16&apiKey=KEY
 ### /v4/historical-odds — Free Historical Timeline
 
 ```
-GET /v4/historical-odds?fixtureId=X&bookmakers=pinnacle,bet365,williamhill&outcomeId=101,102,103&apiKey=KEY
+GET /v4/historical-odds?fixtureId=X&bookmakers=pinnacle,bet365,sbobet&outcomeId=101,102,103&apiKey=KEY
 → ALWAYS FREE. Never counts toward quota.
 → bookmakers: REQUIRED, max 3 comma-separated slugs (official docs: "最多 3 个")
 → Rate limit: 5000ms (≥5 seconds between serial calls)
@@ -1010,7 +1032,7 @@ User: Analyze today's 4 World Cup matches
 
 You (morning phase):
 1. fixtureIds cached → 0 quota
-2. MATCH 1 (serial): GET /v4/historical-odds?...&bookmakers=pinnacle,bet365,williamhill
+2. MATCH 1 (serial): GET /v4/historical-odds?...&bookmakers=pinnacle,bet365,sbobet
    → parse on-the-fly → extract ONLY market 101 prices → ~2-5KB slim output
 3. MATCH 2 (serial): same pattern → ok
 4. MATCH 3 (serial): same pattern → ok
@@ -1029,7 +1051,7 @@ You:
 1. GET /v4/account → check quota
 2. Read fixture from cache → match at 19:00, current 10:00 = 9h before
 3. 9h > 1h → /historical-odds only (free, 3 major bookmakers, cap=max 3)
-4. GET /v4/historical-odds?fixtureId=X&bookmakers=pinnacle,bet365,williamhill&outcomeId=101,102,103 → FREE
+4. GET /v4/historical-odds?fixtureId=X&bookmakers=pinnacle,bet365,sbobet&outcomeId=101,102,103 → FREE
 5. Parse on-the-fly → extract only market 101: {open, now, changes} per bookmaker
 6. Discard raw response (no file save needed)
 7. WebSearch fundamentals
@@ -1066,7 +1088,7 @@ You:
 2. Check /tmp/oddspapi_fixtures_16.json → exists → read from cache (0 quota)
 3. Calculate time-to-kickoff for all 4 → all >1h → /historical-odds only
 
-4. MATCH 1 (serial): GET /v4/historical-odds?...&bookmakers=pinnacle,bet365,williamhill
+4. MATCH 1 (serial): GET /v4/historical-odds?...&bookmakers=pinnacle,bet365,sbobet
    → parse on-the-fly → extract only market 101 → ~2-5KB → ok
 5. MATCH 2 (serial): same → ok
 6. MATCH 3 (serial): same → ok
