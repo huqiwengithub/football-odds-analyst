@@ -297,12 +297,20 @@ On receiving analysis request:
    b. Read fixtures cache → extract target date matches
    c. Calculate time-to-kickoff for each match
 
-2. For each match, SERIALLY (one at a time):
+2. For each match, SERIALLY (one at a time), **2 free calls per match**:
    ├─ > 1h before kickoff → /historical-odds only (free, no confirmation)
-   │   → GET /v4/historical-odds?fixtureId=X&bookmakers=pinnacle,bet365,sbobet&outcomeId=101,102,103&apiKey=KEY
-   │   → Parse on-the-fly: extract only 1X2 + main AH + main O/U per bookmaker (3 each)
-   │   → 0 quota consumed, slim output ~2.5KB (discard raw 2-5MB)
-   │   → Wait ≥5s before next call (rate limit: 5000ms)
+   │   │
+   │   ├─ Call A (1X2): outcomeId=101,102,103 → ~510KB, timeout 15s
+   │   │   GET /v4/historical-odds?fixtureId=X&bookmakers=pinnacle,bet365,sbobet&outcomeId=101,102,103&apiKey=KEY
+   │   │   → Parse: H/D/A open + now + changes per bookmaker
+   │   │
+   │   ├─ Wait ≥5s (rate limit 5000ms)
+   │   │
+   │   └─ Call B (AH + O/U): no outcomeId filter → ~24MB, timeout 60s
+   │       GET /v4/historical-odds?fixtureId=X&bookmakers=pinnacle,bet365,sbobet&apiKey=KEY
+   │       → Pipe to node, extract ONLY: main spreads (top-1 2-outcome by entries) + main totals (top-2 2-outcome by entries) per bookmaker
+   │       → Discard raw 24MB response immediately after extraction
+   │       → Output: ~4KB (3 bookmakers × 2 markets × 4 prices)
    │
    ├─ ≤ 1h before kickoff → /odds (1 quota, ⚠️ MUST confirm with user)
    │   → Ask: "/v4/odds × N matches = N quota. Current: X/250. Proceed?"
@@ -374,7 +382,10 @@ On receiving analysis request:
 >
 > ⚠️ SBOBet 数据偏大（284KB/场，亚盘之王追踪每一次微小变动，时间线 2797 条 vs Pinnacle 747 条），但仍在安全范围。必须带 `outcomeId` 参数——不带则单家即可能超 4MB 导致截断。
 >
-> **>1h 阶段**: `outcomeId=101,102,103` 只拉 1X2（3家合计 ~510KB）。亚盘/大小球在 ≤1h 通过 `/v4/odds` 获取。
+> **>1h 阶段**: 每场 2 次免费调用（均串行，≥5s 间隔）:
+> - Call A: `outcomeId=101,102,103` → 1X2 数据（3家 ~510KB，timeout 15s）
+> - Call B: 无 filter → pipe 提取 AH + O/U 主线（3家 ~24MB raw → ~4KB output，timeout 60s）
+> - ≤1h 阶段: `/v4/odds`（计费，需确认）一次性获取所有市场元数据
 
 > **调用格式**:
 > ```
@@ -383,7 +394,7 @@ On receiving analysis request:
 > → 3家 × 3结果 × {open,now,changes} = 27 数据点，~1KB
 > ```
 
-> **提取代码（无需丢弃，API 已过滤）**:
+> **提取代码 A（1X2）**:
 > ```javascript
 > const d = JSON.parse(raw); const out = {fixtureId: d.fixtureId, bookmakers: {}};
 > for (const [bm, data] of Object.entries(d.bookmakers)) {
@@ -395,9 +406,30 @@ On receiving analysis request:
 >     for (let i=1; i<tl.length; i++) if (tl[i].price!==tl[i-1].price) chg++;
 >     ml[label] = {open: tl[0].price, now: tl[tl.length-1].price, changes: chg};
 >   }
->   out.bookmakers[bm] = ml;
+>   out.bookmakers[bm].ml = ml;
 > }
-> // Output: 3家 × 3结果 × {open,now,changes} → ~1KB
+> // Output A: 3家 × 3结果 × {open,now,changes} → ~1KB
+> ```
+>
+> **提取代码 B（AH + O/U 主线）**:
+> ```javascript
+> for (const [bm, data] of Object.entries(d.bookmakers)) {
+>   const twoway = Object.entries(data.markets)
+>     .filter(([k,m]) => Object.keys(m.outcomes).length === 2)
+>     .map(([k,m]) => {
+>       let n=0; for(const o of Object.values(m.outcomes)) n+=(o.players?.["0"]||[]).length;
+>       return {key: k, entries: n, outcomes: m.outcomes};
+>     }).sort((a,b)=>b.entries-a.entries);
+>   if (twoway.length < 2) continue;
+>   const ext = (x) => {
+>     const ks=Object.keys(x.outcomes), p=(id)=>x.outcomes[id]?.players?.["0"]||[];
+>     return {s0_open: p(ks[0])[0]?.price, s1_open: p(ks[1])[0]?.price,
+>             s0_now: p(ks[0]).slice(-1)[0]?.price, s1_now: p(ks[1]).slice(-1)[0]?.price};
+>   };
+>   out.bookmakers[bm].ah = ext(twoway[0]);  // main spreads
+>   out.bookmakers[bm].ou = ext(twoway[1]);  // main totals
+> }
+> // Output B: 3家 × 2市场 × 4 prices → ~3KB
 > ```
 
 ### Phase Plan (4 matches × 3 checks/day)
