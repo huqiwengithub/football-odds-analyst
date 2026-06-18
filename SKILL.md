@@ -317,8 +317,13 @@ After yes: GET /v4/fixtures?tournamentId=16&from=2026-06-11&to=2026-07-19&apiKey
 ### Core Execution Rule: Tournament-Wide Outcome ID Cache
 
 ```
-💰 配额最大化: /v4/odds-by-tournaments (1配额) 批量获取全赛事outcome ID
-   官方建议: "尽可能批量请求 — 使用带过滤器的/v4/fixtures而非多次单独调用"
+💰 核心策略: 首次分析任意一场比赛 → 立刻缓存整赛季所有比赛的 outcome ID
+   例: 用户说"分析捷克vs南非" → 调 /v4/odds-by-tournaments?tournamentIds=16
+       → 47 场世界杯比赛的全部 outcome ID 一次性缓存
+       → 之后再分析"墨西哥vs韩国" → 0 配额，直接从缓存读
+
+   官方建议: "尽可能批量请求"
+   数据量: ~2.4MB，实测 20s 内完成，不会截断
 
 Outcome ID cache: ../.cache/oddspapi_outcome_ids_16.json (全赛事共享)
 
