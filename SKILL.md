@@ -261,6 +261,13 @@ BILLED (1 request = 1 quota, MUST confirm with user FIRST):
 7. **Disclaimer**: Vig/drake mechanism means long-term mathematical expectation is negative. Odds analysis only improves data discernment, cannot guarantee profit
 8. **Team name display**: ALL output MUST use Chinese domestic names (e.g. "Korea Republic" → "韩国", "Bosnia and Herzegovina" → "波黑"). Use model's built-in knowledge to translate. Only fall back to WebSearch if a team name is unrecognized.
 
+9. **🔴 Retro-Feedback Mandatory (post-match correction loop)**: After any prediction is proven wrong by an actual result, the skill MUST perform a root-cause analysis and update its own judgment rules. Process:
+   - **Identify**: What specific signal was misinterpreted? (odds compression, 6D inflation, narrative over-weighting, etc.)
+   - **Formalize**: Convert the lesson into a concrete, falsifiable rule that would have caught the error
+   - **Update**: Inject the new rule into the relevant Section 4 subsection (trap patterns, opening laws, 6D scoring, correction factors, etc.)
+   - **Mark**: Add a dated comment to the rule: `<!-- 2026-06-19 回检: Czechia 1-1 South Africa → 触发本规则 -->`
+   The goal is continuous improvement: every wrong prediction makes the skill sharper.
+
 ---
 
 ## Section 2: Standardized Execution Flow & Quota Control
@@ -799,7 +806,7 @@ Standard payout rate thresholds:
 | 2.00-2.20 | PK / Home -0.25 |
 | 2.30+ | PK or Away handicap |
 
-### (3) Six Euro-Asian Divergence Trap Patterns
+### (3) Seven Euro-Asian Divergence Trap Patterns
 
 | # | Pattern | Feature | Risk |
 |---|---------|---------|------|
@@ -809,6 +816,7 @@ Standard payout rate thresholds:
 | 4 | Open match, late odds drop + handicap retreat | Standard trap | Fake good news, bookmaker avoiding payout |
 | 5 | Favorite deep handicap + water >1.05 | Bookmaker unwilling to take risk | Favorite struggles to cover, small win/push or upset |
 | 6 | Weak side drops for no reason | Pure money manipulation | Data has minimal reference value |
+| 7 | Narrative-driven moderate compression | Favorite odds compress 5-15% driven by public narrative (suspensions/injuries), but settle above 1.80; draw prob >25% after vig removal | Market overreacts to narrative, creating an overvalued favorite. The underdog becomes underrated. High upset/draw risk. | <!-- 2026-06-19 回检: Czechia 1-1 South Africa, 主胜 2.05→1.877(-8.4%), 平局真实概率27.2%, 南非2停赛叙事驱动 → 触发本陷阱 -->
 
 ### (4) Four Opening Odds Laws
 
@@ -817,7 +825,18 @@ Standard payout rate thresholds:
 3. **Opening water >1.10 test**: Bookmaker doesn't believe in favorite, low probability of covering
 4. **Reasonable market + opening water <0.80 ultra-low**: Bookmaker locking payout early, truly believes in that side
 
-### (5) Late 1-Hour Movement Authenticity Rules
+### (5) Compression Intensity Classification<!-- 2026-06-19 回检: Czechia H 2.05→1.877 = -8.4% → Moderate; 此强度不足以支撑「真实信心」判定 -->
+
+| Intensity | Threshold | Weight in Confidence Boost | Risk Level |
+|:----------|:----------|:--------------------------|:-----------|
+| **Extreme** | >20% odds drop | Full weight (+7%) | Low — market conviction is genuine |
+| **Strong** | 10-20% drop | Full weight (+7%) | Low-Medium — genuine but verify narrative |
+| **Moderate** | 5-10% drop | **Half weight (+3.5%)** | **Medium — may be narrative-driven overreaction** |
+| **Weak** | <5% drop | Zero weight (0%) | High — no real conviction signal |
+
+> ⚠️ **Key insight from Czechia 1-1 South Africa**: 8.4% compression = "Moderate" intensity. The market was nudging, not shoving. Treating moderate compression as "real conviction" is a systematic error. Only Extreme (>20%) and Strong (10-20%) warrant full confidence boosts in the weighted probability model.
+
+### (6) Late 1-Hour Movement Authenticity Rules
 
 | Movement Type | Direction | Interpretation |
 |-------------|---------|--------------|
@@ -826,37 +845,56 @@ Standard payout rate thresholds:
 | Drop line + drop water | Trap pattern | Lowering entry bar to attract retail |
 | Drop line + raise water | Complete bearish | Bookmaker fully against this side, reverse outcome priority |
 
-### (6) Classic Harvest Pattern: Opening Build + Late Reverse
+### (7) Back-to-Wall Effect (绝境爆发效应)<!-- 2026-06-19 回检: 南非首轮0-2负+2停赛 → 背水一战 → 1-1逼平捷克 -->
+
+**Definition**: When a team faces elimination (lost first group match, or must-win scenario), their performance often exceeds market expectations. The market systematically under-prices desperation.
+
+**Quantification**:
+| Scenario | Adjustment | Rationale |
+|:---------|:----------:|:----------|
+| Team lost first group match, faces virtual elimination if they lose again | Draw +5%, Underdog win +5% | Desperate teams overperform market expectations |
+| Team has key players suspended → forced into defensive reorganization | Underdog +3%, Draw +3% | Suspension paradoxically improves defensive organization |
+| Both conditions met simultaneously (like South Africa vs Czechia) | Draw +8%, Underdog +5% | Compound effect — the market's biggest blind spot |
+| Team already eliminated (no stakes) | No adjustment, or favorite +5% | No motivation = underperformance |
+
+### (8) Classic Harvest Pattern: Opening Build + Late Reverse
 
 **Features**: Pre-match low favorite odds + shallow handicap to create certainty. No fundamental justification. Late suddenly raise water + retreat line + raise odds.
 
-### (7) Fundamental Factor Weights
+### (9) Fundamental Factor Weights
 
 | Weight | Factor | Note |
 |--------|--------|------|
-| ⭐⭐⭐⭐⭐ | Core player injuries | GK > CB > CDM > striker |
+| ⭐⭐⭐⭐⭐ | Core player injuries/suspensions | GK > CB > CDM > striker. ⚠️ 停赛利好≠自动兑现 (2026-06-19 回检) |
+| ⭐⭐⭐⭐⭐ | Back-to-Wall motivation | Team facing elimination after first loss → +5~8% underdog/draw boost |
 | ⭐⭐⭐⭐ | Match importance | Title race/relegation/UEFA > mid-table > friendly |
 | ⭐⭐⭐ | Recent form | Last 6-10 matches, recent > season overall |
 | ⭐⭐ | Head-to-head | Last 3-5 direct encounters |
 | ⭐ | External factors | Fatigue, travel, weather |
 
-### (8) Six-Dimension Scoring Model (0-6)
+### (10) Six-Dimension Scoring Model (0-6)<!-- 2026-06-19 回检: Czechia 获6/6满分但仍1-1 → 6D评分存在系统性缺陷: (a) 未检查"叙事驱动型压缩"(b) 未检查真实平局概率>25%的警戒线 -->
 
 | Dim | Criterion | Score Condition |
 |:---:|----------|---------------|
-| 1 | Fundamental logic | Injuries, motivation, form, H2H align with market direction |
+| 1 | Fundamental logic | Injuries/motivation/form/H2H align with market direction. ⚠️ **Back-to-Wall check**: if underdog faces elimination AND favorite's advantage is narrative-driven (suspensions/injuries), score 0 regardless of direction consistency |
 | 2 | Euro-Asian match | Theoretical handicap vs actual ≤ 0.25 ball difference |
-| 3 | Opening objective | Opening odds match strength, no artificial hype |
-| 4 | Late movement clean | Movement doesn't hit any of 6 trap patterns |
-| 5 | Water level logical | Changes are justifiable by fundamentals/money flow |
-| 6 | No one-sided hype | Multi-bookmaker consistency, no anomalous single-side money |
+| 3 | Opening objective | Opening odds match strength, no artificial hype. ⚠️ **Narrative check**: if odds compression's primary driver is a public narrative (not form/fitness), score 0 |
+| 4 | Late movement clean | Movement doesn't hit any of 7 trap patterns (incl. new Trap#7) |
+| 5 | Water level logical | Changes are justifiable by fundamentals/money flow. ⚠️ **Draw probability check**: if true draw probability >25% AND favorite is priced below 2.00, score 0 — high draw prob with moderate favorite = structural warning |
+| 6 | No one-sided hype | Multi-bookmaker consistency, no anomalous single-side money. Check SBOBet divergence |
 
 **Interpretation**:
 - Score ≥ 4: Has data reference value
 - Score = 3: Limited reference value
 - Score ≤ 2: High risk, **recommend skipping this match**
 
-### (9) Industry Mnemonics
+**⚠️ 6D Inflation Warning**: A score of 6/6 does NOT guarantee correctness. It means all technical checks passed — but the model itself may have blind spots. Specifically:
+- If the favorite's odds compression is "Moderate" (5-10%), deduct 1 point from final score
+- If the underdog faces elimination (back-to-wall), deduct 1 point
+- If true draw probability >25%, deduct 1 point
+This "Inflation Penalty" ensures 6/6 is rare and truly meaningful, not a rubber stamp.
+
+### (11) Industry Mnemonics
 
 ```
 Odds dispersion shows direction, Asian handicap water shows truth
@@ -865,9 +903,9 @@ Opening odds set the tone, late movement determines outcome
 Euro-Asian divergence = find upset, fundamentals steady the ship
 ```
 
-### (10) Ten Universal Trap Rules
+### (12) Twelve Universal Trap Rules<!-- 2026-06-19 回检: 规则#1 扩展至全赔率区间; 新增规则#11(叙事驱动)和#12(停赛悖论) -->
 
-1. Low odds ≠ safe bet, ultra-low odds upsets are normal
+1. **Low odds ≠ safe bet — ANY odds range**: Ultra-low (<1.50) AND moderate favorites (1.70-2.00) both lose/draw ~30-50% of the time. The warning applies to ALL odds. <!-- 2026-06-19 回检: Czechia 1.877 → 结果1-1 → 中等赔率同样不可靠 -->
 2. Universal public consensus = bookmaker creates heat = watch for upset
 3. Sudden movement without injury/schedule news = liquidity balance, not directional
 4. Niche leagues = low liquidity = manipulated lines, low credibility
@@ -877,8 +915,10 @@ Euro-Asian divergence = find upset, fundamentals steady the ship
 8. Overhyped matches = traps, undervalued sides = value
 9. Persistently abnormal water levels = prepare for upset
 10. Bookmakers only adjust for two reasons: balance money or induce public flow
+11. **Narrative-driven odds movement is the weakest signal <!-- 2026-06-19 回检 -->**: Odds compression driven by a public narrative (opponent suspensions, star player injury) rather than genuine form/fitness advantage = high probability of overreaction. The narrative creates an overvalued favorite. Check: "Is this compression driven by news everyone already knows?" If yes → reduce confidence.
+12. **Suspension paradox <!-- 2026-06-19 回检: South Africa 2 red cards → 1-1 draw -->**: Key player suspensions do NOT automatically benefit the opponent. Suspended teams often reorganize more defensively and become harder to break down. The "missing players" narrative is the market's most common over-pricing error. When analyzing suspension impact, ask: "Does this force the team to play more defensively?" If yes → the market is likely overvaluing the favorite.
 
-### (11) Weighted Probability Synthesis Model
+### (13) Weighted Probability Synthesis Model<!-- 2026-06-19 回检: 新增压缩强度分级、背水一战效应、叙事折扣; 降低6D满分权重 -->
 
 **Base probability**: From Section 3 math: true home/draw/away probabilities after removing vig.
 
@@ -886,17 +926,21 @@ Euro-Asian divergence = find upset, fundamentals steady the ship
 
 | Factor | Trigger | Adjustment | Direction |
 |--------|---------|:---------:|-----------|
-| Euro-Asian divergence | Hits any of 6 trap patterns | ±10% | Trap#2→home+10%; Trap#1→home-10% |
+| Euro-Asian divergence | Hits any of 7 trap patterns | ±10% | Trap#2→home+10%; Trap#1→home-10%; **Trap#7(narrative)→home-10% + draw+5% + away+5%** |
 | Opening odds law | Hits any of 4 laws | ±8% | Law#1→home+8%; Law#2→home-8% |
-| Late movement | Raise+drop water / drop+raise | ±7% | Raise+drop→home+7%; vice versa home-7% |
+| Late movement authenticity | Per Section 4(6) rules | ±7% | Raise+drop→home+7%; vice versa home-7% |
+| Compression intensity<!-- 2026-06-19 新增 --> | Odds drop magnitude | Variable | Extreme(>20%): +7% · Strong(10-20%): +7% · **Moderate(5-10%): +3.5%** · Weak(<5%): 0% |
 | Fundamental alignment | Odds vs fundamentals direction | ±5% | Aligned→direction+5%; conflict→opposite+5% |
-| 6D score | ≥4 confidence boost / ≤2 degrade | ±5% | ≥4→direction+5%; ≤2→all degrade |
+| Back-to-Wall effect<!-- 2026-06-19 新增 --> | Underdog faces elimination | +5~8% to underdog | Lost first match + elimination risk: draw+5% + away+5%. Both lost+suspensions: draw+8% + away+5% |
+| Narrative discount<!-- 2026-06-19 新增 --> | Compression driven by public narrative | -5% to favorite | "News everyone knows" (suspensions/injuries) → favorite correction -5%, draw +3%, away +2% |
+| 6D score | ≥4 confidence boost / ≤2 degrade | ±3% | ≥4→direction+3%; ≤2→all degrade. <strong>⚠️ 6D满分从+5%降为+3%</strong> <!-- 2026-06-19 修正 --> |
+| SBOBet divergence<!-- 2026-06-19 新增 --> | SBOBet pricing differs from Pinnacle by >0.10 on underdog | ±3% toward SBOBet direction | SBOBet systematically lower on underdog = Asian sharp money signal |
 
 **Formula**:
 ```
 Predicted home = base home + Σ(correction factors)
-Predicted draw = base draw (unchanged)
-Predicted away = base away + Σ(reverse correction)
+Predicted draw = base draw + Σ(draw-specific corrections)
+Predicted away = base away + Σ(away-specific corrections)
 Normalize if sum ≠ 100%
 ```
 
@@ -955,7 +999,7 @@ Step C — Score confidence modifiers:
 → Use Pinnacle as primary reference. Show open → now prices, implied total probability, payout rate, true probabilities.
 
 ### Step 4: Euro-Asian Match + Divergence Check
-→ Convert 1X2 to theoretical handicap using Section 4(2) table. Show all 3 bookmakers side-by-side. Check 6 trap patterns.
+→ Convert 1X2 to theoretical handicap using Section 4(2) table. Show all 3 bookmakers side-by-side. Check 7 trap patterns.
 
 ### Step 5: Opening Odds Positioning
 → **MUST be a separate section from Step 6.** Analyze ONLY the opening prices:
@@ -977,7 +1021,7 @@ Step C — Score confidence modifiers:
 → Score 0-6 using Section 4(8) criteria. Show each dimension pass/fail with brief reason.
 
 ### Step 8: Risk/Trap Checklist
-→ List any of the 6 trap patterns, 4 opening laws, or 10 universal traps triggered. Color-code severity.
+→ List any of the 7 trap patterns, 4 opening laws, or 12 universal traps triggered. Color-code severity.
 
 ### Step 9: Comprehensive Summary
 → **MUST be a separate section from Step 8.** Synthesize Steps 1-8 into:
@@ -989,12 +1033,16 @@ Step C — Score confidence modifiers:
 ### Step 10: Weighted Probability Projection + Score Prediction
 
 1. Take true 3-way probabilities from Step 3 as base
-2. Apply correction factors one by one:
-   - Euro-Asian divergence signal → ±10%
+2. Apply correction factors one by one (完整清单见 Section 4(13)):
+   - Euro-Asian divergence signal (7 trap patterns) → ±10%
    - Opening odds law hit → ±8%
-   - Late movement type → ±7%
+   - Late movement authenticity → ±7%
+   - Compression intensity (Extreme/Strong/Moderate/Weak) → +7%/+7%/+3.5%/0%
    - Fundamental alignment → ±5%
-   - 6D score confidence → ±5%
+   - Back-to-Wall effect (underdog elimination risk) → draw+5~8%, away+5%
+   - Narrative discount (odds driven by public news) → favorite -5%
+   - 6D score confidence → ±3% (下调自 ±5%, 2026-06-19 修正)
+   - SBOBet divergence (Asian sharp vs Pinnacle) → ±3%
 3. Synthesize corrected probabilities, normalize
 4. Map to expected goals (xG) using handicap line + over/under line
 5. Apply Poisson distribution to derive most likely exact scores
