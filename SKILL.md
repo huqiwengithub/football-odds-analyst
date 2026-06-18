@@ -297,33 +297,35 @@ After yes: GET /v4/fixtures?tournamentId=16&from=2026-06-11&to=2026-07-19&apiKey
 
 ---
 
-### Core Execution Rule: Serial-Only, Outcome ID Caching
+### Core Execution Rule: Tournament-Wide Outcome ID Cache
 
 ```
-Outcome ID cache: /tmp/oddspapi_outcome_ids_{fixtureId}.json
+💰 配额最大化: /v4/odds-by-tournaments (1配额) 批量获取全赛事outcome ID
+   官方建议: "尽可能批量请求 — 使用带过滤器的/v4/fixtures而非多次单独调用"
 
-First query of a match (lifetime once, 1 quota):
-  ① ask user: "/v4/odds × 1 = 1 quota for fixture X. Proceed?"
-  ② GET /v4/odds?fixtureId=X&bookmakers=pinnacle&apiKey=KEY (1 quota, ~8s)
-     → From response, extract pinnacle's:
-       a. 1X2 prices (market with "moneyline" in bookmakerMarketId)
-       b. AH outcome IDs: market with "spreads" in bookmakerMarketId, mainLine=true outcomes
-       c. OU outcome IDs: market with "totals" in bookmakerMarketId, mainLine=true outcomes
-       d. CS outcome IDs: market with "correct_score" in bookmakerMarketId, all outcomes
-       e. TG outcome IDs: market with "exact_goals" or similar, all outcomes
-     → Save to /tmp/oddspapi_outcome_ids_{fixtureId}.json
+Outcome ID cache: /tmp/oddspapi_outcome_ids_16.json (全赛事共享)
 
-All subsequent queries (0 quota, fast):
-  ③ Read outcome IDs from cache
-  ④ Call A: GET /v4/historical-odds?...&outcomeId=101,102,103 (1X2, 3家, ~510KB)
+首次运行（全赛事一次，1 配额）:
+  ① 🔴 ask user: "/v4/odds-by-tournaments × 1 = 1 配额。是否继续？"
+  ② GET /v4/odds-by-tournaments?bookmaker=pinnacle&tournamentIds=16&apiKey=KEY
+     → ~2.4MB, 返回全部 47 个 fixture 的 pinnacle 市场元数据
+     → 为每个 fixtureId 提取:
+       a. 1X2: moneyline → outcomes 101/102/103
+       b. AH main: "line/.../spreads" → mainLine=true 的 outcome IDs
+       c. OU main: "line/.../totals"   → mainLine=true 的 outcome IDs
+       d. CS: "correct_score" (if available) → all outcome IDs
+       e. TG: "exact_goals" (if available) → all outcome IDs
+     → 保存: /tmp/oddspapi_outcome_ids_16.json
+
+后续所有查询（0 配额，秒级）:
+  ③ 读 /tmp/oddspapi_outcome_ids_16.json → 获取目标 fixture 的 outcome ID
+  ④ Call A: /v4/historical-odds?outcomeId=101,102,103 (1X2, 3家, ~510KB)
   ⑤ Wait ≥5s
-  ⑥ Call B: GET /v4/historical-odds?...&outcomeId={cached_AH_OU_CS_TG} (pinnacle, ~200KB)
-     → Daily sampling on all data
-     → Output: ~8KB per match
+  ⑥ Call B: /v4/historical-odds?outcomeId={cached_AH_OU_CS_TG} (pinnacle, ~200KB)
+     → Daily sampling → ~8KB per match
 
-Per-match quota: 1 (lifetime) | Subsequent: 0 | No >1h/≤1h rule needed
+全赛事 1 配额(一次性) | 永久 0 | 比每场单独调/v4/odds节省3倍+
 ```
-   └─ No fixture cache → /fixtures first (1 quota, ⚠️ MUST confirm with user)
 
 3. ONLY after previous call validates → proceed to next match
    → NEVER send parallel curl commands
@@ -473,6 +475,9 @@ Phase 0 ─ One-time initialization (⚠️ BILLED — MUST confirm with user fi
   → 1 quota (once only, never refetch — subsequent reads from cache are 0 quota)
   → future analyses read from cache at 0 quota
 
+Phase 0 ─ One-time outcome ID cache (⚠️ 1 quota, user confirmed)
+  /v4/odds-by-tournaments → /tmp/oddspapi_outcome_ids_16.json
+
 Phase 1 ─ Morning (subsequent queries, 0 quota)
   Read outcome IDs from /tmp/oddspapi_outcome_ids_{fixtureId}.json
   Call A (/v4/historical-odds + outcomeId=101,102,103, 3家) → Wait ≥5s → Call B (cached IDs, pinnacle)
@@ -495,9 +500,9 @@ Phase 1 (morning × 30d):    0 quota  (historical-odds, free)
 Phase 2 (afternoon × 30d):  0 quota  (historical-odds, free)
 Phase 3 (T-1h × 30d × 4):   4 × 30 = 120 quota
 ─────────────────────────────────
-Per-match first query: 1 quota. Subsequent: 0.
+fixtures cache(1) + outcome IDs cache(1) = 2 (全赛事一次性)
 ─────────────────────────────────
-4 matches × 1 (first) = 4 | Fixtures cache = 1 | Total: 5 / 250
+后续所有分析: 0 | 总计: 2 / 250
 ```
 
 ### Additional: On-demand Analysis Handling
@@ -505,7 +510,7 @@ Per-match first query: 1 quota. Subsequent: 0.
 > When user requests "predict this match" or "pre-match analysis":
 > 1. GET /v4/account → check quota
 > 2. Check /tmp/oddspapi_outcome_ids_{fixtureId}.json exists
-> 3. If NOT: ask user "/v4/odds × 1 = 1 quota. Proceed?" → cache outcomes IDs
+> 3. If NOT: ask user "/v4/odds-by-tournaments × 1 = 1 quota. Proceed?" → cache all outcomes IDs
 > 4. If EXISTS: 0 quota → Call A + Call B with cached IDs + WebSearch → 11-step analysis
 > 5. ALL calls strictly serial, validated between each
 
@@ -1068,12 +1073,10 @@ Provide key to start: `My OddsPapi API key is xxxxxx`
 ### Daily Execution Plan (4 matches × 3 checks/day)
 
 ```
-Phase 0 (first run): ⚠️ /v4/fixtures × 1 = 1 quota (one-time cache init)
-Phase 1 (morning):   /v4/odds × 4 = 4 quota (first match run, cache IDs) → subsequent Phase 2/3: 0
-Phase 2 (afternoon): 0 quota (cached IDs)
-Phase 3 (pre-match): 0 quota (cached IDs)
+Phase 0: ⚠️ /v4/fixtures × 1 = 1 quota (一次性) + ⚠️ /v4/odds-by-tournaments × 1 = 1 quota (一次性)
+Phase 1-3: 0 quota (cached IDs, /v4/historical-odds free)
 
-Per-match lifetime: 1 quota | Monthly: 1(fixtures) + 4(first run) = 5/250
+全赛事终身配额: 2 | 月消耗: 2/250
 ```
 
 ### Example: Providing API Key
