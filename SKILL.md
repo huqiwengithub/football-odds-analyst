@@ -312,7 +312,7 @@ On receiving analysis request:
    │       → Pipe to node, extract ONLY:
    │         ① Main spreads (top-1 2-outcome by entries) per bookmaker
    │         ② Main totals (top-2 2-outcome by entries) per bookmaker  
-   │         ③ Correct score market (if available) per bookmaker
+   │         ③ Correct Score + Exact Total Goals (top-2 multi-outcome markets) per bookmaker
    │       → Daily sampling: group by date, keep first entry per day per outcome
    │       → Discard raw 24MB response immediately after extraction
    │       → Output: ~8KB
@@ -443,7 +443,7 @@ On receiving analysis request:
 >     return {s0: dailySample(p(ks[0])), s1: dailySample(p(ks[1]))};
 >   };
 >   if (twoway.length>=2) { out.bookmakers[bm].ah = ext(twoway[0]); out.bookmakers[bm].ou = ext(twoway[1]); }
->   // Correct Score: market with most outcomes (typically 20+ for 0-0 to 3-3 etc.)
+>   // Correct Score + 进球数: top-2 markets with >3 outcomes
 >   const csMarket = Object.entries(markets)
 >     .filter(([k,m]) => Object.keys(m.outcomes).length > 3)
 >     .sort((a,b) => {
