@@ -21,13 +21,17 @@ Built-in complete odds analysis system. **Only needs OddsPapi** — 3-bookmaker 
 ① 只有 2 个 API 端点免费：/v4/historical-odds 和 /v4/account
    其余 13 个端点全部计费（1 调用 = 1 配额）
 
-② 任何计费调用前，必须先：
+② 🔴 铁律：花配额前必须确认。无例外。无豁免。
    a. GET /v4/account → 读取剩余配额
    b. 计算本次需要多少配额
    c. 向用户展示并等待明确确认：
-      "需要 [端点] × [次数] = [N] 配额。当前剩余 X/250。是否继续？"
+      "需要 [端点] × [次数] = [N] 配额。当前累计 X/总配额。是否继续？"
+   d. 用户回复 "是"/"yes"/"确认" 之前 → 一个计费请求都不发
+   e. 即使用户 5 分钟前刚说过 "以后不用问了" → 仍然每次都问
 
-③ 永远不等 "yes" 不发请求。永远不假设同意。
+③ 🔴 铁律：不等 "yes" 不发请求。不等 "确认" 不发请求。
+   不假设同意。不猜测意图。不基于上下文推断。
+   不发 "我先拉了后面告诉你" 这类先斩后奏。
    即使之前用户说过 "以后不用问了" — 仍然每次都问。
 
 ④ /v4/historical-odds 失败后禁止静默切到 /v4/odds（收费）。
@@ -209,13 +213,13 @@ BILLED (1 request = 1 quota, MUST confirm with user FIRST):
 ⚠️ Even if response is 4xx/5xx/RATE_LIMITED — quota is still deducted.
    Official docs: "无论响应是否成功或返回错误，请求都会在端点完成处理之后被计数"
 
-Confirmation format:
+🔴 铁律确认格式:
   "需要计费调用:
    /v4/fixtures × 1 = 1 配额（一次性缓存初始化）
    本次预计消耗: 1 · 累计: [count]/[limit] · 剩余: [remaining]
    是否继续？(是/否)"
 
-  → NEVER assume "yes". Wait for explicit "yes" or "确认".
+  → 🔴 不等 "yes"/"确认" 不发任何请求。无例外。无豁免。
   → Calls complete → GET /v4/account → 本次实际消耗 = quota_after - quota_before
   → Report: "本次消耗: [session] · 累计: [now]/[total]" (累计+总数均来自 /v4/account)
   → /v4/historical-odds (free) calls do NOT need confirmation.
