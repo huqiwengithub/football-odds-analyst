@@ -58,7 +58,41 @@ Commands:
 
 ## Section 2: Standardized Execution Flow & Quota Control
 
-### Core Rule: Auto-select Data Source by Time-to-Kickoff
+### ⚠️ Mandatory Precondition: Fetch Entire Season in One Call
+
+**Before any match analysis can proceed, the full season fixture list must be cached in a single request. This is not optional — it enables the time-check logic and prevents dozens of wasted quota.**
+
+```
+First time a league/tournament is used:
+  1. GET /v4/fixtures?tournamentId=X&from=SEASON_START&to=SEASON_END&apiKey=KEY
+     → Returns ALL fixtures in the entire tournament/season
+     → 1 API call = 1 quota = all fixtureIds + startTimes cached
+     
+  2. Store in session:
+     known_fixture_ids[tournamentId] = {
+       "Czech Republic vs South Africa": {"fixtureId": "...", "startTime": "2026-06-18T19:00:00"},
+       ...
+     }
+
+  Subsequent analyses:
+  → Read fixtureId + startTime from cache (0 quota)
+  → Calculate time-to-kickoff from cached startTime
+  → Decide: >1h → /historical-odds only OR ≤1h → /odds + /historical-odds
+```
+
+**Why this is mandatory:**
+- Without cached startTimes, the skill cannot determine whether a match is >1h or ≤1h from kickoff
+- Without cached fixtureIds, every analysis would require a /fixtures call (wasting 1 quota each time)
+- Fetching the entire schedule once instead of daily = 1 quota vs 30+ quota/month
+
+**World Cup 2026 example:**
+```
+GET /v4/fixtures?tournamentId=16&from=2026-06-11&to=2026-07-19&apiKey=KEY
+→ 1 quota → caches all 103 matches
+→ saved vs 30 daily calls = 29 quota saved per month
+```
+
+> For any new league: first call `GET /v4/tournaments?sportId=10` (1 quota) to find its tournamentId, then cache all fixtures at once.
 
 **Most important quota-saving rule in this Skill:**
 
