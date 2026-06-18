@@ -41,6 +41,12 @@ Built-in complete odds analysis system. **Only needs OddsPapi** — 3-bookmaker 
    默认假设：中文用户 = Asia/Shanghai (UTC+8)。
    /v4/fixtures 返回的 startTime 是 UTC → 必须转换为用户本地时间后再过滤日期。
 
+⑦ 📊 数据先行原则（禁止猜想）：
+   Call A + Call B 全部完成、每日采样数据到位后，才启动 11 步分析。
+   禁止：数据还没拉完就开始写基本面分析、预测比分。
+   禁止：数据缺失时用"估计""大概""应该"替代真实数据。
+   每个分析结论必须有对应的 API 数据支撑，标注数据来源(bookmaker+时间点)。
+
 违反以上任何一条 = 浪费用户配额或分析错误比赛。
 ```
 
@@ -307,8 +313,8 @@ On receiving analysis request:
    │   │
    │   ├─ Wait ≥5s (rate limit 5000ms)
    │   │
-   │   └─ Call B (AH + O/U + Correct Score): no outcomeId filter → ~24MB, timeout 60s
-   │       GET /v4/historical-odds?fixtureId=X&bookmakers=pinnacle,bet365,sbobet&apiKey=KEY
+   │   └─ Call B (AH + O/U + Correct Score + 进球数): pinnacle only, no outcomeId → ~4MB, timeout 30s
+   │       GET /v4/historical-odds?fixtureId=X&bookmakers=pinnacle&apiKey=KEY
    │       → Pipe to node, extract ONLY:
    │         ① Main spreads (top-1 2-outcome by entries) per bookmaker
    │         ② Main totals (top-2 2-outcome by entries) per bookmaker  
@@ -381,7 +387,8 @@ On receiving analysis request:
 > | Pinnacle | 97 市场 / ~4MB | **1 市场 / 76KB** | 98% |
 > | SBOBet | 多市场 / ~4MB+ | **1 市场 / 284KB** | 93% |
 > | bet365 | 多市场 / ~2MB | **1 市场 / ~150KB** | 93% |
-> | **3家合计** | **~10MB+** | **~510KB** | **95%** |
+> | **Call A 3家合计** | **~10MB+** | **~510KB** | **95%** |
+> | **Call B pinnacle** | **~4MB** | — | - |
 >
 > API 在服务端完成过滤 → 响应只含 1X2 数据，不需要客户端丢弃。
 >
@@ -389,7 +396,7 @@ On receiving analysis request:
 >
 > **>1h 阶段**: 每场 2 次免费调用（均串行，≥5s 间隔）:
 > - Call A: `outcomeId=101,102,103` → 1X2 数据（3家 ~510KB，timeout 15s）
-> - Call B: 无 filter → pipe 提取 AH + O/U 主线（3家 ~24MB raw → ~4KB output，timeout 60s）
+> - Call B: pinnacle only, 无 filter → pipe 提取 AH + O/U + CS + TG（~4MB raw → ~3KB output，timeout 30s）
 > - ≤1h 阶段: `/v4/odds`（计费，需确认）一次性获取所有市场元数据
 
 > **调用格式**:
@@ -427,9 +434,9 @@ On receiving analysis request:
 > // Output A: 3家 × 3结果 × daily timeseries → ~5KB
 > ```
 >
-> **提取代码 B（让球 AH + 大小球 OU + 波胆 Correct Score）**:
+> **提取代码 B（让球 AH + 大小球 OU + 波胆 CS + 进球数 TG，pinnacle only）**:
 > ```javascript
-> for (const [bm, data] of Object.entries(d.bookmakers)) {
+> const data = d.bookmakers["pinnacle"]; if (!data) return;
 >   const markets = data.markets;
 >   // Main AH + main OU = top-2 2-outcome markets by entries
 >   const twoway = Object.entries(markets)
@@ -460,7 +467,7 @@ On receiving analysis request:
 >     out.bookmakers[bm].cs = cs;
 >   }
 > }
-> // Output B: 3家 × (AH + OU) daily timeseries + CS latest → ~8KB
+> // Output B: pinnacle AH + OU daily + CS + TG latest → ~3KB
 > ```
 
 ### Phase Plan (4 matches × 3 checks/day)
