@@ -269,7 +269,7 @@ First time a league/tournament is used:
 
   6. Calculate time-to-kickoff for each match:
      → diff_ms = startTime_utc - now_utc
-     → Decide: >1h → /historical-odds only OR ≤1h → /odds + /historical-odds
+     → Decide: >1h → subseqent queries use cached IDs with /historical-odds (free) + /historical-odds
 
   ⚠️ Example: user says "明天" at 2026-06-18 22:00 CST.
       Target = 2026-06-19 (local CST).
@@ -278,7 +278,6 @@ First time a league/tournament is used:
 ```
 
 **Why this is mandatory:**
-- Without cached startTimes, the skill cannot determine whether a match is >1h or ≤1h from kickoff
 - Without cached fixtureIds, every analysis would require a /fixtures call (wasting 1 quota each time)
 - Fetching the entire schedule once instead of daily = 1 quota vs 30+ quota/month
 
@@ -294,41 +293,32 @@ After yes: GET /v4/fixtures?tournamentId=16&from=2026-06-11&to=2026-07-19&apiKey
 
 ---
 
-### Core Execution Rule: Serial-Only, Time-Aware
+### Core Execution Rule: Serial-Only, Outcome ID Caching
 
 ```
-On receiving analysis request:
-1. Execute Section 0 (Quota Safety Protocol):
-   a. GET /v4/account → verify remaining quota
-   b. Read fixtures cache → extract target date matches
-   c. Calculate time-to-kickoff for each match
+Outcome ID cache: /tmp/oddspapi_outcome_ids_{fixtureId}.json
 
-2. For each match, SERIALLY (one at a time), **2 free calls per match**:
-   ├─ > 1h before kickoff → /historical-odds only (free, no confirmation)
-   │   │
-   │   ├─ Call A (1X2): outcomeId=101,102,103 → ~510KB, timeout 15s
-   │   │   GET /v4/historical-odds?fixtureId=X&bookmakers=pinnacle,bet365,sbobet&outcomeId=101,102,103&apiKey=KEY
-   │   │   → Parse + daily sampling: group by date, keep first entry per day per outcome
-   │   │   → Output: 3家 × 3结果 × {open, daily_timeseries[]} → ~5KB
-   │   │
-   │   ├─ Wait ≥5s (rate limit 5000ms)
-   │   │
-   │   └─ Call B (AH + O/U + Correct Score + 进球数): pinnacle only, no outcomeId → ~4MB, timeout 30s
-   │       GET /v4/historical-odds?fixtureId=X&bookmakers=pinnacle&apiKey=KEY
-   │       → Pipe to node, extract ONLY:
-   │         ① Main spreads (top-1 2-outcome by entries) per bookmaker
-   │         ② Main totals (top-2 2-outcome by entries) per bookmaker  
-   │         ③ Correct Score + Exact Total Goals (top-2 multi-outcome markets) per bookmaker
-   │       → Daily sampling: group by date, keep first entry per day per outcome
-   │       → Discard raw 24MB response immediately after extraction
-   │       → Output: ~8KB
-   │
-   ├─ ≤ 1h before kickoff → /odds (1 quota, ⚠️ MUST confirm with user)
-   │   → Ask: "/v4/odds × N matches = N quota. Current: X/250. Proceed?"
-   │   → GET /v4/odds?fixtureId=X&apiKey=KEY
-   │   → Extracts: pinnacle 1X2 + AH main line + O/U main line only
-   │   → 1 quota per match, response ~8-12MB (parse, don't store)
-   │
+First query of a match (lifetime once, 1 quota):
+  ① ask user: "/v4/odds × 1 = 1 quota for fixture X. Proceed?"
+  ② GET /v4/odds?fixtureId=X&bookmakers=pinnacle&apiKey=KEY (1 quota, ~8s)
+     → From response, extract pinnacle's:
+       a. 1X2 prices (market with "moneyline" in bookmakerMarketId)
+       b. AH outcome IDs: market with "spreads" in bookmakerMarketId, mainLine=true outcomes
+       c. OU outcome IDs: market with "totals" in bookmakerMarketId, mainLine=true outcomes
+       d. CS outcome IDs: market with "correct_score" in bookmakerMarketId, all outcomes
+       e. TG outcome IDs: market with "exact_goals" or similar, all outcomes
+     → Save to /tmp/oddspapi_outcome_ids_{fixtureId}.json
+
+All subsequent queries (0 quota, fast):
+  ③ Read outcome IDs from cache
+  ④ Call A: GET /v4/historical-odds?...&outcomeId=101,102,103 (1X2, 3家, ~510KB)
+  ⑤ Wait ≥5s
+  ⑥ Call B: GET /v4/historical-odds?...&outcomeId={cached_AH_OU_CS_TG} (pinnacle, ~200KB)
+     → Daily sampling on all data
+     → Output: ~8KB per match
+
+Per-match quota: 1 (lifetime) | Subsequent: 0 | No >1h/≤1h rule needed
+```
    └─ No fixture cache → /fixtures first (1 quota, ⚠️ MUST confirm with user)
 
 3. ONLY after previous call validates → proceed to next match
@@ -395,9 +385,8 @@ On receiving analysis request:
 > ⚠️ SBOBet 数据偏大（284KB/场，亚盘之王追踪每一次微小变动，时间线 2797 条 vs Pinnacle 747 条），但仍在安全范围。必须带 `outcomeId` 参数——不带则单家即可能超 4MB 导致截断。
 >
 > **>1h 阶段**: 每场 2 次免费调用（均串行，≥5s 间隔）:
-> - Call A: `outcomeId=101,102,103` → 1X2 数据（3家 ~510KB，timeout 15s）
-> - Call B: pinnacle only, 无 filter → pipe 提取 AH + O/U + CS + TG（~4MB raw → ~3KB output，timeout 30s）
-> - ≤1h 阶段: `/v4/odds`（计费，需确认）一次性获取所有市场元数据
+> - Call A: `outcomeId=101,102,103` → 1X2 数据（3家 ~510KB）
+> - Call B: `outcomeId={cached from first /v4/odds call}` → AH + O/U + CS + TG（pinnacle, ~200KB）
 
 > **调用格式**:
 > ```
@@ -480,25 +469,17 @@ Phase 0 ─ One-time initialization (⚠️ BILLED — MUST confirm with user fi
   → 1 quota (once only, never refetch — subsequent reads from cache are 0 quota)
   → future analyses read from cache at 0 quota
 
-Phase 1 ─ Morning (>1h → historical-odds only, FREE)
-  Serial loop (match 1 → extract+discard → match 2 → ...), ≥5s apart:
-  GET /v4/historical-odds?fixtureId=X&bookmakers=pinnacle,bet365,sbobet&outcomeId=101,102,103
-  → Parse on-the-fly → extract ONLY 1X2 + main AH + main O/U per bookmaker
-  → Discard raw response → output ~2.5KB per match
-  Focus: opening odds positioning + 3-bookmaker dispersion + full-day strategy framework
+Phase 1 ─ Morning (subsequent queries, 0 quota)
+  Read outcome IDs from /tmp/oddspapi_outcome_ids_{fixtureId}.json
+  Call A (/v4/historical-odds + outcomeId=101,102,103, 3家) → Wait ≥5s → Call B (cached IDs, pinnacle)
+  Daily sampling → ~8KB output per match
+  Focus: opening odds positioning + 3-bookmaker dispersion + daily trend
 
-Phase 2 ─ Afternoon (>1h → historical-odds only, FREE)
-  Same serial pattern as Phase 1, ≥5s apart → 0 quota each
+Phase 2 ─ Afternoon (same as Phase 1, 0 quota)
   Focus: odds movement comparison + scoring update
 
-Phase 3 ─ T-1h (≤1h → /odds, BILLED ⚠️ REQUIRES USER CONFIRMATION)
-  Before executing:
-    → Ask: "/odds needed for N matches = N quota. Current: X/250. Proceed?"
-    → Wait for user's "yes" before any billed calls
-  Serial loop (match 1 → validate → match 2 → ...):
-  GET /v4/odds?fixtureId=X → 1 quota each
-  Extract ONLY: pinnacle 1X2 + AH main line + O/U main line
-  Discard all other 349+ bookmakers and altLine markets
+Phase 3 ─ Pre-match final check (0 quota)
+  Same as Phase 1/2. No special billing needed — IDs cached from first run.
   Focus: AH divergence check + final probability synthesis
 ```
 
@@ -510,20 +491,19 @@ Phase 1 (morning × 30d):    0 quota  (historical-odds, free)
 Phase 2 (afternoon × 30d):  0 quota  (historical-odds, free)
 Phase 3 (T-1h × 30d × 4):   4 × 30 = 120 quota
 ─────────────────────────────────
-Total: 1 + 120 = 121 / 250  129 remaining
+Per-match first query: 1 quota. Subsequent: 0.
+─────────────────────────────────
+4 matches × 1 (first) = 4 | Fixtures cache = 1 | Total: 5 / 250
 ```
 
 ### Additional: On-demand Analysis Handling
 
 > When user requests "predict this match" or "pre-match analysis":
 > 1. GET /v4/account → check quota
-> 2. Read match startTime from cache (or init cache first)
-> 3. Calculate current time vs kickoff difference
-> 4. If diff > 1h: /historical-odds (free) + WebSearch fundamentals → 11-step analysis
->    → If historical-odds fails after 1 retry: ask user (skip / switch to web / use billed /odds)
-> 5. If diff ≤ 1h: ask user to confirm /odds (billed, 1 quota/match) before proceeding
-> 6. ALL calls strictly serial, validated between each
-> 7. NEVER auto-switch from free to billed endpoint
+> 2. Check /tmp/oddspapi_outcome_ids_{fixtureId}.json exists
+> 3. If NOT: ask user "/v4/odds × 1 = 1 quota. Proceed?" → cache outcomes IDs
+> 4. If EXISTS: 0 quota → Call A + Call B with cached IDs + WebSearch → 11-step analysis
+> 5. ALL calls strictly serial, validated between each
 
 ---
 
@@ -1084,12 +1064,12 @@ Provide key to start: `My OddsPapi API key is xxxxxx`
 ### Daily Execution Plan (4 matches × 3 checks/day)
 
 ```
-Phase 0 (first run): ⚠️ Ask user to confirm /v4/fixtures × 1 = 1 quota → 1 quota
-Phase 1 (morning):   /v4/historical-odds × 4 → 0 quota (free, no confirmation, ≥5s apart)
-Phase 2 (afternoon): /v4/historical-odds × 4 → 0 quota (free, no confirmation, ≥5s apart)
-Phase 3 (T-1h):      ⚠️ Ask user to confirm /v4/odds × 4 = 4 quota → 4 quota
+Phase 0 (first run): ⚠️ /v4/fixtures × 1 = 1 quota (one-time cache init)
+Phase 1 (morning):   /v4/odds × 4 = 4 quota (first match run, cache IDs) → subsequent Phase 2/3: 0
+Phase 2 (afternoon): 0 quota (cached IDs)
+Phase 3 (pre-match): 0 quota (cached IDs)
 
-Daily billed: 0-4 quota | Monthly: 1+120=121/250 | Free calls: unlimited
+Per-match lifetime: 1 quota | Monthly: 1(fixtures) + 4(first run) = 5/250
 ```
 
 ### Example: Providing API Key
