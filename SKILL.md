@@ -35,7 +35,13 @@ Built-in complete odds analysis system. **Only needs OddsPapi** — single `/v4/
 ⑤ 所有调用严格串行，上一个返回并验证后才发下一个。
    禁止并发。禁止跳过验证。
 
-违反以上任何一条 = 浪费用户配额。
+⑥ 🕐 时区规则（选错比赛 = 全盘错误）：
+   用户说 "明天" / "今天" → 必须以用户所在时区判断。
+   获取方式：读取系统时区（date +%Z）、或用户上下文中的 UTC offset。
+   默认假设：中文用户 = Asia/Shanghai (UTC+8)。
+   /v4/fixtures 返回的 startTime 是 UTC → 必须转换为用户本地时间后再过滤日期。
+
+违反以上任何一条 = 浪费用户配额或分析错误比赛。
 ```
 
 All conclusions based on mathematical formulas, handicap rules, and fundamental logic. No subjective judgment.
@@ -226,6 +232,7 @@ Confirmation format:
    - Confidence level for each score
    - Confidence interval and reverse risk note
 7. **Disclaimer**: Vig/drake mechanism means long-term mathematical expectation is negative. Odds analysis only improves data discernment, cannot guarantee profit
+8. **Team name display**: ALL output (HTML report, summary cards, tables, score predictions) MUST use Chinese domestic names. /v4/fixtures returns English names (e.g. "Korea Republic", "Bosnia and Herzegovina") — these MUST be converted to Chinese names (e.g. "韩国", "波黑") using the mapping table in Section 6A before any display output.
 
 ---
 
@@ -243,15 +250,25 @@ First time a league/tournament is used:
      → 1 quota → save response to /tmp/oddspapi_fixtures_{tournamentId}.json
   3. If EXISTS: read from file (0 quota)
 
-  4. Extract fixtureIds + startTimes for target date:
-     → Read from cache file
-     → Filter by startTime within target date range
-     → Build match list: [{fixtureId, participant1Name, participant2Name, startTime}]
+  4. Determine target date in **user's local timezone**:
+     → Get user timezone: read `date +%Z` → if "+08" or "CST" or Chinese context → Asia/Shanghai (UTC+8)
+     → "明天" = current_local_date + 1 day
+     → "今天" = current_local_date
 
-  Subsequent analyses:
-  → Read fixtureId + startTime from cache (0 quota)
-  → Calculate time-to-kickoff from cached startTime
-  → Decide: >1h → /historical-odds only OR ≤1h → /odds + /historical-odds
+  5. Filter fixtures for target date (convert UTC → local):
+     → /v4/fixtures returns startTime in ISO 8601 UTC (e.g. "2026-06-18T16:00:00.000Z")
+     → Convert: localTime = new Date(startTime + 'Z'). Add timezone offset hours
+     → Filter: keep only fixtures where localTime date matches target date
+     → Build match list: [{fixtureId, participant1Name, participant2Name, startTime, localTime}]
+
+  6. Calculate time-to-kickoff for each match:
+     → diff_ms = startTime_utc - now_utc
+     → Decide: >1h → /historical-odds only OR ≤1h → /odds + /historical-odds
+
+  ⚠️ Example: user says "明天" at 2026-06-18 22:00 CST.
+      Target = 2026-06-19 (local CST).
+      A match at UTC 2026-06-18T16:00:00Z = CST 2026-06-19 00:00 → ✅ matches.
+      A match at UTC 2026-06-19T19:00:00Z = CST 2026-06-20 03:00 → ❌ next day, skip.
 ```
 
 **Why this is mandatory:**
@@ -898,6 +915,68 @@ RULES:
 ```
 
 **Why Step 9 is the most frequently missed**: After completing Steps 1-8 (all analytical/technical), it's easy to jump straight to Step 10 (score prediction) because score prediction "feels like" the conclusion. But Step 9 serves a distinct purpose: it synthesizes all preceding analysis into a single narrative paragraph with an actionable direction judgment. This is the bridge between raw data and the probability numbers. Without it, the report is a pile of numbers without a thesis.
+
+---
+
+## Section 6A: Team Name Mapping（中英文对照表）
+
+> /v4/fixtures 和 /v4/odds 返回英文队名。输出报告必须全部替换为中文名。
+
+### 2026 世界杯 48 队中文名映射
+
+| API 返回名 | 中文显示名 |
+|:---|:---|
+| Mexico | 墨西哥 |
+| South Africa | 南非 |
+| Korea Republic | 韩国 |
+| Czechia | 捷克 |
+| Canada | 加拿大 |
+| Bosnia and Herzegovina | 波黑 |
+| Qatar | 卡塔尔 |
+| Switzerland | 瑞士 |
+| USA | 美国 |
+| Paraguay | 巴拉圭 |
+| Australia | 澳大利亚 |
+| Turkiye | 土耳其 |
+| Brazil | 巴西 |
+| Morocco | 摩洛哥 |
+| Haiti | 海地 |
+| Scotland | 苏格兰 |
+| Germany | 德国 |
+| Curacao | 库拉索 |
+| Netherlands | 荷兰 |
+| Japan | 日本 |
+| Ivory Coast | 科特迪瓦 |
+| Ecuador | 厄瓜多尔 |
+| Sweden | 瑞典 |
+| Tunisia | 突尼斯 |
+| Spain | 西班牙 |
+| Cape Verde Islands | 佛得角 |
+| Saudi Arabia | 沙特阿拉伯 |
+| Uruguay | 乌拉圭 |
+| Belgium | 比利时 |
+| Egypt | 埃及 |
+| Iran | 伊朗 |
+| New Zealand | 新西兰 |
+| France | 法国 |
+| Senegal | 塞内加尔 |
+| Iraq | 伊拉克 |
+| Norway | 挪威 |
+| Argentina | 阿根廷 |
+| Algeria | 阿尔及利亚 |
+| Austria | 奥地利 |
+| Jordan | 约旦 |
+| Portugal | 葡萄牙 |
+| Congo DR | 刚果民主共和国 |
+| England | 英格兰 |
+| Croatia | 克罗地亚 |
+| Ghana | 加纳 |
+| Panama | 巴拿马 |
+| Uzbekistan | 乌兹别克斯坦 |
+| Colombia | 哥伦比亚 |
+
+> 使用方式：每处显示队名时，用此表查 API 返回的 `participant1Name`/`participant2Name` → 取中文名。
+> 未知队名：保留英文原名并标注 "(name unknown)"。
 
 ---
 
