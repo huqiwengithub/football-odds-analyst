@@ -302,15 +302,20 @@ On receiving analysis request:
    │   │
    │   ├─ Call A (1X2): outcomeId=101,102,103 → ~510KB, timeout 15s
    │   │   GET /v4/historical-odds?fixtureId=X&bookmakers=pinnacle,bet365,sbobet&outcomeId=101,102,103&apiKey=KEY
-   │   │   → Parse: H/D/A open + now + changes per bookmaker
+   │   │   → Parse + daily sampling: group by date, keep first entry per day per outcome
+   │   │   → Output: 3家 × 3结果 × {open, daily_timeseries[]} → ~5KB
    │   │
    │   ├─ Wait ≥5s (rate limit 5000ms)
    │   │
-   │   └─ Call B (AH + O/U): no outcomeId filter → ~24MB, timeout 60s
+   │   └─ Call B (AH + O/U + Correct Score): no outcomeId filter → ~24MB, timeout 60s
    │       GET /v4/historical-odds?fixtureId=X&bookmakers=pinnacle,bet365,sbobet&apiKey=KEY
-   │       → Pipe to node, extract ONLY: main spreads (top-1 2-outcome by entries) + main totals (top-2 2-outcome by entries) per bookmaker
+   │       → Pipe to node, extract ONLY:
+   │         ① Main spreads (top-1 2-outcome by entries) per bookmaker
+   │         ② Main totals (top-2 2-outcome by entries) per bookmaker  
+   │         ③ Correct score market (if available) per bookmaker
+   │       → Daily sampling: group by date, keep first entry per day per outcome
    │       → Discard raw 24MB response immediately after extraction
-   │       → Output: ~4KB (3 bookmakers × 2 markets × 4 prices)
+   │       → Output: ~8KB
    │
    ├─ ≤ 1h before kickoff → /odds (1 quota, ⚠️ MUST confirm with user)
    │   → Ask: "/v4/odds × N matches = N quota. Current: X/250. Proceed?"
@@ -394,42 +399,68 @@ On receiving analysis request:
 > → 3家 × 3结果 × {open,now,changes} = 27 数据点，~1KB
 > ```
 
-> **提取代码 A（1X2）**:
+> **每日采样规则（应用于所有提取代码）**:
+> ```javascript
+> // 从完整时间线中每天只取第一条，将 2797 条压缩为 ~38 条
+> function dailySample(timeline) {
+>   const days = {};
+>   for (const entry of timeline) {
+>     const day = entry.createdAt.slice(0, 10); // "2026-05-11"
+>     if (!days[day]) days[day] = entry.price;
+>   }
+>   return Object.entries(days).map(([date, price]) => ({date, price}));
+> }
+> ```
+>
+> **提取代码 A（1X2 胜平负）**:
 > ```javascript
 > const d = JSON.parse(raw); const out = {fixtureId: d.fixtureId, bookmakers: {}};
 > for (const [bm, data] of Object.entries(d.bookmakers)) {
+>   const m101 = data.markets["101"]; if (!m101) continue;
 >   const ml = {};
 >   for (const [oid, label] of [["101","H"],["102","D"],["103","A"]]) {
->     const tl = data.markets["101"]?.outcomes[oid]?.players?.["0"] || [];
->     if (!tl.length) continue;
->     let chg = 0;
->     for (let i=1; i<tl.length; i++) if (tl[i].price!==tl[i-1].price) chg++;
->     ml[label] = {open: tl[0].price, now: tl[tl.length-1].price, changes: chg};
+>     const tl = m101.outcomes[oid]?.players?.["0"] || [];
+>     ml[label] = dailySample(tl); // [{date, price}, ...]
 >   }
 >   out.bookmakers[bm].ml = ml;
 > }
-> // Output A: 3家 × 3结果 × {open,now,changes} → ~1KB
+> // Output A: 3家 × 3结果 × daily timeseries → ~5KB
 > ```
 >
-> **提取代码 B（AH + O/U 主线）**:
+> **提取代码 B（让球 AH + 大小球 OU + 波胆 Correct Score）**:
 > ```javascript
 > for (const [bm, data] of Object.entries(d.bookmakers)) {
->   const twoway = Object.entries(data.markets)
+>   const markets = data.markets;
+>   // Main AH + main OU = top-2 2-outcome markets by entries
+>   const twoway = Object.entries(markets)
 >     .filter(([k,m]) => Object.keys(m.outcomes).length === 2)
 >     .map(([k,m]) => {
 >       let n=0; for(const o of Object.values(m.outcomes)) n+=(o.players?.["0"]||[]).length;
 >       return {key: k, entries: n, outcomes: m.outcomes};
 >     }).sort((a,b)=>b.entries-a.entries);
->   if (twoway.length < 2) continue;
 >   const ext = (x) => {
 >     const ks=Object.keys(x.outcomes), p=(id)=>x.outcomes[id]?.players?.["0"]||[];
->     return {s0_open: p(ks[0])[0]?.price, s1_open: p(ks[1])[0]?.price,
->             s0_now: p(ks[0]).slice(-1)[0]?.price, s1_now: p(ks[1]).slice(-1)[0]?.price};
+>     return {s0: dailySample(p(ks[0])), s1: dailySample(p(ks[1]))};
 >   };
->   out.bookmakers[bm].ah = ext(twoway[0]);  // main spreads
->   out.bookmakers[bm].ou = ext(twoway[1]);  // main totals
+>   if (twoway.length>=2) { out.bookmakers[bm].ah = ext(twoway[0]); out.bookmakers[bm].ou = ext(twoway[1]); }
+>   // Correct Score: market with most outcomes (typically 20+ for 0-0 to 3-3 etc.)
+>   const csMarket = Object.entries(markets)
+>     .filter(([k,m]) => Object.keys(m.outcomes).length > 3)
+>     .sort((a,b) => {
+>       let na=0,nb=0; for(const o of Object.values(a[1].outcomes)) na+=(o.players?.["0"]||[]).length;
+>       for(const o of Object.values(b[1].outcomes)) nb+=(o.players?.["0"]||[]).length;
+>       return nb-na;
+>     })[0];
+>   if (csMarket) {
+>     const cs = {};
+>     for (const [oid, odata] of Object.entries(csMarket[1].outcomes)) {
+>       const tl = odata.players?.["0"] || [];
+>       cs[oid] = dailySample(tl).slice(-1)[0]; // only latest for each score
+>     }
+>     out.bookmakers[bm].cs = cs;
+>   }
 > }
-> // Output B: 3家 × 2市场 × 4 prices → ~3KB
+> // Output B: 3家 × (AH + OU) daily timeseries + CS latest → ~8KB
 > ```
 
 ### Phase Plan (4 matches × 3 checks/day)
