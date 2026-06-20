@@ -1,14 +1,32 @@
 ---
 name: football-odds-analyst
-description: "Professional football odds/Asian handicap analyst v2.7. Trigger keywords: analyze match, odds analysis, handicap analysis, 1X2 analysis, trap detection, mixed parlay, 竞彩. Cache-first: odds-by-tournaments (1 quota = entire tournament). 12+1 step analysis. W/L 79.2% (28 matches). Mixed parlay +107.8% ROI (6/6 tickets)."
+description: "Professional football odds/Asian handicap analyst v2.9. Trigger keywords: analyze match, odds analysis, handicap analysis, 1X2 analysis, trap detection, mixed parlay, 竞彩. Cache-first: odds-by-tournaments (1 quota = entire tournament). 12+1 step analysis. W/L 79.2% (28 matches). Mixed parlay +107.8% ROI (6/6 tickets)."
 allowed-tools: Read, Write, Bash, WebSearch, WebFetch
 agent_created: true
-version: 2.7
-released: 2026-06-20
+version: 2.9
+released: 2026-06-21
 references: references/knowledge-base.md
+# v2.9 changelog (2026-06-20 session):
+# - 7 portfolio construction rules hardened through iterative optimization
+# - Rule 1: Single-point failure audit → must have ≥2 distinct anchors
+# - Rule 2: P(全灭) must enumerate all outcome combos, not just anchor-fail case
+# - Rule 3: Pairwise coverage: all 2-folds of top-3 favorites for any-2-win coverage
+# - Rule 4: Pyramid allocation: heaviest ticket must cover budget alone → P(不亏)=P(A)
+# - Rule 5: JQS single-number precision (0/1/2/3/4/5/6/7+, no ranges)
+# - Rule 6: Chinese-only output for team names and play types in parlay section
+# - Rule 7: Profit range output mandatory for every mixed parlay
+# v2.8 changelog:
+# - API domain: oddspapi.com → oddspapi.io (migrated 2026-06-20)
+# - Added --noproxy "*" flag for API calls behind proxy
+# - Added rate limit rule: /v4/historical-odds ~2.5s sequential gap
+# - Added Pinnacle market ID mapping: 101=1X2 (home=101, draw=102, away=103)
+# - Added ¥2 multiple constraint for 竞彩
+# - Added Poisson-based RSPF/JQS probability derivation from AH+OU data
+# - Added dynamic allocation formula with 覆盖本金 constraint
+# - Historical-odds file size warning: 4-10MB, use temp files
 ---
 
-# Football Odds Analyst v2.7 — Execution Engine
+# Football Odds Analyst v2.9 — Execution Engine
 
 > **HOW TO USE**: This file is the execution checklist. Detailed rules live in `references/knowledge-base.md`. Sections marked `$KB-N` reference the knowledge base — `Read` that file when you need the detailed table/formula/definition.
 >
@@ -30,15 +48,20 @@ references: references/knowledge-base.md
 ⑦ CACHE-FIRST: Read ~/.cache/oddspapi/{tournamentId}.json → exists? use it. Not? ask → pull → cache.
 ⑧ /v4/odds-by-tournaments (1 quota = all matches) vs /v4/odds (1 quota/match). ALWAYS prefer odds-by-tournaments.
 ⑨ SBOBET validation: first call → if no AH data → fallback Singbet or dual-purpose bet365. Mark accordingly.
+⑩ 🔴 API DOMAIN: api.oddspapi.io (NOT .com). Always include --noproxy "*" for curl if behind proxy.
+⑪ 🔴 RATE LIMIT: /v4/historical-odds has ~2.5s rate limit. Parallel calls → RATE_LIMITED error. Must sequential with ≥3s gap.
+⑫ Historical-odds files can be 4-10MB each. Write to temp files (/tmp/), never load entire response in memory.
+   Use streaming or process from disk. Market 101 = 1X2 (home=101, draw=102, away=103) is the canonical market ID.
 ```
 
 ### API Quick Reference
 | Endpoint | Cost | When |
 |----------|:----:|------|
-| `/v4/account` | 0 | Before any billed call |
-| `/v4/historical-odds?fixtureId=X&bookmakers=p,s,b` | 0 | 3 daily checks per match |
-| `/v4/odds-by-tournaments?tournamentIds=X&bookmaker=Y` | 1 | T-1h if no cache |
-| `/v4/fixtures?tournamentId=X` | 1 | Once per tournament |
+| `https://api.oddspapi.io/v4/account?apiKey=KEY` | 0 | Before any billed call |
+| `https://api.oddspapi.io/v4/historical-odds?fixtureId=X&bookmakers=p,s,b&apiKey=KEY` | 0 | 3 daily checks per match; sequential only (≥3s gap) |
+| `https://api.oddspapi.io/v4/odds-by-tournaments?tournamentIds=X&bookmaker=Y&apiKey=KEY` | 1 | T-1h if no cache |
+| `https://api.oddspapi.io/v4/odds?fixtureId=X&bookmaker=Y&apiKey=KEY` | 1 | Individual match (use only when historical-odds is too large) |
+| `https://api.oddspapi.io/v4/fixtures?tournamentId=X&apiKey=KEY` | 1 | Once per tournament |
 
 ### 🔴 API Parameter Iron Law
 ```
@@ -236,11 +259,13 @@ Rules: lottery.gov.cn official: https://www.lottery.gov.cn/bzzx/yxgz/20191119/10
 |:--:|:--:|------|
 | SPF | 8 | ⭐⭐⭐ Primary |
 | RSPF | 8 | ⭐⭐ When SPF too low or blowout |
-| JQS | 6 | ⭐⭐ When OU analysis clear |
+| JQS | 6 | ⭐⭐ 🔴 Must pick ONE specific number (0/1/2/3/4/5/6/7+), NOT a range |
 | BQC | 4 | ⭐ HT confidence ≥80% only |
 | BF | 4 | ❌ Never for parlay |
 
 **Core rules**: ① Football only. ② Same match: 1 play type only. ③ Cap = min(all plays' max). ④ Prize = ¥2×∏(odds).
+⑤ 🔴 **投注金额必须是 2 元的整数倍**（最低 2 元/注）。分配方案中的金额必须取整为 2 的倍数，同时保持总和 = 预设预算。
+⑥ 🔴 **输出全部使用中文**：队名必须用中文全称（德国、日本、荷兰…），玩法用中文（胜平负、让球胜平负、总进球数）。禁止输出 GER/JPN/NED/ECU/TUN 等英文缩写。
 
 ### JCL Handicap → Pinnacle AH
 ```
@@ -259,13 +284,29 @@ RSPF: AH water ≤1.85 + same direction → use RSPF. AH water >2.10 → SPF saf
 ```
 
 ### Barbell Portfolio (Core Output)
-→ Budget spread across 3 plans: Conservative (SPF 3-fold) + Balanced (mixed 3-fold) + Aggressive (RSPF+JQS).
-→ Dynamic allocation formula: $KB-6 (not fixed 60/30/10).
+→ Budget spread across 3 tickets, each using DIFFERENT anchor matches to avoid single-point failure.
+→ 🔴 **Anti-correlation rule**: No two tickets may share a match as their primary anchor. If the most-used anchor fails, at least one ticket must survive.
+→ 🔴 **Dynamic allocation formula**: Alloc<sub>i</sub> = P<sub>hit,i</sub> / ΣP<sub>hit</sub> × Budget, then round to nearest ¥2 multiple.
+→ **Cover本金约束**：保守型 Alloc<sub>cons</sub> × Odds<sub>cons</sub> ≥ Budget（确保命中则回收全部本金）。
+→ **盈利范围输出**：必须附盈亏情景表（全中/双中/单中/全灭），含概率、回报、净利润。标注 EV 和 P(盈利≥0)。
+→ **RSPF/JQS 概率推导**：使用 Poisson 分布 × 盘口推导的 xG。
+  - xG<sub>home</sub> = (OU_line + |AH_line|) / 2,  xG<sub>away</sub> = (OU_line − |AH_line|) / 2
+  - RSPF(N)主胜 = Poisson P(home_goals − away_goals > N)
+  - RSPF(N)平 = Poisson P(home_goals − away_goals = N)
+  - JQS [N球] = Poisson P(total = N), N∈{0,1,2,3,4,5,6,7+}
 
 ```
-Conservative P_hit <0.10 → skip day. Aggressive P_hit <0.02 → cancel, merge into balanced.
-Only 2 matches → conservative+balanced only. 3 straight full-miss days → pause, review logic.
+🔴 CRITICAL: Verify portfolio before output.
+   - Count distinct anchors across all 3 tickets. If <2 anchors → redesign.
+   - P(total loss) = P(anchor1 fails) × P(all other anchors fail | anchor1 fails) → MUST ≤ 30%.
+   - If P(total loss) > 30%, add a hedge ticket independent of the most-used anchor.
+   - Conservative P_hit <0.10 → skip day.
+   - Aggressive P_hit <0.02 → cancel, merge into balanced.
+   - Only 2 matches → conservative+balanced only.
+   - 3 straight full-miss days → pause, review logic.
+   - P_hit must be computed from Pinnacle de-vigged probs × Poisson distrib, NOT from JCL implied probs.
 ```
+→ Full mixed parlay methodology + barbell formulas: `references/knowledge-base.md` §KB-6, §KB-7.
 
 ### Blowout Days
 ```
@@ -276,6 +317,84 @@ Debut/long-absence cluster: ≥2 teams trigger Rule #24 → skip or max 1 match
 
 ### Backtest: ¥600→¥1,246 (+107.8%). 6/6 tickets. 11/28 matches (39%) correctly skipped.
 → Full mixed parlay methodology + barbell formulas: `references/knowledge-base.md` §KB-6, §KB-7.
+
+---
+
+## 🏗️ PORTFOLIO CONSTRUCTION RULES (v2.9)
+
+> **Structured from iterative portfolio optimization. These are universal — no match-specific names.**
+
+### Rule 1: Single-Point Failure Audit (MANDATORY before output)
+```
+① List all matches that appear as anchors in ANY ticket.
+② If any one match appears in ALL tickets → 🚨 SINGLE-POINT FAILURE.
+   P(全灭) ≥ P(该锚点未命中). A 64.8% favorite still fails 35.2% of the time.
+③ Fix: add at least one ticket whose anchor match appears NOWHERE else.
+④ Re-audit after fix: count distinct anchor matches. Must have ≥2.
+   If 2 anchors have combined fail prob < 15%, add a 3rd.
+```
+
+### Rule 2: P(全灭) Must Be Computed Correctly
+```
+🔴 NEVER approximate as "P(anchor fails) × P(other fails)". This misses
+   the "anchor passes but secondary legs fail" case, which is often large.
+🔴 CORRECT: enumerate ALL outcome combinations of the top-N matches used as legs.
+   With 3 binary-outcome matches → 8 combos. Sum P of combos where no ticket hits.
+   Example: anchor-fail case = 19.8%, anchor-pass + legs-fail case = 9.5%.
+   True P(全灭) = 29.3%, NOT 19.8%.
+```
+
+### Rule 3: Pairwise Coverage
+```
+When 3+ high-probability SPF picks exist (individual P > 55%), create all 3
+pairwise 2-folds as the core network. Higher-P combos get heavier weight.
+This guarantees: any 2 of the 3 favorites winning → ≥1 ticket hits.
+Without this: the "anchor-fails but other-2-win" combo (~12%) has zero coverage.
+```
+
+### Rule 4: Pyramid Allocation
+```
+🔴 The highest-P_hit ticket MUST be heavy enough to cover the total budget alone:
+     Weight_best × Odds_best ≥ Total_Budget
+   This makes P(不亏) = P(best ticket hits) — typically 35-45%.
+   Remaining budget cascades to lower-P tickets as supplementary upside.
+
+🔴 NEVER weight tickets equally. Equal weights force multi-ticket coordination
+   for budget recovery, dropping P(不亏) by 15-20pp vs pyramid allocation.
+```
+
+### Rule 5: JQS Precision
+```
+🔴 JQS = total goals exact number: 0/1/2/3/4/5/6/7+. NO ranges like "2-3球".
+   Select the single most probable value from Poisson(total_goals; λ).
+```
+
+### Rule 6: Output Language
+```
+🔴 Parlay section: 100% Chinese. Teams by full Chinese name. Play types:
+   胜平负 / 让球胜平负(±N) / 总进球数. No English abbreviations.
+   Technical/analysis sections may retain standard abbreviations (AH, xG, SPF).
+```
+
+### Rule 7: Profit Range Output
+```
+Every mixed parlay output MUST include:
+  □ Scenario table: ticket hits under each outcome combination
+  □ Profit table: best / typical / worst case, each with probability
+  □ P(全灭) computed by Rule 2 enumeration
+  □ P(不亏 ≥ Budget) — primary quality metric
+  □ EV = Σ(P_i × Return_i) − Budget (structural negative EV is expected)
+```
+
+### Rule 7: Profit Range Output
+```
+Every mixed parlay output MUST include:
+  □ Scenario table: which tickets hit under which combination of outcomes
+  □ Profit range: best case / typical / worst case, each with probability
+  □ P(全灭) with correct computation (Rule 2)
+  □ P(不亏 ≥ Budget) = P(anchor ticket hits AND covers budget)
+  □ Weighted EV = Σ(P_i × Return_i) − Budget
+```
 
 ---
 
