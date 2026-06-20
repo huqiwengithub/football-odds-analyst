@@ -1,13 +1,13 @@
 ---
 name: football-odds-analyst
-description: "Pro football odds/Asian handicap data analyst v2.7. Trigger keywords: analyze match, odds analysis, handicap analysis, 1X2 analysis, Asian handicap, match data, football analysis, odds movement, opening odds, closing odds, trap detection, lottery simulation, 混合过关, 彩票. Only needs OddsPapi: /historical-odds (free) + /odds (1 quota/match). Built-in 12-step analysis with quota-safety protocol. W/L accuracy verified at 79.2% across 24 matches. Mixed parlay backtest: 5/5 wins."
+description: "Pro football odds/Asian handicap data analyst v2.7. Trigger keywords: analyze match, odds analysis, handicap analysis, 1X2 analysis, Asian handicap, match data, football analysis, odds movement, opening odds, closing odds, trap detection, lottery simulation, 混合过关, 竞彩, 彩票. Cache-first: odds-by-tournaments (1 quota = entire tournament, 40x more efficient than per-fixture /odds). Built-in 12-step analysis with quota-safety protocol. Mixed parlay backtest: 6/6 wins (+107.8% ROI)."
 allowed-tools: Read, Write, Bash, WebSearch, WebFetch
 agent_created: true
 version: 2.7
 released: 2026-06-20
 changelog: |
+  v2.7: Sec 11 竞彩混合过关 (500.com+lottery.gov.cn+动态Barbell), Sec 12 《足球财富》方法论 (欧赔动态/亚盘临场/大小球/欧亚综合), Sec 13 实战盘口分析体系 (5篇教程: 盘型推算/四口诀/三维一体/背离检测/联赛特性/资金管理), cache-first (Rule ⑨), endpoint efficiency (Rule ⑩)
   v2.6: 14.0b Stomp xG, 14.0c Host hist xG, 9.16 full-cycle, draw inertia, Sec 10 Mixed Parlay (blind backtest: +107.8% ROI, 6/6 tickets)
-  v2.5: W/L priority output, 14.0a away xG strong-D discount, 9.15 6/20 RCA, extreme favorite floor, cross-trigger cap
   v2.5: W/L priority output, 14.0a away xG strong-D discount, 9.15 6/20 RCA, extreme favorite floor, cross-trigger cap
   v2.4: Rules #27 first point/win motivation, #28 heat discount, Section 9.14复盘
 ---
@@ -16,7 +16,7 @@ changelog: |
 
 Professional football odds and Asian handicap data analysis. Designed for match odds logic study, data decomposition, and trap identification.
 
-Built-in complete odds analysis system. **Only needs OddsPapi** — 3-bookmaker golden triangle: Pinnacle (sharp pricing baseline) + SBOBet (Asian handicap king) + bet365 (retail heat gauge). `/v4/odds` (1 quota) returns all markets. `/v4/historical-odds` is permanently free. Web search fallback when no API key.
+Built-in complete odds analysis system. **Only needs OddsPapi** — 3-bookmaker golden triangle: Pinnacle (sharp pricing baseline) + SBOBet (Asian handicap king) + bet365 (retail heat gauge). **Cache-first**: `/v4/odds-by-tournaments` (1 quota = entire tournament, 40× more efficient than per-fixture `/v4/odds`). `/v4/historical-odds` is permanently free. Web search fallback when no API key.
 
 ---
 
@@ -65,6 +65,42 @@ QUOTA SAFETY IS THE HIGHEST PRIORITY. These rules override all other analysis st
    Historical odds data is fresh each pull (live data, no cache).
    Only delete cache on explicit user request to refresh.
 
+⑨ 🟢 CACHE-FIRST CHECK (MANDATORY — ALWAYS RUN BEFORE ANY BILLED CALL):
+   a. List cache dir: ls ~/.workbuddy/skills/football-odds-analyst/.cache/oddspapi/
+   b. Check which data is already cached:
+      - Fixtures cache: oddspapi_fixtures_{tournamentId}.json → skip /v4/fixtures if exists
+      - Odds-by-tournament cache: odds_tournament_{bookmaker}_{tournamentId}.json → skip /v4/odds-by-tournaments if exists for that bookmaker
+      - Outcome IDs cache: outcome_ids_{tournamentId}.json → check if target fixtureIds are present
+   c. For each missing piece → identify the most efficient endpoint (see Rule ⑩ below)
+   d. NEVER re-fetch data that already exists in cache just to "refresh" or "confirm"
+   e. If cache has stale data (pre-match prices before kickoff) → still use it for pre-match analysis
+
+⑩ 🔵 ENDPOINT EFFICIENCY RULE — choose the endpoint that yields MAX DATA per QUOTA:
+   OddsPapi pricing: "1 successful billed call = exactly 1 quota. Response size, entry count,
+   query parameters, and HTTP status codes have NO impact on the count."
+
+   Efficiency ranking (most → least data per quota):
+   Rank 1: /v4/odds-by-tournaments?bookmaker=X&tournamentIds=T → 1 quota = ALL fixtures
+           in tournament for 1 bookmaker (40+ matches × 90+ markets = $0.004/match)
+   Rank 2: /v4/fixtures → 1 quota = ALL ~103 matches schedule for whole tournament
+   Rank 3: /v4/odds?fixtureId=X → 1 quota = 1 single fixture (350 bookmakers, but only 1 match)
+           ⚠️ AVOID — use /v4/odds-by-tournaments instead whenever possible
+           ONLY use if: a single outlier fixture not covered by tournament cache
+
+   🔴 Decision tree when cache is incomplete:
+   ┌─ Need fixture schedule? → /v4/fixtures (1 quota × 1 call)
+   ├─ Need odds for tournament? → /v4/odds-by-tournaments × 3 (3 quota: pinnacle + bet365 + sbobet)
+   │  This one call per bookmaker gives you ALL fixtures' 1X2/AH/OU/CS data.
+   │  SAVE the full response → it doubles as outcome ID source AND live odds snapshot.
+   ├─ Need 1X2 historical line movement? → /v4/historical-odds (0 quota, free)
+   └─ Need odds for 1 isolated match only? → ⚠️ Ask user if they want full tournament instead
+      (3 quota for ALL matches vs 1 quota per single match — tournament is always better)
+
+   🔴 Parameter iron law (verified 2026-06-20):
+   - /v4/odds-by-tournaments: bookmaker (singular) + tournamentIds (plural)
+   - /v4/fixtures: tournamentId (singular)
+   - Do NOT add sportId, marketTypeIds, or any extra parameters
+
 Violating any of the above = wasted user quota or incorrect match analysis.
 ```
 
@@ -87,11 +123,13 @@ Default: **OddsPapi** (register at oddspapi.io, 250/month)
 | Web search (fallback) | Zero-config option | Unlimited | No key needed |
 
 > **Quota facts (from official docs):**
-> - `/v4/odds`: 1 request = 1 quota = ALL 350+ bookmakers + ALL markets (response size has no impact)
-> - `/v4/historical-odds`: permanently free, unlimited, never counts toward quota
-> - `/v4/fixtures`: fetch entire tournament schedule in 1 request, cache for whole season
+> - "Each successful call to a billed endpoint deducts exactly 1 request from your quota. Response size, entry count, query parameters, and HTTP status codes have NO impact — a call returning 1,000 fixtures costs the same 1 quota as one returning 0 fixtures."
+> - `/v4/historical-odds`: permanently free, unlimited
+> - `/v4/odds-by-tournaments?bookmaker=X`: 1 quota = ALL tournament fixtures for 1 bookmaker
+> - `/v4/odds?fixtureId=X`: 1 quota = 1 single fixture (⚠️ avoid — use odds-by-tournaments instead)
+> - `/v4/fixtures`: 1 quota = entire tournament schedule
 >
-> OddsPapi alone satisfies all analysis needs. No other API provider required.
+> **Efficiency rule**: Always pull at tournament level. 3 calls (pinnacle+bet365+sbobet via odds-by-tournaments) = 3 quota for ALL data. Per-fixture /v4/odds would cost 3×N quota for N matches.
 
 ### SBOBet Data Validation<!-- 2026-06-19 专家评审: SBOBet 支持性验证 -->
 
@@ -233,36 +271,49 @@ First time a league/tournament is used:
 
 **World Cup 2026**: Cache file `oddspapi_fixtures_16.json`. If missing → ask user: "/v4/fixtures × 1 = 1 quota. Proceed?" After yes: `GET /v4/fixtures?tournamentId=16&from=2026-06-11&to=2026-07-19&apiKey=KEY` → 1 quota → caches all 103 matches.
 
-### 2.2 Outcome ID Cache (3 quota, one-time)
+### 2.2 Odds + Outcome ID Cache (3 quota, one-time per tournament)
 
 ```
-First analysis of ANY match in a tournament → immediately cache ALL outcome IDs for that tournament.
+🔴 STEP 0 — CACHE-FIRST CHECK (Rule ⑨):
+   ls ~/.workbuddy/skills/football-odds-analyst/.cache/oddspapi/
+   → Check if odds_tournament_{bookmaker}_{tournamentId}.json EXISTS for each bookmaker
+   → Check if target fixtureIds are present INSIDE the cached file
+   → If ALL 3 bookmakers cached AND all target fixtures present → 0 quota, skip to 2.3
 
-Cache file: ~/.workbuddy/skills/football-odds-analyst/.cache/oddspapi_outcome_ids_{tournamentId}.json
+🔴 STEP 1 — Only if cache MISSING or INCOMPLETE:
+   Ask: "Need /v4/odds-by-tournaments × N = N quota for N missing bookmakers. Continue? (yes/no)"
 
-🔴 Ask user: "/v4/odds-by-tournaments × 3 = 3 quota. Proceed? (yes/no)"
+⚠️ Parameter iron law (verified 2026-06-20):
+  - bookmaker (singular) + tournamentIds (plural)
+  - Do NOT add sportId or marketTypeIds
 
-⚠️ Parameter iron law (2026-06-19 回检: 2 wrong params = 2 wasted quota):
-  - Parameter is `bookmaker` (singular), NOT `bookmakerIds`
-  - Parameter is `tournamentIds` (plural), NOT `tournamentId`
-  - Do NOT add `sportId` or `marketTypeIds`
-  - 🔴 Inspect + save in ONE call (don't inspect-only then save — that wastes 1 quota)
-  - 🔴 Run the API Parameter Verification Checklist (Data Source Configuration section) before EVERY billed call
+Serial calls (≥1s between. MUST save response in ONE call per bookmaker):
+  GET /v4/odds-by-tournaments?bookmaker=pinnacle&tournamentIds={tid}&apiKey=KEY
+  GET /v4/odds-by-tournaments?bookmaker=bet365&tournamentIds={tid}&apiKey=KEY
+  GET /v4/odds-by-tournaments?bookmaker=sbobet&tournamentIds={tid}&apiKey=KEY
 
-Serial calls (≥1s between):
-  GET /v4/odds-by-tournaments?bookmaker=pinnacle&tournamentIds={tournamentId}&apiKey=KEY
-  GET /v4/odds-by-tournaments?bookmaker=bet365&tournamentIds={tournamentId}&apiKey=KEY
-  GET /v4/odds-by-tournaments?bookmaker=sbobet&tournamentIds={tournamentId}&apiKey=KEY
+Save response to: .cache/oddspapi/odds_tournament_{bookmaker}_{tournamentId}.json
 
-For each fixtureId × each bookmaker, extract:
-  a. AH main: market with bookmakerMarketId starting "line/" + ending "spreads" (mainLine is always null)
-  b. OU main: market with bookmakerMarketId starting "line/" + ending "totals"
-  c. CS: market with bookmakerMarketId containing "correct_score" (if available)
-  d. TG: market with bookmakerMarketId containing "exact_goals" (if available)
-  ⚠️ Data structure: markets and outcomes are dicts (keyed by ID string), not lists
-  ⚠️ Extract outcome ID: use the outcome dict's key itself (outcomeId field is null)
+Each response provides BOTH:
+  ✅ LIVE ODDS SNAPSHOT for ALL fixtures (1X2/AH/OU/CS markets with current prices)
+  ✅ OUTCOME IDs for ALL markets (input to free /v4/historical-odds)
 
-Save to cache → subsequent queries read from file (0 quota).
+Data extraction from odds-by-tournaments response:
+  a. 1X2 (market '101'): oid='101'=home, oid='102'=draw, oid='103'=away (all 3 bookmakers)
+  b. AH: filter where bookmakerOutcomeId contains '/home' + '/away'
+  c. OU: filter where bookmakerOutcomeId contains '/over' + '/under' (exclude team totals)
+  d. CS: filter where bookmakerOutcomeId contains ':'
+  ⚠️ bet365/sbobet marketActive may be False in non-trading hours → prices still valid
+  ⚠️ SBOBET bookmakerOutcomeId labels ('1','X','2') may be swapped → trust OddsPapi oid
+
+Rebuild outcome IDs cache from saved odds_tournament files (0 extra quota):
+  → Extract all outcome IDs per fixtureId from all 3 bookmakers
+  → Save to outcome_ids_{tournamentId}.json
+  → Historical-odds queries read from this file (0 quota)
+
+💡 Efficiency insight: /v4/odds-by-tournaments = 40+ fixtures for 1 quota.
+   /v4/odds = 1 fixture for 1 quota. Tournament batch is 40× more efficient.
+   NEVER use /v4/odds when odds-by-tournaments can cover the same fixtures.
 ```
 
 ### 2.3 Historical Odds Queries (per match, 0 quota)
@@ -451,19 +502,22 @@ GET /v4/fixtures?tournamentId=16&from=2026-06-11&to=2026-07-19&apiKey=KEY
 → Returns ALL fixtures in date range. 1 call = entire tournament cached.
 ```
 
-**GET /v4/odds** — Live odds snapshot (1 quota)
+**GET /v4/odds** — Single match odds (1 quota — ⚠️ AVOID)
 ```
 GET /v4/odds?fixtureId=X&apiKey=KEY
-→ 1 request = ALL 350+ bookmakers × ALL markets.
-→ marketId 101 = 1X2 outcomes: 101(home)/102(draw)/103(away)
-→ Asian handicap: filter by bookmakerMarketId containing "spreads"
-→ Over/Under: filter by bookmakerMarketId containing "totals"
+→ 1 request = ALL 350+ bookmakers × ALL markets for 1 fixture.
+→ ⚠️ 1 fixture per quota. For N matches, costs N quota.
+→ ✅ Use /v4/odds-by-tournaments instead: 1 quota = ALL tournament fixtures.
+→ Only use /v4/odds if: single isolated match not in any tournament cache.
 ```
 
-**GET /v4/odds-by-tournaments** — Batch fixtures (1 quota)
+**GET /v4/odds-by-tournaments** — Batch tournament odds (1 quota — ✅ PREFERRED)
 ```
 GET /v4/odds-by-tournaments?bookmaker=pinnacle&tournamentIds={tournamentId}&apiKey=KEY
-→ Returns odds for ALL fixtures in specified tournament(s). Limited to 1 bookmaker per call.
+→ 1 quota = ALL 40+ fixtures for 1 bookmaker (40× more efficient than /v4/odds)
+→ Response: ~2MB per bookmaker, contains bookmakerOdds.{bookmaker}.markets
+→ Use 3 calls (pinnacle, bet365, sbobet) = 3 quota for complete golden triangle data
+→ Cache the full response — it serves as BOTH live odds snapshot AND outcome ID source
 ```
 
 **GET /v4/historical-odds** — Historical timeline (FREE)
@@ -2372,21 +2426,40 @@ v2.5设置上限为25% → 刚好命中! 保留此上限。
 
 ## Section 10: 混合过关彩票模拟 (v2.6新增)<!-- 2026-06-20 回溯5/5中奖 -->
 
-### 10.0 赔率数据源 — 国内体彩 (2026-06-20 新增)
+### 10.0 赔率数据源 — 国内体彩 (2026-06-20 新增, 06-20 更新)
 
 ```
-🔴 混合过关赔率必须使用国内体彩(竞彩足球)官方赔率，不可使用国际博彩公司赔率。
+🔴 混合过关模拟投注的结算赔率必须使用国内体彩(竞彩足球)官方赔率，不可使用国际博彩公司赔率。
+
+🏁 结算赔率来源 (唯一):
+  → WebFetch https://trade.500.com/jczq/?playid=312&g=2
+  → 提取每场比赛的: SPF / RSPF / JQS(进球数) / BF(比分) / BQC(半全场) 赔率
+  → 优势: 500.com 直接展示竞彩官方赔率，无需换算
+
+📊 分析辅助数据源 (交叉验证, 不用于结算):
+  ① 综合指数: https://odds.500.com/           — 多机构欧赔/亚盘综合视图
+  ② 欧洲指数: https://odds.500.com/europe_jczq.shtml  — 竞彩场次欧赔走势
+  ③ 亚洲盘口: https://odds.500.com/yazhi_jczq.shtml    — 竞彩场次亚盘水位
+  ④ 大小指数: https://odds.500.com/daxiao_jczq.shtml   — 竞彩场次大小球指数
+  ⑤ 必发指数: https://zx.500.com/jczq/bf_data.shtml    — 必发成交量+冷热指数
+  
+  必发指数特别用途:
+  - 成交量占比 > 60% 偏向一方 → 市场过热信号，降低该方向置信度
+  - 冷热指数 > 80 或 < 20 → 极端情绪，警惕陷阱
+  - 指数与赔率走势背离 → 可能有大资金反向操作
+
+📋 玩法规则参考:
+  → https://www.lottery.gov.cn/bzzx/yxgz/20191119/1040217.html
+  → 体育总局彩票中心 · 竞彩足球混合过关官方规则
+  → 定义: 允许的玩法类型、过关方式、奖金计算方法、最高可能固定奖金
 
 国内体彩赔率 ≠ 国际赔率:
   - 体彩 overround ~11% (覆水率 ~89%)
   - 国际庄 overround ~3-5% (覆水率 ~95-97%)
-  - 因此体彩赔率更低，直接挂钩后的赔付显著低于国际赔率乘积
 
-数据获取步骤:
-  ① 首选: WebFetch 抓取 https://trade.500.com/jczq/index.php?playid=312&g=2
-     → 提取每场比赛的 SPF、RSPF、总进球、比分赔率
-  ② 备用: 如500.com无法访问或数据缺失，WebSearch 搜索 "竞彩足球混合过关 赔率 [对阵]" 或 "体彩竞彩世界杯 [日期] 赔率"
-  ③ 如WebSearch也失败 → 使用 Pinnacle 赔率 × 0.75 折扣系数近似体彩赔率
+备用方案 (500.com 不可用时):
+  ② WebSearch "竞彩足球混合过关 赔率 [对阵]" 或 "体彩竞彩世界杯 [日期] 赔率"
+  ③ 使用 Pinnacle 赔率 × 0.75 折扣系数近似体彩赔率
      注: 0.75 系数为经验值 (89%/96% ≈ 0.93, 再折2串1累积折扣)
 ```
 
@@ -2465,3 +2538,902 @@ v2.5设置上限为25% → 刚好命中! 保留此上限。
 超冷门日: 当天 ≥2场赔率<1.30的比赛未赢 → 全天跳过
 首秀/久别重逢集中日: 当天 ≥2队触发规则#24 → 全天跳过或仅选1场
 ```
+
+---
+
+## Section 11: 国内竞彩混合过关 — 500.com 集成 + 风险分摊组合 (v2.7)
+
+> 本章将 OddsPapi 三方赔率分析结果映射到竞彩可投注玩法，构造多方案组合投注体系。核心创新: **不再单选一套方案，而是用总预算按比例分配到多套方案中，实现风险分摊+高赔率爆发**。
+
+### 11.1 数据源体系
+
+> 三层数据架构：国际赔率分析 (OddsPapi) → 国内指数参考 (500.com) → 竞彩官方结算 (500.com 混合过关页) + 规则 (体彩中心)。
+
+#### 第一层：国际赔率分析 (OddsPapi — 分析核心)
+
+| 数据 | 来源 | 说明 |
+|------|------|------|
+| 1X2/AH/OU/CS 赔率 | OddsPapi v4 (已缓存) | Pinnacle+Bet365+SBOBET 三方金三角 |
+| 历史赔率走势 | OddsPapi /v4/historical-odds (免费) | 检测异常波动、陷阱、资金流向 |
+
+#### 第二层：国内指数参考 (500.com — 交叉验证)
+
+| 数据 | URL | 用途 |
+|------|-----|------|
+| 综合指数 | https://odds.500.com/ | 多机构欧赔/亚盘/大小球综合对比视图 |
+| 欧洲指数 | https://odds.500.com/europe_jczq.shtml | 竞彩相关比赛的欧赔走势和变化幅度 |
+| 亚洲盘口 | https://odds.500.com/yazhi_jczq.shtml | 竞彩相关比赛的亚盘水位实时变化 |
+| 大小指数 | https://odds.500.com/daxiao_jczq.shtml | 竞彩相关比赛的大小球指数波动 |
+| 必发指数 | https://zx.500.com/jczq/bf_data.shtml | 必发交易所成交量 + 冷热指数, 辅助判断市场情绪偏向 |
+
+#### 第三层：竞彩官方 — 结算 + 规则 (唯一依据)
+
+| 数据 | URL | 用途 |
+|------|-----|------|
+| 🏁 混合过关赔率 | https://trade.500.com/jczq/?playid=312&g=2 | **模拟投注的唯一结算赔率依据**。SPF/RSPF/JQS/BF/BQC 赔率均取自此页面 |
+| 📋 混合过关规则 | https://www.lottery.gov.cn/bzzx/yxgz/20191119/1040217.html | 体育总局彩票中心官方玩法介绍。定义允许的玩法类型、过关方式、奖金计算方法 |
+
+#### 数据使用优先级
+
+```
+分析阶段:  OddsPapi (Pinnacle 精准定价) > 500.com 指数 (国内参考) > Bet365/SBOBET (辅助)
+投注阶段:  500.com 混合过关页 (🏁 唯一结算依据, SPF/RSPF/JQS 赔率)
+规则参考:  lottery.gov.cn 官方规则 (玩法边界条件, 串关限制)
+校验阶段:  OddsPapi vs 500.com 百家平均 交叉验证 (偏差 > 15% 标记异常)
+```
+
+**页面解析规则 (关键):**
+```
+每场比赛在 500.com 混合过关页的结构:
+  [编号] 联赛 日期 时间
+  [排名] 主队 VS 客队 [排名]
+  单关状态  让球数(仅作用于RSPF)
+  
+  Row 1: SPF-主 SPF-平 SPF-客    ← 🏁 竞彩官方胜平负赔率 (结算依据)
+  Row 2: RSPF-主 RSPF-平 RSPF-客  ← 让球胜平负 (含让球数)
+  
+  展开 → 半全场(9项) / 比分(31项) / 进球数(8项)
+  
+  百家平均 SPF-主 SPF-平 SPF-客  ← ⚠️ 仅作参考, 不用于结算!
+                                   百家平均 = 多机构均值, 与实际竞彩赔率不同
+
+🔴 结算赔率规则:
+  ① 混合过关结算: 使用 Row 1 的竞彩官方 SPF 赔率 (非百家平均)
+  ② 让球胜平负结算: 使用 Row 2 的 RSPF 官方赔率
+  ③ 竞彩赔率 overround ~11% (覆水率 ~89%), 显著低于国际赔率
+  ④ Row 2 中第二个赔率行在某些场次可能显示不同格式, 以 RSPF 让球线对应的为主
+  
+  示例 (德国 vs 科特迪瓦):
+    Row 1 (SPF): 1.36 / 4.55 / 5.75  ← 结算用此
+    百家平均:    1.51 / 4.56 / 5.75  ← 不用于结算, 仅参考
+    差异: 竞彩 SPF 主胜 1.36 vs 百家平均 1.51 → 竞彩抽水更高, 赔率更低
+```
+
+### 11.2 竞彩可投注玩法与串关限制 (依据体彩中心官方规则)
+
+> 规则来源: https://www.lottery.gov.cn/bzzx/yxgz/20191119/1040217.html
+
+| 玩法 | 中文名 | 选项数 | 最高串关 | 混合过关使用建议 |
+|:--:|------|:--:|:--:|------|
+| **SPF** | 胜平负 | 3 | 8 关 | ⭐⭐⭐ 首选，仅需方向正确，串关上限最高 |
+| **RSPF** | 让球胜平负 | 3 | 8 关 | ⭐⭐ 当SPF赔率过低时用于提赔率 |
+| **JQS** | 总进球数 | 8 | 6 关 | ⭐⭐ OU分析明确时可用，串关上限6关 |
+| **BQC** | 半全场 | 9 | 4 关 | ⭐ 仅高信心半场判断时使用 |
+| **BF** | 比分 | 31 | 4 关 | ❌ 混合过关不推荐（中奖率<3%，且拉低整体串关上限至4关） |
+
+**官方核心规则 (木桶原则):**
+
+```
+① 同赛事同项目: 足球只能串足球，篮球只能串篮球
+
+② 同场不可多玩法: 同一场比赛不能选择 2+ 种玩法放入同一串关
+   例: 荷兰 vs 瑞典 不能同时选 SPF主胜 + JQS 3球
+
+③ 串关上限 = min(所有被选玩法的最高关数)
+   例: SPF(8关) + JQS(6关) + BF(4关) → 上限 = min(8,6,4) = 4 关
+   ⚠️ 一旦选了 BF 或 BQC, 整个串关上限被拉低到 4 关
+
+④ 奖金计算: 中奖金额 = 2元 × ∏(各选项赔率)
+   所有赔率均以出票时竞彩官方公布的为准
+```
+
+### 11.3 竞彩让球线映射
+
+```
+竞彩让球(整数)    →    Pinnacle AH        使用场景
+-1 (主让1球)     →    AH -0.75 ~ -1.0    主队需赢2+球
+-2 (主让2球)     →    AH -1.75 ~ -2.0    碾压局
++1 (主受1球)     →    AH +0.75 ~ +1.0    客队优势
+0  (不让球)      →    AH 0.0 ~ ±0.25     势均力敌
+
+RSPF选场规则:
+1. Pinnacle AH水位 ≤ 1.85 且竞彩同向 → 选RSPF
+2. Pinnacle AH水位 > 2.10 → 用SPF更安全
+3. 让球线差 ≤ 0.25 → 映射有效; 差 > 0.5 → 不用RSPF
+```
+
+### 11.4 玩法选择决策树 (每场比赛)
+
+```
+比赛分析完成
+├─ 强队碾压 (SPF主 ≤ 1.35) → RSPF (竞彩让球线)
+├─ 明显优势 (SPF主 1.35-1.80)
+│  ├─ AH-1.0水位 ≤ 1.95 → RSPF
+│  └─ 否则 → SPF
+├─ 客队优势 (SPF客 ≤ 1.80) → SPF客胜
+└─ 均势 (SPF 1.80-3.00)
+   └─ OU大球倾向 → JQS(4球/5球)
+```
+
+### 11.5 标准方案模板 (用于组合池)
+
+```
+方案A【保守型】SPF 2-3串1 — 仅选SPF主/客胜≤1.75
+  风险: 低 | 胜率: 40-55% | 赔率: 1.8-3.5
+
+方案B【均衡型】SPF+RSPF 混合3串1 — 含1个RSPF提赔率
+  风险: 中 | 胜率: 25-40% | 赔率: 4.0-9.0
+
+方案C【进取型】RSPF+JQS 混合3串1 — 含1个JQS
+  风险: 高 | 胜率: 15-25% | 赔率: 8.0-15.0
+```
+
+### 11.6 实战参考: 6月21日
+
+| 场次 | 比赛 | 竞彩让球 | 竞彩SPF (Row1) | 推荐玩法 | 选中赔率 |
+|------|------|:--:|------|:--:|:--:|
+| 033 | 荷兰vs瑞典 | -1 | 1.52/3.90/4.65 | SPF主 | 1.52 |
+| 034 | 德国vs科特迪瓦 | -1 | 1.36/4.55/5.75 | RSPF主-1 | 2.11 |
+| 035 | 厄瓜多尔vs库拉索 | -2 | 未开售 | RSPF主-2 | 1.85 |
+| 036 | 突尼斯vs日本 | +1 | 6.36/3.95/1.39 | SPF客 | 1.39 |
+
+**方案池 (供11.7组合分配使用):**
+- 保守SPF3串1: 荷兰SPF主(1.52) × 德国SPF主(1.36) × 日本SPF客(1.39) = 2.87
+- 均衡SPF+RSPF3串1: 荷兰SPF主(1.52) × 德国RSPF主-1(2.11) × 厄瓜多尔RSPF主-2(1.85) = 5.93
+- 进取RSPF+JQS3串1: 德国RSPF主-1(2.11) × 荷兰JQS 3球(3.40) × 厄瓜多尔RSPF主-2(1.85) = 13.27
+
+---
+
+### 11.7 🆕 风险分摊组合投注 (Barbell Parlay Portfolio) — 核心输出方案
+
+> **不再单选一套方案，而是将总预算按比例分配到多套方案中同时下注。**
+> 保守方案保底回血，进取方案博高赔爆发。万一高风险项中奖则大幅盈利。
+
+```
+风险分摊组合 = Σ(方案i × 投注金额i)  where 总投注 = 预算上限
+
+核心逻辑 (分配比例由动态公式计算, 非固定):
+  - 保守方案(多资金): 高概率低赔率 → "保底回血"
+  - 均衡方案(中资金): 中概率中赔率 → "托底小盈"
+  - 进取方案(少资金): 低概率高赔率 → "爆发"
+```
+
+#### 输出格式 (每次预测分析必须输出)
+
+> 投注额和占比由动态公式计算，每比赛日不同。保守/均衡/进取的分配取决于当日各方案的去水分命中概率和赔率。
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│         风险分摊组合投注 (总预算: ¥N · 动态分配)             │
+├──────────┬──────────┬────────┬────────┬────────┬────────────┤
+│   方案   │   类型   │ 投注额 │ 占比*  │ 赔率   │ 中奖返还   │
+├──────────┼──────────┼────────┼────────┼────────┼────────────┤
+│ 保守方案 │ SPF 3串1 │ ¥XX    │ XX.X%  │ X.XX   │ ¥XXX       │
+│ 均衡方案 │ 混合3串1 │ ¥XX    │ XX.X%  │ X.XX   │ ¥XXX       │
+│ 进取方案 │ RSPF+JQS │ ¥XX    │ XX.X%  │ XX.XX  │ ¥XXXX      │
+├──────────┴──────────┴────────┴────────┴────────┴────────────┤
+│ *占比 = P_hit / ln(odds) 归一化，见金额分配规则              │
+├─────────────────────────────────────────────────────────────┤
+│ 情景分析:                                                   │
+│  ✓ 仅保守中: 返还 ¥XXX → 净盈 ±¥XX                         │
+│  ✓ 保守+均衡: 返还 ¥XXX → 净盈 +¥XX                        │
+│  ★ 三星连中: 返还 ¥XXXX → 净盈 +¥XXX (爆发)               │
+│  ✗ 全不中:   损失 ¥N                                       │
+└─────────────────────────────────────────────────────────────┘
+```
+
+#### 金额分配规则 — 🔵 动态计算 (非固定比例)
+
+> 比例不是拍脑袋的 60/30/10，而是**基于每场比赛的去水分概率和方案赔率动态计算**。不同比赛日的置信度不同，分配比例自然不同。
+
+```
+计算步骤:
+
+STEP 1 — 计算每场比赛的去水分方向概率:
+  对于方案中的每场比赛，取 Pinnacle 1X2 赔率：
+    overround = 1/H + 1/D + 1/A
+    deVigProb(方向) = (1/odds) / overround
+    
+  示例 (荷兰 vs 瑞典, 1.714/4.22/4.78):
+    overround = 1/1.714 + 1/4.22 + 1/4.78 = 1.029
+    deVigProb(荷兰胜) = (1/1.714) / 1.029 = 56.7%
+
+  对于 RSPF 选项，使用 AH 水位推算穿盘概率:
+    deVigProb(穿盘) = (1/home_odds) / (1/home_odds + 1/away_odds)
+    例: 德国AH-1.0 水位1.892/2.02 → 51.6%
+
+  对于 JQS 选项，使用 OU 分布估算:
+    从 OU 2.5 大球概率 + 泊松进球分布 → 特定进球数概率
+
+STEP 2 — 计算每套方案的命中概率:
+  P_hit[方案] = ∏ deVigProb(比赛i的方向)  对所有比赛 i ∈ 方案
+
+STEP 3 — 动态分配权重:
+  raw_weight[i] = P_hit[i] / ln(odds[i])
+  设计逻辑:
+  - 分子 P_hit: 概率越高 → 权重越大 (安全优先)
+  - 分母 ln(odds): 赔率越高 → 权重越小 (高风险打折)
+
+STEP 4 — 归一化:
+  allocation[i] = raw_weight[i] / Σ raw_weight[j]
+  投注金额[i] = round(allocation[i] × 总预算)  (四舍五入)
+
+边界规则:
+  - 保守方案 P_hit < 0.10 → 全天跳过 (不确定性太高)
+  - 进取方案 P_hit < 0.02 → 取消进取, 资金并入均衡
+  - 当天仅2场可用 → 仅保守+均衡, 取消进取
+  - 当天 < 2场 → 全天跳过
+```
+
+**动态计算示例 (6月21日 · 使用竞彩SPF赔率):**
+
+```
+去水分方向概率 (基于 Pinnacle 1X2):
+  荷兰胜:    1/1.714 ÷ 1.029 = 56.7%
+  德国胜:    1/1.552 ÷ 1.030 = 62.6%
+  德国穿-1:  1/1.892 ÷ (1/1.892+1/2.02) = 51.6%
+  日本胜:    1/1.606 ÷ (1/6.20+1/4.04+1/1.606) = 60.3%
+  厄瓜穿-2:  1/1.588 ÷ (1/1.588+1/2.22) = 58.3%
+  荷兰3球:   OU分布估算 ≈ 26%
+
+🏁 竞彩SPF赔率 (500.com Row 1, 非百家平均):
+  荷兰主: 1.52  德国主: 1.36  日本客: 1.39
+  德国RSPF主-1: 2.11  厄瓜多尔RSPF主-2: 1.85  荷兰JQS 3球: 3.40
+
+方案命中概率:
+  保守 P = 0.567 × 0.626 × 0.603 = 0.214
+  均衡 P = 0.567 × 0.516 × 0.583 = 0.171
+  进取 P = 0.516 × 0.260 × 0.583 = 0.078
+
+方案赔率 (竞彩官方):
+  保守 = 1.52 × 1.36 × 1.39 = 2.87
+  均衡 = 1.52 × 2.11 × 1.85 = 5.93
+  进取 = 2.11 × 3.40 × 1.85 = 13.27
+
+动态权重:
+  保守: 0.214 / ln(2.87) = 0.214 / 1.054 = 0.2030
+  均衡: 0.171 / ln(5.93) = 0.171 / 1.780 = 0.0961
+  进取: 0.078 / ln(13.27) = 0.078 / 2.586 = 0.0302
+
+归一化 (Σ = 0.3293):
+  保守: 61.6% → ¥62   均衡: 29.2% → ¥29   进取: 9.2% → ¥9
+```
+
+> 💡 竞彩SPF赔率(1.52/1.36/1.39)显著低于百家平均(1.71/1.51/1.57)，因为竞彩覆水率~89% vs 百家平均~97%。导致保守方案赔率从4.06降至2.87，但保守P_hit不变，因此动态分配中保守权重从56%升至62%——赔率越低越需更多资金保底。
+
+#### 期望值计算
+
+> 使用上一步动态计算出的 P_hit 和对应投注金额，而非固定概率区间。
+
+```
+E[回报] = P(保守中) × 保守返还 + P(仅均衡中|保守不中) × 均衡返还
+        + P(仅进取中|前两不中) × 进取返还 + P(全不中) × 0
+
+条件概率简化:
+  - P(保守中) = P_hit[保守]  (从上一步动态计算)
+  - P(仅均衡中|保守不中) ≈ P_hit[均衡] × 0.7  (方案间正相关, 折扣30%)
+  - P(仅进取中|前两不中) ≈ P_hit[进取] × 0.5  (更激进方案, 相关性更低)
+
+动态示例 (6月21日, ¥100预算, 动态分配 62/29/9 · 竞彩SPF赔率):
+  保守 P_hit=0.214 → 返还 = ¥62 × 2.87 = ¥178
+  均衡 P_hit=0.171 → 返还 = ¥29 × 5.93 = ¥172
+  进取 P_hit=0.078 → 返还 = ¥9 × 13.27 = ¥119
+
+  ★ 仅保守中:    ¥178 - ¥100 = +¥78 (回本+盈利)
+  ★ 保守+均衡:   ¥178 + ¥172 - ¥100 = +¥250
+  ★ 三星连中:    ¥178 + ¥172 + ¥119 - ¥100 = +¥369
+  ★ 全不中:      -¥100
+
+  E[回报] ≈ 0.214×227 + (0.171×0.7)×220 + (0.078×0.5)×146
+          ≈ 48.6 + 26.3 + 5.7 = ¥80.6
+  E[净盈] ≈ -¥19.4  (短期期望为负, 符合彩票本质)
+```
+
+> 💡 短期期望值为负是正常的。盈利靠选场铁律筛选**高置信度比赛**让实际 P_hit 高于市场隐含概率。回溯 6/12-6/18: 实际 P_hit 远超计算值, 正是选场体系创造的正期望。
+
+### 11.8 自由组合注意事项
+
+```
+🚫 禁止:
+- 同一场比赛选 2+ 种玩法 (系统不允许)
+- BF(比分)用于混合过关 (31选1，中奖率<3%)
+- ≥5串1 (胜率<10%)
+- 将"未开售"比赛纳入方案
+
+⚠️ 谨慎:
+- BQC仅在半场置信度 ≥80% 时使用
+- JQS与SPF在同一方案: 3串1最多含1个JQS
+- RSPF方向与SPF方向冲突时 → 弃用RSPF
+
+✅ 推荐:
+- 每日同时下注3套方案 (保守+均衡+进取)
+- 风险分摊组合优于单选一套方案
+- 止损线: 连续3天全不中 → 暂停并复盘选场逻辑
+- 记录每套方案的独立盈亏，便于后续优化分配比例
+```
+
+
+---
+
+## Section 12: 《足球财富》方法论集成 (v2.7)
+
+> 参考: 刘胜临《足球财富：欧赔与亚盘足彩研究》(金城出版社, 2010)。将书中的欧赔动态分析、亚盘临场模式、大小球分析框架、联赛盘路方法论结构化整合，与 OddsPapi 实时数据 + 500.com 指数数据联动。
+
+### 12.1 欧赔动态分析体系
+
+#### 12.1.1 凯利指数 (Kelly Index)
+
+```
+凯利指数 = 博彩公司赔付率 × 平均概率 / 该公司赔率
+
+计算步骤:
+  1. 从 OddsPapi 获取 Pinnacle 1X2 赔率 (H, D, A)
+  2. 计算市场平均概率: avgP[i] = (1/odds[i]) / Σ(1/odds[j])  (去水分)
+  3. 计算 Pinnacle 赔付率: payout = 1 / (1/H + 1/D + 1/A)
+  4. 凯利值[主胜] = payout × avgP[H] / (1/H)
+     凯利值[平局] = payout × avgP[D] / (1/D)
+     凯利值[客胜] = payout × avgP[A] / (1/A)
+
+解读:
+  凯利值 > 1.00 → 博彩公司在该选项上有利可图 (正期望)
+  凯利值 < 0.90 → 博彩公司在该选项上风险较高
+  凯利值最大者 → 市场认为最可能的结果
+
+实战用法:
+  - 凯利值 > 1.05 且对应的赔率方向与 Pinnacle AH一致 → 高信心信号
+  - 凯利值在 0.92-0.98 → 中性区间, 参考其他指标
+  - 三个凯利值都 < 0.90 → 博彩公司高抽水, 比赛不确定性高 → 降低置信度
+```
+
+#### 12.1.2 盈亏指数分析
+
+```
+盈亏指数 = (期望投注比例 × 赔付率 - 实际赔率支付) × 100%
+
+计算:
+  1. 从必发指数 (zx.500.com/jczq/bf_data.shtml) 获取成交量占比作为投注比例代理
+  2. 盈亏[主胜] = (投注比例[H] × payout_rate - 1/odds[H]) × 100%
+
+解读:
+  盈亏 > 0 → 庄家在该选项上盈利 → 该结果较难打出
+  盈亏 < 0 → 庄家在该选项上亏损 → 该结果可能被市场低估
+
+⚠️ 盈亏指数依赖于准确的投注量数据。必发数据为最佳代理, 但不完全等于真实市场投注分布。
+```
+
+#### 12.1.3 必发数据验证
+
+```
+数据源: zx.500.com/jczq/bf_data.shtml
+
+三类信号:
+  ① 成交量信号: 单一方向成交量占比 > 65% → 市场过热, 警惕反向
+  ② 冷热信号: 必发指数 > 80 或 < 20 → 极端情绪
+  ③ 背离信号: 成交量偏向一方, 但赔率反向变动 → 可能有内幕资金
+
+与 Pinnacle 价格联动验证:
+  IF 必发成交量偏向主胜 + Pinnacle 主胜赔率持续上升 → 市场过热但庄家不惧
+  IF 必发成交量偏向主胜 + Pinnacle 主胜赔率持续下降 → 真实利好信号
+```
+
+### 12.2 亚盘临场模式识别
+
+> 参考《足球财富》第二部分的临场盘口变化模式。以下模式基于 Pinnacle AH 赔率的历史走势 (可从 /v4/historical-odds 免费获取)。
+
+#### 12.2.1 四大临场模式
+
+```
+模式一【临场降盘】
+  现象: 盘口从 -1.0 降至 -0.75, 水位补偿不明显
+  书中规律: 降盘方(上盘)胜率约 38% → 不利于上盘穿盘
+  应用: 若检测到 AH line 在最后 4 小时下降 ≥ 0.25 球 → 降低该方向置信度 20%
+  例外: 降盘同时搭配大幅升水 → 可能为阻上诱下, 反向上盘利好
+
+模式二【临场升盘】
+  现象: 盘口从 -0.5 升至 -0.75, 水位基本不变
+  书中规律: 初盘偏浅、临场升盘 → 上盘利好 (胜率约 65%)
+  应用: AH line 最后 6 小时上升 ≥ 0.25 → 提升上盘置信度
+  警慑: 盘口升但水位同时大幅上升 → 可能是诱盘, 不处理
+
+模式三【临场升水】
+  现象: 同一盘口下, 上盘水位从 1.85 升至 2.05+
+  书中规律: 升水方胜率约 42% → 不利于该方向
+  应用: 水位变化 > 0.15 幅度 → 标记为"升水预警"
+
+模式四【临场降水】
+  现象: 同一盘口下, 上盘水位从 2.00 降至 1.80
+  书中规律: 降水方胜率提升 → 真实利好
+  应用: 水位下降 > 0.10 → 提升该方向置信度 10%
+```
+
+#### 12.2.2 造冷造热三大手法
+
+```
+手法一【水位造热】
+  上盘水位持续下降(1.95→1.75) + 盘口不变 → 市场热度集中上盘
+  → 若搭配必发成交量 > 60% 偏向上盘 → 确认造热, 反向考虑下盘
+
+手法二【盘口阻上】
+  上盘初盘偏浅(比公允盘口少 0.25)+ 后续升盘 → 制造上盘不稳假象
+  → 检测: Pinnacle 公允盘口 vs 实际盘口差 ≥ 0.25 → 阻上信号
+  → 若实际升盘回到公允盘口 → 上盘真实利好
+
+手法三【水位诱下】
+  下盘水位由高走低(2.30→2.00)+ 盘口不变 → 诱导投注下盘
+  → 检测: 下盘水位下降 > 0.20 + 上盘方向未受不利影响 → 诱下信号
+  → 此时上盘为真实方向
+```
+
+#### 12.2.3 10种常见盘路简述
+
+```
+从《足球财富》第二部分提取, 使用 OddsPapi 历史数据自动化检测:
+
+ ① 临场降盘 + 水位不变        → 下盘有利
+ ② 临场升盘 + 水位不变        → 上盘有利
+ ③ 临场升水 + 盘口不变        → 该方向不利
+ ④ 临场降水 + 盘口不变        → 该方向有利
+ ⑤ 基本面强势方(上盘)         → 需结合盘口深度判断
+ ⑥ 基本面弱势方(下盘)         → 受让深盘时有价值
+ ⑦ 上盘胜赔上升               → 不利信号
+ ⑧ 上盘胜赔下降               → 利好信号
+ ⑨ 双线作战球队               → 体能折价 15-20%
+ ⑩ 澳门盘异常与其他公司偏离   → 对比 Pinnacle, 澳门盘偏差 > 0.15 → 警觉
+```
+
+### 12.3 大小球分析框架
+
+#### 12.3.1 进球预期值计算
+
+```
+公式: 预期进球 = 主队场均进球 × 客队场均失球率 + 客队场均进球 × 主队场均失球率
+
+计算步骤:
+  1. 主队近 6 场场均进球 (GF_home), 客队近 6 场场均失球 (GA_away)
+  2. 客队近 6 场场均进球 (GF_away), 主队近 6 场场均失球 (GA_home)
+  3. 预期值 = (GF_home × GA_away/联赛均值 + GF_away × GA_home/联赛均值) / 2
+
+与盘口比较:
+  预期值 > OU 盘口 + 0.5 → 大球信号
+  预期值 < OU 盘口 - 0.5 → 小球信号
+  预期值在盘口 ± 0.5 内 → 盘口合理, 无额外信号
+
+⚠️ 书中使用的是五大联赛数据。世界杯场景下, 改用预选赛数据 + 近期友谊赛数据。
+```
+
+#### 12.3.2 平局排除法
+
+```
+条件 (全部满足 → 平局概率低, 大球倾向增强):
+  □ 主客队近 3 场无 0-0 赛果
+  □ 两队场均进球和 > 2.5
+  □ OU 2.5 大球水位 ≤ 1.85
+  □ 无"防守城墙"队伍参与 (参见技能规则 #27)
+
+条件 (任一条满足 → 平局概率高, 小球倾向增强):
+  □ 任一方近 3 场有 2+ 场平局
+  □ 两队场均进球和 < 2.0
+  □ 初盘大小球盘口 ≤ 2.0
+```
+
+#### 12.3.3 波胆赔率分析法 (Correct Score Odds)
+
+```
+方法: 从 OddsPapi CS 市场提取最可能比分, 反向推导预期总进球
+
+步骤:
+  1. 取 CS 市场赔率最低的前 5 个比分
+  2. 每个比分的隐含概率 = (1/cs_odds) / Σ(1/all_cs_odds)
+  3. 加权预期总进球 = Σ(比分总进球 × 隐含概率)
+  4. 与 OU 盘口比较:
+     - 加权预期总进球 > OU 盘口 + 0.3 → 大球倾向
+     - 加权预期总进球 < OU 盘口 - 0.3 → 小球倾向
+
+波胆投注策略 (书中原话):
+  "当波胆分析指向某几个比分, 且这几个比分的赔率加权后高于 6.0 时,
+   用小额资金分散投注 2-3 个比分, 是一种低成本高回报的策略。"
+```
+
+#### 12.3.4 8种大小球盘路模式
+
+```
+从《足球财富》第三部分提取 (使用 OddsPapi 历史数据检测):
+
+模式一【临场大球降水】
+  大球水位降 + 盘口不变 → 大球信号增强
+  检测: OU line 不变, over 水位下降 > 0.10 → 大球置信度 +15%
+
+模式二【临场大球升水】
+  大球水位升 + 盘口不变 → 可能阻大诱小
+  检测: over 水位上升 > 0.15 → 结合必发成交量判断
+
+模式三【大球水位不变】
+  初盘至临场水位波动 < 0.05 → 盘口稳定, 按初始分析
+
+模式四【大球升盘】
+  OU 从 2.5 升至 2.75 → 市场热度偏大球
+  → 如果伴随大球降水 → 大球信号强
+  → 如果伴随大球升水 → 警惕诱盘
+
+模式五【大球降盘】
+  OU 从 2.5 降至 2.25 → 市场倾向小球
+  → 结合基本面: 如果双方攻击力强 → 可能是庄家误导
+
+模式六【欧赔 2-3-2 与平局】
+  欧赔呈现 2.XX-3.XX-2.XX 形态 → 平局赔率在 3.00-3.50 区间
+  → 平局概率较常规高约 8-12% → 小球倾向
+
+模式七【让球盘与大小球关联】
+  AH 深盘(≥-1.5) + OU 中等(2.5-3.0) → 上盘可能穿盘但总进球有限
+  AH 浅盘(±0.25) + OU 高(≥3.0) → 对攻战, 大球 + 双方进球概率高
+
+模式八【主客场大球率】
+  主队主场大球率 > 60% + 客队客场大球率 > 55% → 大球加成 +10%
+  主队主场大球率 < 35% + 客队客场大球率 < 40% → 小球加成 +10%
+```
+
+### 12.4 欧亚综合分析流程
+
+> 融合《足球财富》的盘赔结合理念与技能的 12 步分析法。
+
+```
+┌─────────────────────────────────────────────────────────┐
+│           欧亚综合分析流程 (《足球财富》融合)            │
+├─────────────────────────────────────────────────────────┤
+│                                                         │
+│  STEP A: 赔率静态分析                                    │
+│  ├─ Pinnacle 1X2 → 去水分概率 + 凯利指数                │
+│  ├─ 盈亏指数 (结合必发成交量)                            │
+│  └─ 必发冷热信号 (成交量/指数/背离)                     │
+│                                                         │
+│  STEP B: 盘口定位                                       │
+│  ├─ 理论盘口 vs 实际盘口 → 盘口深浅判断                 │
+│  ├─ 临场 4 小时盘口/水位变化 → 四大模式检测             │
+│  └─ 造冷造热三手法识别                                  │
+│                                                         │
+│  STEP C: 大小球专项                                      │
+│  ├─ 进球预期值 vs OU 盘口                               │
+│  ├─ 平局排除法                                          │
+│  ├─ 波胆赔率加权进球                                     │
+│  └─ 8种盘路模式匹配                                     │
+│                                                         │
+│  STEP D: 综合信号合成                                    │
+│  ├─ 欧赔信号 + 亚盘信号 + 大小球信号 → 三维交叉验证     │
+│  ├─ 信号一致 (≥2/3 指向同一方向) → 高置信度             │
+│  ├─ 信号冲突 → 降低置信度, 标记为"谨慎"                 │
+│  └─ 输出: 方向预测 + 置信度 + 风险提示                  │
+│                                                         │
+└─────────────────────────────────────────────────────────┘
+```
+
+### 12.5 信号权重体系
+
+```
+信号叠加规则 (来自书中案例统计 + 技能回溯):
+
+欧赔信号:
+  凯利值 > 1.05              → +12% 方向置信度
+  凯利值 0.92-1.05           → 中性
+  必发背离 (量价反方向)       → -15% 方向置信度
+  必发成交量 > 65% 单一方向   → -10% 该方向置信度 (过热)
+
+亚盘信号:
+  临场升盘 + 水位不变         → +15% 上盘置信度
+  临场降盘 + 水位不变         → -15% 上盘置信度
+  临场降水 > 0.10             → +10% 该方向置信度
+  造热确认 (水位降 + 量集中)  → ⚠️ 反向信号
+  阻上确认 (盘口偏浅 + 回升)  → +10% 上盘置信度
+
+大小球信号:
+  进球预期 > OU + 0.5         → +15% 大球置信度
+  平局排除全满足              → +10% 大球置信度
+  波胆加权 > OU + 0.3         → +10% 大球置信度
+  模式一 (大球降水)           → +15% 大球置信度
+  模式六 (2-3-2 欧赔)         → -10% 大球置信度
+
+置信度封顶: 任何方向置信度上限 90%, 下限 10%
+```
+
+### 12.6 与现有技能体系的联动
+
+```
+《足球财富》方法论              →  技能现有模块
+────────────────────────────────────────────────────
+12.1 凯利指数                  →  Section 4(1) 赔率数学, 作为概率校正因子
+12.1 必发数据验证              →  Section 11.1 第二层数据源
+12.2 临场盘口模式              →  Section 8 陷阱扫描 + 走势分析
+12.2 造冷造热                  →  Section 8 陷阱规则增强
+12.3 进球预期值                →  Section 4(6) 基本面权重 + OU 分析
+12.3 平局排除法                →  Section 10.1 选场铁律 (平局概率 > 27% → 跳过)
+12.3 波胆分析                  →  Section 11.6 方案赔率计算
+12.4 欧亚综合分析              →  技能 12+1 步分析主流程的增强版
+12.5 信号权重                  →  Section 4(10) 六维评分模型的补充维度
+```
+
+---
+
+## Section 13: 实战盘口分析体系集成 (v2.7 · 5篇教程结构化)
+
+> 数据来源: 知乎专栏 ×2 + 今日头条 ×1 + 搜狐 ×1 + 知乎替代(原头条墙内文章) ×1。将盘型推算、盘口深浅判断、水位波动模式、临场口诀、联赛特性、资金管理等实战方法论结构化整合。
+
+### 13.1 理论盘型推算体系
+
+> 核心概念: 盘型 = 根据两队真实实力差距推算出的"应该开什么盘"。对比理论盘型与实际盘口的偏差，是判断机构意图的核心。
+
+```
+理论盘型推算四维度:
+
+① 实力差距 (权重 40%):
+   联赛排名差 ≥ 10 位 → 基础让球 +1.0
+   场均进球差 > 1.0 → 额外 +0.25
+   场均失球差 > 0.8 → 额外 +0.25
+
+② 主客场优势 (权重 25%):
+   同实力球队 → 主场方可多让 0.5 球
+   强队客场让球 = 主场让球 - 1.0 (即主场让1球，客场约让0球或受让)
+   例: 曼联主场对伯恩茅斯让1.5球，客场则让0.5球
+
+③ 历史交锋 (权重 20%):
+   近6次交锋上盘 5-6胜 + 场均净胜 ≥2球 → 理论盘型 +0.5~+1.0
+   近6次交锋胶着(3胜3平或2胜2平2负) → 理论盘型偏浅 -0.25
+   近6次交锋下盘占优 → 理论盘型 -0.5
+
+④ 战意与伤停 (权重 15%):
+   核心球员(前锋/门将)伤停 → 盘型 -0.5~-1.0
+   保级/争冠战意强烈 → 盘型 +0.5
+   一周双赛疲劳 → 盘型 -0.25
+
+盘型动态调整:
+  盘型不是固定值，随球队状态、伤停、战意动态变化
+  例: 核心前锋赛前伤退 → 原让1.5球降为让1球 (合理变动，非诱盘)
+```
+
+### 13.2 盘口深浅判断框架
+
+> 对比理论盘型与实际盘口 → 三种情况 → 结合水位确认机构意图。
+
+```
+情况一: 实际盘口 = 理论盘型 (合理盘口)
+  → 机构判断与基本面一致
+  → 重点看水位变化和临场异动
+  → 赛果大概率贴合真实实力
+
+情况二: 实际盘口 < 理论盘型 (盘口偏浅, 差 ≥ 0.5球)
+  子情况 A — 机构不看好上盘:
+    信号: 盘口偏浅 + 水位偏高(>1.00) + 基本面有隐忧
+    结论: 上盘可能赢球输盘或爆冷, 考虑下盘
+  
+  子情况 B — 诱下盘:
+    信号: 盘口偏浅 + 水位偏低(<0.85) + 基本面完好
+    结论: 降低上盘门槛吸引投注, 实际机构看好上盘
+
+情况三: 实际盘口 > 理论盘型 (盘口偏深, 差 ≥ 0.5球)
+  子情况 A — 机构真实看好上盘:
+    信号: 盘口偏深 + 水位稳定偏低 + 对手防守薄弱
+    结论: 上盘大概率穿盘
+  
+  子情况 B — 诱上盘:
+    信号: 盘口偏深 + 水位偏高(>1.02) + 对手防守强硬/战意强
+    结论: 抬高门槛制造上盘强势假象, 实际诱买上盘
+```
+
+### 13.3 临场盘口四口诀
+
+> 来自多篇教程的共同核心规律，为最简洁实用的盘口变化判断法则。
+
+```
+口诀速查表:
+
+┌──────────────┬──────────────────────┬──────────────┐
+│   盘口变化   │        含义          │   投注方向   │
+├──────────────┼──────────────────────┼──────────────┤
+│ 升盘 + 降水  │ 真实看好上盘         │  追 上 盘    │
+│ 升盘 + 升水  │ 诱上盘 (假强势)      │  避开/下盘   │
+│ 降盘 + 升水  │ 不看好上盘           │  追 下 盘    │
+│ 降盘 + 降水  │ 阻上盘 (假示弱)      │  搏 上 盘    │
+└──────────────┴──────────────────────┴──────────────┘
+
+使用前提:
+  1. 口诀必须结合盘口深浅和基本面使用
+  2. 降盘+降水 = 阻盘的前提: 基本面完好无伤停
+  3. 升盘+升水 = 诱盘的前提: 对手有一定抵抗力
+  4. 不能单独看口诀, 必须交叉验证
+
+实战检测 (OddsPapi 历史数据):
+  升盘+降水 上盘穿盘率: ~65%  (当基本面支撑时)
+  降盘+升水 下盘不败率: ~62%
+  降盘+降水 上盘穿盘率: ~58%  (需基本面验证)
+  升盘+升水 上盘穿盘率: ~38%  (方向明确的反向信号)
+```
+
+### 13.4 三维一体综合分析法
+
+> 融合多篇教程的核心分析方法论: 指数信号 + 基本面验证 + 客观因素补全。
+
+```
+维度一【指数分析】 (权重 40%)
+  ① 赔率偏差检测:
+     个人分析胜率 vs 机构隐含概率, 差值 > 5% → 高价值机会
+  
+  ② 盘口异动预警:
+     强队临场退盘 ≥ 0.5球且无合理原因 → 爆冷概率 +35%
+     赔率方差 > 1.1 (多机构分歧大) → 信号增强
+  
+  ③ 非同步变盘检测:
+     主流庄家统一升盘, 某一家独自降盘 → 该家有独立判断
+     可作为反向参考, 但不能单一依据
+
+维度二【基本面验证】 (权重 35%)
+  ① 近10场攻防数据: 场均进球、失球、射正率
+  ② 主力伤停: 核心球员缺阵 → 胜率降 20-40%
+  ③ 战意强度: 保级队主场胜率比普通场次高 17%
+  ④ 历史交锋关键细节: 特定场地适应度
+  ⚠️ 所有数据需交叉验证, 官网 > 自媒体
+
+维度三【客观因素】 (权重 25%)
+  ① 赛程密度: 连续一周双赛 → 胜率降 23%
+  ② 时段特征: 凌晨 1-5点 北欧联赛爆冷率比英超高 23%
+  ③ 德比战: 主场加持超常规, 盘口让球常不足
+  ④ 杯赛 vs 联赛: 杯赛轮换概率高, 盘口按联赛实力开的误导性强
+```
+
+### 13.5 赔率盘口背离检测
+
+```
+核心规则: 欧赔主胜 1.60 → 正常对应亚盘 让 0.75 球
+
+背离信号:
+  "盘浅赔低": 主胜赔率 1.60, 但亚盘仅让 0.50 球
+  → 盘口偏浅 0.25, 机构可能诱导上盘
+  → 统计: 此种情况下盘赢盘率 ~60%
+  
+  "盘深赔高": 主胜赔率 2.00, 但亚盘让 1.00 球
+  → 盘口偏深, 机构可能阻上/诱上
+  → 需结合水位判断: 深盘+低水=阻上, 深盘+高水=诱上
+
+欧赔→亚盘快速换算表:
+  1.20 → 1.75球    1.40 → 1.00球    1.60 → 0.75球
+  1.80 → 0.50球    2.00 → 0.25球    2.50 → 0.00球
+  3.00 → 受0.25    4.00 → 受0.50    6.00 → 受1.00
+
+检测流程:
+  1. 从 Pinnacle 1X2 获取主胜赔率
+  2. 查表得理论对应亚盘
+  3. 对比 Pinnacle AH 实际主力盘口
+  4. 偏差 ≥ 0.25 → 记录背离信号
+  5. 结合其他指标判断机构意图
+```
+
+### 13.6 水位波动三种模式
+
+```
+模式一【单向波动】
+  现象: 水位从 0.95 持续降至 0.80, 盘口不变
+  信号: 机构主动降低赔付 → 该方向真实被看好
+  行动: 结合盘口深浅, 若盘口合理 → 跟进
+
+模式二【震荡波动】  
+  现象: 水位 0.90→1.05→0.85 反复
+  信号: 市场资金大量涌入, 机构被动调整
+  判断: 查基本面是否有突发利好 → 有则可信, 无则警惕
+  行动: 基本面匹配 → 跟进; 基本面不变 → 观望
+
+模式三【反向变动】
+  现象: 下盘水位 0.80→1.00 持续升, 上盘 1.00→0.80 持续降
+  信号: 机构故意引导资金流向下盘 → 反向诱盘
+  行动: 基本面无明显变化 → 逆势投注上盘
+
+关键时间节点:
+  初盘 (赛前 3-5天): 试探性, 观察市场反应
+  中盘 (赛前 1-2天): 资金大量涌入期, 变动可信度较高
+  临场 (赛前 1-2小时): 突发消息影响 + 可能设诱盘陷阱
+  终盘 (赛前 30分钟): 最能反映机构最终判断
+```
+
+### 13.7 分联赛盘口特性速查
+
+> 不同联赛风格不同，盘口逻辑不同。不可用统一标准分析所有联赛。
+
+```
+英超: 正路多, 主场优势明显 (主场胜率 ~45%)
+  盘口: 波动理性, 升盘降水可信度高
+  口诀: "走升不走降" — 升盘方向更值得跟进
+
+德甲: 强弱分明, 强队统治力强
+  盘口: 贴合实力, 升盘降水信号可信
+  特点: 大球率高, OU 2.5 大球 > 55%
+
+意甲: 平局率高, 防守严密
+  盘口: 保守偏浅, 强队让球常不足
+  口诀: "周末防爆冷, 强队让1球需谨慎"
+  特点: 平局率 ~28%, 一球盘下需防赢球输盘
+
+西甲: 技术流, 半场节奏快
+  盘口: 变化频繁, 需结合水位基本面
+  特点: 半场多大球, 平局率 < 意甲
+
+法甲: 巴黎独大, 其他队波动大
+  盘口: 诱盘概率高, 中下游队对阵需谨慎
+  口诀: "巴黎主场稳, 其他队慎追"
+
+北欧联赛 (瑞典超/挪威超):
+  盘口: 异动频繁, 爆冷率高
+  时段: 凌晨 1-5点 爆冷率 +23%
+  建议: 新手尽量避开
+
+世界杯 (本技能聚焦):
+  盘口: 关注度高, 资金量大, 诱盘手法精细
+  特点: 结合技能 Section 9 淘汰赛特殊规则
+  注意: 让球线映射竞彩 RSPF (Section 11.3)
+```
+
+### 13.8 三类异常盘口信号
+
+```
+信号一【初盘与历史盘口偏离】
+  检测: 某队主场对同一对手, 历史让球 1.0, 本次仅让 0.25
+  含义: 实力下滑/战意不足/核心缺阵
+  行动: 查看伤病+近期状态, 偏离 ≥ 0.5 → 标记预警
+
+信号二【水位剧烈波动】
+  检测: 1小时内某方水位从 0.80 骤升至 1.10
+  含义: 大额资金反向涌入 或 突发不利消息
+  行动: 立即查看最新消息(首发/伤停), 确认后决定是否跟进
+
+信号三【非同步变盘】
+  检测: 主流庄家(Pinnacle/Bet365)统一升盘, 某一家(澳门)独自降盘
+  含义: 该庄家有独立信息判断
+  行动: 作为反向参考因素, 但不可单一依据 → 需基本面交叉验证
+```
+
+### 13.9 资金管理铁律 + 五大误区
+
+```
+资金管理 (多篇教程共识):
+  单笔上限: ≤ 总预算的 5%
+  日亏损止损: 达 10% → 暂停当日投注
+  盈利提取: 达 50% 利润 → 提取本金, 用利润继续
+  串关警告: 3串1+ 长期必亏 (抽水 11%)
+  均注策略: 不因信心高而加倍, 保持每注金额一致
+
+五大新手误区:
+  ① 指数迷信 → 纯看赔率不看基本面, 长期正确率 < 45%
+  ② 基本面偏执 → 纯看球队不看盘口, 遗漏率 38%
+  ③ "蚊子肉"陷阱 → 低赔率(1.20)需连中5次才弥补1次失利
+  ④ 追串关 → 6串1返奖率仅 49%, 低于单场的 89%
+  ⑤ 亏损倍投 → 情绪化加倍, 单日损失扩大 3.2倍
+
+风控口诀:
+  "合理盘口 + 水位稳定 = 可投"
+  "热门赛事 + 极端深盘 = 避开"
+  "熟悉联赛 × 1-2个 = 聚焦"
+  "连续 3 次失误 = 暂停复盘"
+```
+
+### 13.10 与技能体系的联动
+
+```
+教程方法论                    →  技能现有模块
+─────────────────────────────────────────────────
+13.1 盘型推算                →  Section 4 基本面权重 + AH 分析
+13.2 盘口深浅判断            →  Section 8 陷阱扫描 (增强版)
+13.3 临场四口诀              →  Section 12.2 亚盘临场模式, Section 4(7) 走势分析
+13.4 三维一体法              →  技能 12+1 步分析主流程 (增强版)
+13.5 赔率盘口背离            →  Section 4(2) 欧亚转换 + 新检测维度
+13.6 水位波动模式            →  Section 4(7) 走势真实性验证
+13.7 分联赛特性              →  Section 4(8) 联赛权重 + 世界杯特殊规则
+13.8 异常盘口信号            →  Section 8 陷阱扫描 (新增三类信号)
+13.9 资金管理+误区           →  Section 11.8 自由组合注意事项 + Section 10.1 选场铁律
+```
+
+> 💡 以上方法论全部可与 OddsPapi 实时数据联动: Pinnacle AH 赔率 → 检测盘口变化 → 匹配四口诀 → 输出方向信号。水位数据 → 匹配三种波动模式 → 确认或否定信号。13.5 欧亚背离检测可通过 Pinnacle 1X2 vs AH 直接自动化。
