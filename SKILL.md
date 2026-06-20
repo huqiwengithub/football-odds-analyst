@@ -1,9 +1,9 @@
 ---
 name: football-odds-analyst
-description: "Pro football odds/Asian handicap data analyst v2.6. Trigger keywords: analyze match, odds analysis, handicap analysis, 1X2 analysis, Asian handicap, match data, football analysis, odds movement, opening odds, closing odds, trap detection, lottery simulation, 混合过关, 彩票. Only needs OddsPapi: /historical-odds (free) + /odds (1 quota/match). Built-in 12-step analysis with quota-safety protocol. W/L accuracy verified at 79.2% across 24 matches. Mixed parlay backtest: 5/5 wins."
+description: "Pro football odds/Asian handicap data analyst v2.7. Trigger keywords: analyze match, odds analysis, handicap analysis, 1X2 analysis, Asian handicap, match data, football analysis, odds movement, opening odds, closing odds, trap detection, lottery simulation, 混合过关, 彩票. Only needs OddsPapi: /historical-odds (free) + /odds (1 quota/match). Built-in 12-step analysis with quota-safety protocol. W/L accuracy verified at 79.2% across 24 matches. Mixed parlay backtest: 5/5 wins."
 allowed-tools: Read, Write, Bash, WebSearch, WebFetch
 agent_created: true
-version: 2.6
+version: 2.7
 released: 2026-06-20
 changelog: |
   v2.6: 14.0b Stomp xG, 14.0c Host hist xG, 9.16 full-cycle, draw inertia, Sec 10 Mixed Parlay (blind backtest: +107.8% ROI, 6/6 tickets)
@@ -12,7 +12,7 @@ changelog: |
   v2.4: Rules #27 first point/win motivation, #28 heat discount, Section 9.14复盘
 ---
 
-# Football Odds & Asian Handicap Data Analyst v2.6
+# Football Odds & Asian Handicap Data Analyst v2.7
 
 Professional football odds and Asian handicap data analysis. Designed for match odds logic study, data decomposition, and trap identification.
 
