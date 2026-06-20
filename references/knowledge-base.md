@@ -1,6 +1,35 @@
-# Knowledge Base Reference — Football Odds Analyst v2.7
+# Knowledge Base Reference — Football Odds Analyst v2.9
 
-> **Load trigger**: Read this file when the main SKILL.md instructs you to reference a specific section ($KB-n). Contains all detailed rules, formulas, trap definitions, scoring criteria, and methodology.
+> **Load trigger**: Read this file when SKILL.md instructs you to reference a specific section ($KB-N). Contains all detailed rules, formulas, trap definitions, scoring criteria, and methodology.
+>
+> **Reading strategy**: Start with KB-2 (traps) + KB-4 (6D) — used every match. Then KB-6 + KB-7 for Step 10. KB-8 + KB-9 are supplementary.
+
+---
+
+## KB-0: Pre-Flight — Team Names + Verification
+
+### Team Name Verification Protocol
+```
+1. For each team from fixtures: check static map → FOUND? ✅
+2. NOT found → WebSearch "[Team] Chinese name football national team"
+3. STILL not found → use English + ⚠️ red marker in output
+4. World Cup: ALWAYS WebSearch "2026 World Cup teams Chinese name list"
+5. If ANY fallback used → set {{NAME_ERROR_ACTIVE}} = active in HTML report
+```
+
+### Static Chinese Name Map
+```
+Switzerland=瑞士, Korea Republic=韩国, Bosnia and Herzegovina=波黑, Japan=日本,
+Czechia=捷克, South Africa=南非, Canada=加拿大, Qatar=卡塔尔, Mexico=墨西哥,
+Brazil=巴西, Argentina=阿根廷, France=法国, Germany=德国, England=英格兰,
+Spain=西班牙, Portugal=葡萄牙, Italy=意大利, Netherlands=荷兰, Croatia=克罗地亚,
+Uruguay=乌拉圭, Belgium=比利时, Colombia=哥伦比亚, USA=美国, Morocco=摩洛哥,
+Australia=澳大利亚, Iran=伊朗, New Zealand=新西兰, Sweden=瑞典, Ivory Coast=科特迪瓦,
+Ecuador=厄瓜多尔, Curacao=库拉索, Tunisia=突尼斯, Denmark=丹麦, Norway=挪威,
+Poland=波兰, Senegal=塞内加尔, Egypt=埃及, Nigeria=尼日利亚, Ghana=加纳,
+Costa Rica=哥斯达黎加, Panama=巴拿马, Jamaica=牙买加, Serbia=塞尔维亚,
+Austria=奥地利, Ukraine=乌克兰, Turkey=土耳其, Greece=希腊, Scotland=苏格兰
+```
 
 ---
 
