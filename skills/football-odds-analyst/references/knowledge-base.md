@@ -1184,19 +1184,61 @@ High-risk traps = #13,#16,#19,#20,#21 (≥1 trigger = high risk)
 ### 13.6 Shadow Testing Acceptance Criteria
 
 ```
-Live trading prerequisites (≥1 month shadow testing):
+### 13.6 Shadow Testing & Backtesting
 
-All met before switching to real money:
-  ☐ A类信号胜率 ≥ 65%
-  ☐ Counter signals (resistance wall/trap breaks) accuracy ≥ 70%
-  ☐ 串关全灭概率 ≤ 25%
-  ☐ 竞彩返还率下模拟 EV ≥ −3%
-  ☐ 连续 2 周无单周回撤 > 5%
+#### Data Sources
 
-Signal traceability review template (mandatory per match):
-  Match info + event tier + signal confidence level (A/B/C)
-  Final logit correction + per-module contribution breakdown
-  Hit/miss root cause (model misjudgment / new bookmaker tactic / dirty data)
+```
+Prediction side: analyst report → {date}_predictions.json (auto-saved after each analysis run)
+  Fields: match_code, predicted_W/L, confidence_tier, each module signal contribution
+
+Result side: 500.com wanchang → {date}_results.json (scraper --wanchang mode)
+  URL: https://live.500.com/wanchang.php
+  Fields: home_team, away_team, ft_score, ht_score
+
+Matching: pair predictions with results by team names + date
+  If exact match not found → fuzzy match (Levenshtein distance < 3)
+```
+
+#### Backtesting Workflow
+
+```
+1. After each analysis: auto-save predictions to .cache/backtest/{date}_predictions.json
+2. After matches complete: scraper fetches https://live.500.com/wanchang.php?date={date}
+   → parses completed match results → saves to .cache/backtest/{date}_results.json
+3. Compare script (can be run anytime):
+   - Load predictions + results for all dates in backtest range
+   - Pair by team name + date
+   - Compute metrics:
+     □ Overall W/L direction accuracy
+     □ Accuracy by confidence tier (A/B/C)
+     □ Counter signal (traps/resistance wall) accuracy
+     □ P(全灭) actual vs predicted
+     □ Simulated EV (with 0.89 return rate + slippage)
+     □ Per-module information gain (which modules add signal)
+4. Calibrate:
+   - If any dimension in 6D shows negative correlation → flag for removal
+   - If DRI thresholds misaligned → adjust by league percentile
+   - If fractional Kelly over/under-betting → tune coefficient
+```
+
+#### Minimum Sample Size
+
+```
+Before ANY parameter change: ≥ 100 matches per league tier
+Before live trading: ≥ 300 matches total (all tiers combined)
+Before removing a module: ≥ 50 matches where that module fired
+```
+
+#### Wanchang Fetch Mode (Scraper)
+
+```bash
+# Fetch completed match results for a date
+python3 references/parser.py --wanchang --date 2026-06-20 --json
+
+# Output: .cache/500com/{date}_wanchang.json
+# Schema: [{date, time, league, home_team, away_team, home_rank, away_rank, ft_score, ht_score}]
+```
   对应规则优化建议
 ```
 

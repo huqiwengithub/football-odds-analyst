@@ -154,3 +154,53 @@ Output structure same as v1.0: contains `basic` section (SPF/RQSPF/AH/OU/JQS/BF/
 | `--no-cache` | Skip cache, force refresh | Use cache |
 | `--match NAME` | Filter by team name | All |
 | `--cache-dir DIR` | Cache directory | .cache/500com/ |
+
+---
+
+## Wanchang (Completed Matches) — For Backtesting
+
+### Data Source
+
+```
+URL: https://live.500.com/wanchang.php
+Content: All completed matches for the most recent matchday
+Fields: match ID (fid), kickoff time, league, home team (with rank), away team (with rank),
+        full-time score, half-time score
+```
+
+### Parsing Rules
+
+```
+Extract from the page:
+  League: text between "[" and "]" after match date, or standalone league name
+  Time: HH:MM format
+  Home team: name after ranking bracket, before score
+  Away team: name after score, before optional ranking bracket
+  Full-time score: "X-Y" format between team names
+  Half-time score: second "X-Y" at end of line
+
+Filter: only extract matches where league contains target keywords (e.g., "世界杯" for World Cup)
+Output format:
+  {
+    "fid": "extractable from detail link",
+    "date": "2026-06-20",
+    "time": "11:00",
+    "league": "世界杯",
+    "home_team": "土耳其",
+    "away_team": "巴拉圭",
+    "home_rank": 3,
+    "away_rank": 4,
+    "ft_score": "0-1",
+    "ht_score": "0-1"
+  }
+```
+
+### Usage with Backtesting
+
+```
+1. Scraper fetches wanchang → outputs completed match results JSON
+2. Analyst reads prediction log + actual results
+3. Compare: predicted W/L direction vs actual outcome
+4. Compute: accuracy, EV, win rate per confidence tier (A/B/C), trap accuracy
+5. Output: backtest report → parameter calibration recommendations
+```
