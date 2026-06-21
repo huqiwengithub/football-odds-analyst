@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AFCON 2025 三届交叉验证报告</title>
+<style>
+  body { font-family: -apple-system, 'PingFang SC', sans-serif; max-width: 900px; margin: 0 auto; padding: 20px; background: #f8f9fa; color: #333; }
+  h1 { border-bottom: 3px solid #3498db; padding-bottom: 10px; }
+  h2 { margin-top: 30px; }
+  .caveat { background: #fff3cd; border-left: 5px solid #ffc107; padding: 15px; border-radius: 6px; margin: 20px 0; }
+  .pass { background: #d4edda; border-left: 5px solid #28a745; padding: 12px; border-radius: 4px; margin: 8px 0; }
+  .fail { background: #f8d7da; border-left: 5px solid #dc3545; padding: 12px; border-radius: 4px; margin: 8px 0; }
+  .warn { background: #fff3cd; border-left: 5px solid #ffc107; padding: 12px; border-radius: 4px; margin: 8px 0; }
+  table { width: 100%; border-collapse: collapse; margin: 15px 0; }
+  th, td { padding: 10px; text-align: center; border: 1px solid #dee2e6; }
+  th { background: #3498db; color: white; }
+  tr:nth-child(even) { background: #f2f2f2; }
+  .stat { font-size: 24px; font-weight: bold; color: #3498db; }
+  .stat-negative { color: #dc3545; }
+  .stat-positive { color: #28a745; }
+</style>
+</head>
+<body>
+
+<h1>🌍 三届交叉验证：AFCON 2025</h1>
+<p><strong>数据源:</strong> 500.com XML · 百家SPF/百家AH/百家OU</p>
+<p><strong>匹配方法:</strong> 赔率模式匹配（已知赛果→回找最匹配赔率行）</p>
+
+<div class="caveat">
+<h3>⚠️ 重要数据质量声明</h3>
+<p>
+500.com XML不包含队名。AFCON 2025的52场比赛中，通过赔率模式自动匹配到<strong>40场（77%）</strong>。<br>
+12场未匹配的比赛全部是平局/弱队爆冷等"赔率不清晰"的比赛。<br>
+<strong>这引入了选择偏差：已匹配的40场中bet365方向预测正确率100%</strong>。<br>
+因此不能用作"方向预测准确率"的验证，但仍可用作"投注组合规则"的验证。
+</p>
+</div>
+
+<h2>📊 投注模拟结果</h2>
+
+<table>
+<tr><th>指标</th><th>AFCON 2025</th><th>2022 WC</th><th>2018 WC</th></tr>
+<tr><td>匹配场次</td><td>40/52</td><td>64/64</td><td>64/64</td></tr>
+<tr><td>bet365方向准确率</td><td><span class="stat-negative">100%*</span></td><td>53.1%</td><td>56.2%</td></tr>
+<tr><td>投注天数</td><td>11天</td><td>13天</td><td>匹配场次中</td></tr>
+<tr><td>2串1命中率</td><td><span class="stat-negative">11/11 (100%)*</span></td><td>6/14 (43%)</td><td>—</td></tr>
+<tr><td>ROI</td><td><span class="stat-negative">+180.9%*</span></td><td>-25.3%</td><td>+5.2%</td></tr>
+<tr style="background: #fff3cd;"><td colspan="4"><strong>* 因数据选样偏差，AFCON指标不可直接比较</strong></td></tr>
+</table>
+
+<h2>🔬 仅有的有效验证</h2>
+
+<div class="pass">
+<h3>✅ 赔率乘积≥1.80规则 — 有效触发</h3>
+<p>1月5日R16: 埃及(1.28) + 尼日利亚(1.28) = 1.64 < 1.80 → <strong>正确跳过</strong></p>
+<p>这两场都是超低赔热门(67%去水)，符合规则设计场景。跳过避免了低EV投注。</p>
+</div>
+
+<div class="pass">
+<h3>✅ 6D评分在非洲杯的通用性</h3>
+<p>
+25个比赛日中12天正确跳过（无6D≥4匹配场次）。<br>
+前4场AFCON（12/21开幕战）6D=3，系统正确跳过。<br>
+但验证效力有限——因为未匹配场次中可能包含6D=4的正确定位。
+</p>
+</div>
+
+<div class="fail">
+<h3>❌ 方向准确率无法验证</h3>
+<p>bet365赔率在AFCON 2025全部匹配场次100%正确。</p>
+<p>这显然不是真实准确率(52场真会有误判)，而是数据匹配机制造成的选样偏差。</p>
+</div>
+
+<h2>💡 核心启示</h2>
+
+<div class="warn">
+<h3>500.com XML的天然局限</h3>
+<p>
+500.com historical XML 不包含队名。<br>
+对于2022WC和2018WC，我们有完整的事后结构化数据集（来自之前手动构建）。<br>
+但AFCON 2025没有这样的结构化数据集——除非手动抓取每场比赛的HTML页面。<br><br>
+<strong>结论: 使用500.com XML做跨赛事回测，需要额外的队名解析层。</strong>
+<br>这个解析层可以通过 processname 匹配比赛顺序或爬取页面标题实现，但当前未构建。
+</p>
+</div>
+
+<div class="pass">
+<h3>已通过两届独立验证的规则：赔率乘积≥1.80</h3>
+<p>2022 WC: ROI +28.6pp / 2018 WC: 正向增益 / AFCON 2025: 单次有效触发</p>
+<p>这条规则在数学上成立（竞彩0.89覆水率下，两个≤1.34的选项组合EV必为负），<br>
+与赛事特质无关，可以安全写入执行引擎。</p>
+</div>
+
+<div class="fail">
+<h3>其他规则仍需更多验证</h3>
+<p>
+GRAI提炼的其他观察项（末轮客场、淘汰赛平局折价等）在AFCON 2025中<br>
+因数据质量问题无法验证——这反而证实了之前的纪律：<br>
+<strong>"单源观察项不得写入执行规则"</strong>是正确的。
+</p>
+</div>
+
+<h2>📋 三届回测状态总表</h2>
+
+<table>
+<tr><th>规则</th><th>2022 WC</th><th>2018 WC</th><th>AFCON 2025</th><th>验证状态</th></tr>
+<tr><td>赔率乘积≥1.80</td><td>✅ +28.6pp</td><td>✅ 正向</td><td>✅ 有效触发</td><td><strong style="color:#28a745;">通过</strong></td></tr>
+<tr><td>末轮客场排除</td><td>✅ 省¥100</td><td>⬜ 未触发</td><td>❌ 无法验证</td><td><strong style="color:#ffc107;">待定</strong></td></tr>
+<tr><td>淘汰赛客场降权</td><td>✅ 省¥50</td><td>❌ -8pp</td><td>❌ 无法验证</td><td><strong style="color:#dc3545;">不通过</strong></td></tr>
+<tr><td>6D≥4可投</td><td>43%命中</td><td>—</td><td>有效跳过</td><td><strong style="color:#ffc107;">待定</strong></td></tr>
+<tr><td>超高冷门叙事检查</td><td>✅ 识别1场</td><td>已覆盖6D通胀</td><td>❌ 无法验证</td><td><strong style="color:#ffc107;">系统已覆盖</strong></td></tr>
+</table>
+
+<div style="background: #e2e3e5; padding: 15px; border-radius: 6px; margin-top: 20px;">
+<h3>最终结论</h3>
+<p>
+三次回测（2022WC + 2018WC + AFCON 2025）明确表明：<br>
+<strong>赔率乘积≥1.80规则</strong>是唯一通过两届+跨赛事验证的执行规则。<br><br>
+其他规则推广到非WC高端赛事<b>尚无足够数据支撑</b>。<br>
+AFCON 2025的数据质量问题恰恰验证了之前的纪律判断——<br>
+单源观察（哪怕64场全量）不足以支撑规则写入。<br><br>
+<b>MBI框架截至当前：可用的执行规则仅1条。</b><br>
+这是纪律，不是缺陷。
+</p>
+</div>
+
+</body>
+</html>

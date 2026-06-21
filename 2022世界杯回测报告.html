@@ -1,0 +1,1215 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>2022世界杯回测报告 — Pinnacle收盘赔率 vs 实际结果</title>
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+       background: #f0f2f5; color: #333; padding: 20px; }
+.container { max-width: 1280px; margin: 0 auto; }
+h1 { text-align:center; padding:30px 0 10px; font-size:28px; color:#1a1a2e; }
+h1 small { display:block; font-size:14px; color:#888; font-weight:normal; margin-top:5px; }
+.subtitle { text-align:center; color:#666; margin-bottom:30px; font-size:15px; }
+
+.stats-grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(180px, 1fr)); gap:16px; margin-bottom:30px; }
+.stat-card { background:#fff; border-radius:12px; padding:20px; text-align:center; box-shadow:0 2px 8px rgba(0,0,0,0.06); }
+.stat-card .value { font-size:32px; font-weight:700; }
+.stat-card .label { font-size:13px; color:#888; margin-top:4px; }
+.stat-card.highlight { border:2px solid #1a7d36; }
+.stat-card .sub { font-size:11px; color:#aaa; margin-top:2px; }
+
+.section { background:#fff; border-radius:12px; padding:24px; margin-bottom:24px; box-shadow:0 2px 8px rgba(0,0,0,0.06); }
+.section h2 { font-size:18px; color:#1a1a2e; margin-bottom:16px; padding-bottom:8px; border-bottom:2px solid #eee; }
+.section h3 { font-size:15px; color:#444; margin:16px 0 10px; }
+
+table { width:100%; border-collapse:collapse; font-size:13px; }
+th { background:#f7f8fa; padding:10px 8px; text-align:left; font-weight:600; color:#555; border-bottom:2px solid #e0e0e0; white-space:nowrap; }
+td { padding:8px; border-bottom:1px solid #eee; vertical-align:middle; }
+tr:hover { background:#f8f9fd; }
+
+.badge { display:inline-block; padding:2px 8px; border-radius:4px; font-size:11px; font-weight:600; color:#fff; }
+.badge-win { background:#e74c3c; }
+.badge-draw { background:#f39c12; }
+.badge-loss { background:#2980b9; }
+.badge-correct { background:#27ae60; }
+.badge-wrong { background:#e74c3c; }
+
+.tier-tag { display:inline-block; padding:1px 6px; border-radius:3px; font-size:10px; color:#fff; }
+.tier-a { background:#1a7d36; }
+.tier-b { background:#2d7d9a; }
+.tier-c { background:#b8860b; }
+.tier-d { background:#8b4513; }
+
+.roi-pos { color:#27ae60; }
+.roi-neg { color:#e74c3c; }
+.roi-neutral { color:#888; }
+
+.upset-card { background:#fff5f5; border:1px solid #fecaca; border-radius:8px; padding:14px; margin-bottom:10px; }
+.upset-card .match-title { font-size:15px; font-weight:600; }
+.upset-card .detail { font-size:12px; color:#666; margin-top:4px; }
+
+.chart-bar { height:20px; border-radius:4px; background:#eee; margin:4px 0; overflow:hidden; }
+.chart-bar-fill { height:100%; border-radius:4px; transition:width 0.5s; }
+
+@media (max-width: 768px) {
+    .stats-grid { grid-template-columns:repeat(2, 1fr); }
+    table { font-size:12px; }
+}
+</style>
+</head>
+<body>
+<div class="container">
+
+<h1>🏆 2022卡塔尔世界杯 • 赔率回测报告
+<small>数据源：500.com Pinnacle 收盘赔率 × 64场实际赛果</small></h1>
+<p class="subtitle">分析基准：Pinnacle（平博）百家欧赔收盘价，Shin de-vig 去抽水概率</p>
+
+<!-- === Stats Cards === -->
+<div class="stats-grid">
+  <div class="stat-card highlight">
+    <div class="value">53.1%</div>
+    <div class="label">方向预测准确率</div>
+    <div class="sub">34/64 场</div>
+  </div>
+  <div class="stat-card">
+    <div class="value">-668%</div>
+    <div class="label">全场累计 ROI</div>
+    <div class="sub">等注 1 单位，不含抽水</div>
+  </div>
+  <div class="stat-card">
+    <div class="value">0/64</div>
+    <div class="label">正期望值场次</div>
+    <div class="sub">EV > 0 的比赛</div>
+  </div>
+  <div class="stat-card">
+    <div class="value">30</div>
+    <div class="label">冷门场次</div>
+    <div class="sub">预测方向错误</div>
+  </div>
+  <div class="stat-card">
+    <div class="value">34/34</div>
+    <div class="label">低赔方向胜出</div>
+    <div class="sub">主胜/客胜</div>
+  </div>
+  <div class="stat-card">
+    <div class="value">64</div>
+    <div class="label">分析场次</div>
+    <div class="sub">2022世界杯全部</div>
+  </div>
+</div>
+
+<!-- === Tier Analysis === -->
+<div class="section">
+<h2>📊 信心分级准确率</h2>
+<p style="color:#888; font-size:13px; margin-bottom:12px;">按 Pinnacle 最低赔率分档，检查各档预测准确率和回报</p>
+<table>
+<tr><th>信心等级</th><th>赔率范围</th><th>场次</th><th>正确</th><th>准确率</th><th>累计 ROI</th><th>表现</th></tr>
+<tr>
+  <td><span class="tier-tag tier-a">A ★ 极稳</span></td>
+  <td><1.50</td>
+  <td>16</td>
+  <td>11/16</td>
+  <td>
+    <div class="chart-bar"><div class="chart-bar-fill" style="width:68.75%;background:#27ae60"></div></div>
+    68.8%
+  </td>
+  <td class="roi-neg">-11.2%</td>
+  <td style="font-size:12px;">⚠️ 一般</td>
+</tr>
+<tr>
+  <td><span class="tier-tag tier-b">B 稳健</span></td>
+  <td>1.50-2.00</td>
+  <td>29</td>
+  <td>17/29</td>
+  <td>
+    <div class="chart-bar"><div class="chart-bar-fill" style="width:58.620689655172406%;background:#e67e22"></div></div>
+    58.6%
+  </td>
+  <td class="roi-pos">+1.5%</td>
+  <td style="font-size:12px;">⚠️ 一般</td>
+</tr>
+<tr>
+  <td><span class="tier-tag tier-c">C 谨慎</span></td>
+  <td>2.00-3.00</td>
+  <td>19</td>
+  <td>6/19</td>
+  <td>
+    <div class="chart-bar"><div class="chart-bar-fill" style="width:31.57894736842105%;background:#e74c3c"></div></div>
+    31.6%
+  </td>
+  <td class="roi-neg">-28.0%</td>
+  <td style="font-size:12px;">❌ 危险</td>
+</tr>
+</table>
+</div>
+
+<!-- === Stage Analysis === -->
+<div class="section">
+<h2>📅 阶段分析</h2>
+<table>
+<tr><th>阶段</th><th>场次</th><th>正确</th><th>准确率</th><th>主胜</th><th>平局</th><th>客胜</th></tr>
+<tr>
+  <td><strong>小组赛</strong></td>
+  <td>48</td>
+  <td>24/48</td>
+  <td>50.0%</td>
+  <td><span style="color:#e74c3c"></span></td>
+  <td><span style="color:#f39c12">●●●●●●●●●●</span></td>
+  <td><span style="color:#2980b9"></span></td>
+</tr>
+<tr>
+  <td><strong>1/8决赛</strong></td>
+  <td>8</td>
+  <td>6/8</td>
+  <td>75.0%</td>
+  <td><span style="color:#e74c3c"></span></td>
+  <td><span style="color:#f39c12">●●</span></td>
+  <td><span style="color:#2980b9"></span></td>
+</tr>
+<tr>
+  <td><strong>1/4决赛</strong></td>
+  <td>4</td>
+  <td>1/4</td>
+  <td>25.0%</td>
+  <td><span style="color:#e74c3c"></span></td>
+  <td><span style="color:#f39c12">●●</span></td>
+  <td><span style="color:#2980b9"></span></td>
+</tr>
+<tr>
+  <td><strong>半决赛</strong></td>
+  <td>2</td>
+  <td>2/2</td>
+  <td>100.0%</td>
+  <td><span style="color:#e74c3c"></span></td>
+  <td><span style="color:#f39c12"></span></td>
+  <td><span style="color:#2980b9"></span></td>
+</tr>
+<tr>
+  <td><strong>季军赛</strong></td>
+  <td>1</td>
+  <td>1/1</td>
+  <td>100.0%</td>
+  <td><span style="color:#e74c3c"></span></td>
+  <td><span style="color:#f39c12"></span></td>
+  <td><span style="color:#2980b9"></span></td>
+</tr>
+<tr>
+  <td><strong>决赛</strong></td>
+  <td>1</td>
+  <td>0/1</td>
+  <td>0.0%</td>
+  <td><span style="color:#e74c3c"></span></td>
+  <td><span style="color:#f39c12">●</span></td>
+  <td><span style="color:#2980b9"></span></td>
+</tr>
+</table>
+</div>
+
+<!-- === Upsets === -->
+<div class="section">
+<h2>💥 十大冷门</h2>
+<p style="color:#888; font-size:13px; margin-bottom:12px;">按「冷门系数」排序（实际赛果赔率 / 最低赔率），越高越冷</p>
+<div class="upset-card">
+  <div class="match-title">🔥 阿根廷 1:2 沙特 <span style="font-size:12px;color:#888;font-weight:normal;">(小组赛)</span></div>
+  <div class="detail">
+    Pinnacle 预测 <strong>主胜</strong>（赔率 1.13）→ 实际 <strong>客胜</strong>（赔率 22.00）
+    冷门系数：<strong>19.5x</strong>
+  </div>
+  <div class="detail" style="color:#999;">全赔率：1.13 / 10.50 / 22.00 | 真实概率：86.2% / 9.4% / 4.5%</div>
+</div>
+<div class="upset-card">
+  <div class="match-title">⚡ 喀麦隆 1:0 巴西 <span style="font-size:12px;color:#888;font-weight:normal;">(小组赛)</span></div>
+  <div class="detail">
+    Pinnacle 预测 <strong>客胜</strong>（赔率 1.36）→ 实际 <strong>主胜</strong>（赔率 8.75）
+    冷门系数：<strong>6.4x</strong>
+  </div>
+  <div class="detail" style="color:#999;">全赔率：8.75 / 5.50 / 1.36 | 真实概率：11.2% / 17.7% / 71.1%</div>
+</div>
+<div class="upset-card">
+  <div class="match-title">⚡ 日本 0:1 哥斯达黎加 <span style="font-size:12px;color:#888;font-weight:normal;">(小组赛)</span></div>
+  <div class="detail">
+    Pinnacle 预测 <strong>主胜</strong>（赔率 1.50）→ 实际 <strong>客胜</strong>（赔率 7.75）
+    冷门系数：<strong>5.2x</strong>
+  </div>
+  <div class="detail" style="color:#999;">全赔率：1.50 / 4.40 / 7.75 | 真实概率：65.0% / 22.3% / 12.7%</div>
+</div>
+<div class="upset-card">
+  <div class="match-title">⚡ 澳大利亚 1:0 丹麦 <span style="font-size:12px;color:#888;font-weight:normal;">(小组赛)</span></div>
+  <div class="detail">
+    Pinnacle 预测 <strong>客胜</strong>（赔率 1.44）→ 实际 <strong>主胜</strong>（赔率 7.50）
+    冷门系数：<strong>5.2x</strong>
+  </div>
+  <div class="detail" style="color:#999;">全赔率：7.50 / 5.10 / 1.44 | 真实概率：13.1% / 19.2% / 67.7%</div>
+</div>
+<div class="upset-card">
+  <div class="match-title">⚠️ 德国 1:2 日本 <span style="font-size:12px;color:#888;font-weight:normal;">(小组赛)</span></div>
+  <div class="detail">
+    Pinnacle 预测 <strong>主胜</strong>（赔率 1.46）→ 实际 <strong>客胜</strong>（赔率 7.30）
+    冷门系数：<strong>5.0x</strong>
+  </div>
+  <div class="detail" style="color:#999;">全赔率：1.46 / 4.95 / 7.30 | 真实概率：66.8% / 19.8% / 13.4%</div>
+</div>
+<div class="upset-card">
+  <div class="match-title">⚠️ 日本 2:1 西班牙 <span style="font-size:12px;color:#888;font-weight:normal;">(小组赛)</span></div>
+  <div class="detail">
+    Pinnacle 预测 <strong>客胜</strong>（赔率 1.56）→ 实际 <strong>主胜</strong>（赔率 6.57）
+    冷门系数：<strong>4.2x</strong>
+  </div>
+  <div class="detail" style="color:#999;">全赔率：6.57 / 4.41 / 1.56 | 真实概率：15.0% / 22.3% / 62.7%</div>
+</div>
+<div class="upset-card">
+  <div class="match-title">⚠️ 摩洛哥 1:0 葡萄牙 <span style="font-size:12px;color:#888;font-weight:normal;">(1/4决赛)</span></div>
+  <div class="detail">
+    Pinnacle 预测 <strong>客胜</strong>（赔率 1.59）→ 实际 <strong>主胜</strong>（赔率 6.69）
+    冷门系数：<strong>4.2x</strong>
+  </div>
+  <div class="detail" style="color:#999;">全赔率：6.69 / 3.96 / 1.59 | 真实概率：14.6% / 24.6% / 60.9%</div>
+</div>
+<div class="upset-card">
+  <div class="match-title">⚠️ 突尼斯 1:0 法国 <span style="font-size:12px;color:#888;font-weight:normal;">(小组赛)</span></div>
+  <div class="detail">
+    Pinnacle 预测 <strong>客胜</strong>（赔率 1.63）→ 实际 <strong>主胜</strong>（赔率 5.80）
+    冷门系数：<strong>3.6x</strong>
+  </div>
+  <div class="detail" style="color:#999;">全赔率：5.80 / 4.00 / 1.63 | 真实概率：16.7% / 24.2% / 59.0%</div>
+</div>
+<div class="upset-card">
+  <div class="match-title">⚠️ 克罗地亚 0:0 巴西 <span style="font-size:12px;color:#888;font-weight:normal;">(1/4决赛)</span></div>
+  <div class="detail">
+    Pinnacle 预测 <strong>客胜</strong>（赔率 1.41）→ 实际 <strong>平局</strong>（赔率 4.85）
+    冷门系数：<strong>3.4x</strong>
+  </div>
+  <div class="detail" style="color:#999;">全赔率：9.00 / 4.85 / 1.41 | 真实概率：10.9% / 20.2% / 68.9%</div>
+</div>
+<div class="upset-card">
+  <div class="match-title">⚠️ 英格兰 0:0 美国 <span style="font-size:12px;color:#888;font-weight:normal;">(小组赛)</span></div>
+  <div class="detail">
+    Pinnacle 预测 <strong>主胜</strong>（赔率 1.50）→ 实际 <strong>平局</strong>（赔率 4.35）
+    冷门系数：<strong>2.9x</strong>
+  </div>
+  <div class="detail" style="color:#999;">全赔率：1.50 / 4.35 / 7.95 | 真实概率：65.1% / 22.6% / 12.4%</div>
+</div>
+</div>
+
+<!-- === Match Detail Table === -->
+<div class="section">
+<h2>📋 全场逐场分析</h2>
+<div style="overflow-x:auto;">
+<table>
+<tr>
+  <th>#</th><th>日期</th><th>主队</th><th>比分</th><th>客队</th>
+  <th>Pinnacle H/D/A</th><th>预测</th><th>实际</th><th>结果</th>
+  <th>档位</th><th>回报</th><th>EV</th>
+</tr>
+<tr>
+  <td>1</td>
+  <td style="white-space:nowrap">11-20</td>
+  <td style="text-align:right">卡塔尔</td>
+  <td style="text-align:center;font-weight:600;">0:2</td>
+  <td>厄瓜多尔</td>
+  <td style="font-size:11px;white-space:nowrap">3.84/3.18/2.24</td>
+  <td><span class="badge away">客胜</span></td>
+  <td><span class="badge away">客胜</span></td>
+  <td><span class="badge badge-correct">✅ 正确</span></td>
+  <td><span class="tier-tag tier-c">C 谨慎</span></td>
+  <td class="roi-pos" style="font-weight:600;">+124%</td>
+  <td style="font-size:12px;">-2.2%</td>
+</tr>
+<tr>
+  <td>2</td>
+  <td style="white-space:nowrap">11-21</td>
+  <td style="text-align:right">塞内加尔</td>
+  <td style="text-align:center;font-weight:600;">0:2</td>
+  <td>荷兰</td>
+  <td style="font-size:11px;white-space:nowrap">6.26/3.70/1.68</td>
+  <td><span class="badge away">客胜</span></td>
+  <td><span class="badge away">客胜</span></td>
+  <td><span class="badge badge-correct">✅ 正确</span></td>
+  <td><span class="tier-tag tier-b">B 稳健</span></td>
+  <td class="roi-pos" style="font-weight:600;">+68%</td>
+  <td style="font-size:12px;">-2.7%</td>
+</tr>
+<tr>
+  <td>3</td>
+  <td style="white-space:nowrap">11-21</td>
+  <td style="text-align:right">英格兰</td>
+  <td style="text-align:center;font-weight:600;">6:2</td>
+  <td>伊朗</td>
+  <td style="font-size:11px;white-space:nowrap">1.38/4.65/11.50</td>
+  <td><span class="badge home">主胜</span></td>
+  <td><span class="badge home">主胜</span></td>
+  <td><span class="badge badge-correct">✅ 正确</span></td>
+  <td><span class="tier-tag tier-a">A ★ 极稳</span></td>
+  <td class="roi-pos" style="font-weight:600;">+38%</td>
+  <td style="font-size:12px;">-2.8%</td>
+</tr>
+<tr style='background:#fff5f5'>
+  <td>4</td>
+  <td style="white-space:nowrap">11-22</td>
+  <td style="text-align:right">美国</td>
+  <td style="text-align:center;font-weight:600;">1:1</td>
+  <td>威尔士</td>
+  <td style="font-size:11px;white-space:nowrap">2.54/3.14/3.23</td>
+  <td><span class="badge home">主胜</span></td>
+  <td><span class="badge draw">平局</span></td>
+  <td><span class="badge badge-wrong">❌ 错误</span></td>
+  <td><span class="tier-tag tier-c">C 谨慎</span></td>
+  <td class="roi-neg" style="font-weight:600;">-100%</td>
+  <td style="font-size:12px;">-2.2%</td>
+</tr>
+<tr style='background:#fff5f5'>
+  <td>5</td>
+  <td style="white-space:nowrap">11-22</td>
+  <td style="text-align:right">墨西哥</td>
+  <td style="text-align:center;font-weight:600;">0:0</td>
+  <td>波兰</td>
+  <td style="font-size:11px;white-space:nowrap">2.48/3.19/3.27</td>
+  <td><span class="badge home">主胜</span></td>
+  <td><span class="badge draw">平局</span></td>
+  <td><span class="badge badge-wrong">❌ 错误</span></td>
+  <td><span class="tier-tag tier-c">C 谨慎</span></td>
+  <td class="roi-neg" style="font-weight:600;">-100%</td>
+  <td style="font-size:12px;">-2.3%</td>
+</tr>
+<tr style='background:#fff5f5'>
+  <td>6</td>
+  <td style="white-space:nowrap">11-22</td>
+  <td style="text-align:right">阿根廷</td>
+  <td style="text-align:center;font-weight:600;">1:2</td>
+  <td>沙特</td>
+  <td style="font-size:11px;white-space:nowrap">1.13/10.50/22.00</td>
+  <td><span class="badge home">主胜</span></td>
+  <td><span class="badge away">客胜</span></td>
+  <td><span class="badge badge-wrong">❌ 错误</span></td>
+  <td><span class="tier-tag tier-a">A ★ 极稳</span></td>
+  <td class="roi-neg" style="font-weight:600;">-100%</td>
+  <td style="font-size:12px;">-2.6%</td>
+</tr>
+<tr style='background:#fff5f5'>
+  <td>7</td>
+  <td style="white-space:nowrap">11-22</td>
+  <td style="text-align:right">丹麦</td>
+  <td style="text-align:center;font-weight:600;">0:0</td>
+  <td>突尼斯</td>
+  <td style="font-size:11px;white-space:nowrap">1.61/3.94/6.70</td>
+  <td><span class="badge home">主胜</span></td>
+  <td><span class="badge draw">平局</span></td>
+  <td><span class="badge badge-wrong">❌ 错误</span></td>
+  <td><span class="tier-tag tier-b">B 稳健</span></td>
+  <td class="roi-neg" style="font-weight:600;">-100%</td>
+  <td style="font-size:12px;">-2.6%</td>
+</tr>
+<tr>
+  <td>8</td>
+  <td style="white-space:nowrap">11-23</td>
+  <td style="text-align:right">法国</td>
+  <td style="text-align:center;font-weight:600;">4:1</td>
+  <td>澳大利亚</td>
+  <td style="font-size:11px;white-space:nowrap">1.22/7.50/15.50</td>
+  <td><span class="badge home">主胜</span></td>
+  <td><span class="badge home">主胜</span></td>
+  <td><span class="badge badge-correct">✅ 正确</span></td>
+  <td><span class="tier-tag tier-a">A ★ 极稳</span></td>
+  <td class="roi-pos" style="font-weight:600;">+22%</td>
+  <td style="font-size:12px;">-1.8%</td>
+</tr>
+<tr>
+  <td>9</td>
+  <td style="white-space:nowrap">11-23</td>
+  <td style="text-align:right">西班牙</td>
+  <td style="text-align:center;font-weight:600;">7:0</td>
+  <td>哥斯达黎加</td>
+  <td style="font-size:11px;white-space:nowrap">1.15/9.15/21.00</td>
+  <td><span class="badge home">主胜</span></td>
+  <td><span class="badge home">主胜</span></td>
+  <td><span class="badge badge-correct">✅ 正确</span></td>
+  <td><span class="tier-tag tier-a">A ★ 极稳</span></td>
+  <td class="roi-pos" style="font-weight:600;">+15%</td>
+  <td style="font-size:12px;">-2.7%</td>
+</tr>
+<tr style='background:#fff5f5'>
+  <td>10</td>
+  <td style="white-space:nowrap">11-23</td>
+  <td style="text-align:right">德国</td>
+  <td style="text-align:center;font-weight:600;">1:2</td>
+  <td>日本</td>
+  <td style="font-size:11px;white-space:nowrap">1.46/4.95/7.30</td>
+  <td><span class="badge home">主胜</span></td>
+  <td><span class="badge away">客胜</span></td>
+  <td><span class="badge badge-wrong">❌ 错误</span></td>
+  <td><span class="tier-tag tier-a">A ★ 极稳</span></td>
+  <td class="roi-neg" style="font-weight:600;">-100%</td>
+  <td style="font-size:12px;">-2.5%</td>
+</tr>
+<tr style='background:#fff5f5'>
+  <td>11</td>
+  <td style="white-space:nowrap">11-23</td>
+  <td style="text-align:right">摩洛哥</td>
+  <td style="text-align:center;font-weight:600;">0:0</td>
+  <td>克罗地亚</td>
+  <td style="font-size:11px;white-space:nowrap">3.55/3.29/2.30</td>
+  <td><span class="badge away">客胜</span></td>
+  <td><span class="badge draw">平局</span></td>
+  <td><span class="badge badge-wrong">❌ 错误</span></td>
+  <td><span class="tier-tag tier-c">C 谨慎</span></td>
+  <td class="roi-neg" style="font-weight:600;">-100%</td>
+  <td style="font-size:12px;">-2.1%</td>
+</tr>
+<tr>
+  <td>12</td>
+  <td style="white-space:nowrap">11-24</td>
+  <td style="text-align:right">比利时</td>
+  <td style="text-align:center;font-weight:600;">1:0</td>
+  <td>加拿大</td>
+  <td style="font-size:11px;white-space:nowrap">1.64/4.20/5.62</td>
+  <td><span class="badge home">主胜</span></td>
+  <td><span class="badge home">主胜</span></td>
+  <td><span class="badge badge-correct">✅ 正确</span></td>
+  <td><span class="tier-tag tier-b">B 稳健</span></td>
+  <td class="roi-pos" style="font-weight:600;">+64%</td>
+  <td style="font-size:12px;">-2.7%</td>
+</tr>
+<tr>
+  <td>13</td>
+  <td style="white-space:nowrap">11-24</td>
+  <td style="text-align:right">瑞士</td>
+  <td style="text-align:center;font-weight:600;">1:0</td>
+  <td>喀麦隆</td>
+  <td style="font-size:11px;white-space:nowrap">1.80/3.60/5.34</td>
+  <td><span class="badge home">主胜</span></td>
+  <td><span class="badge home">主胜</span></td>
+  <td><span class="badge badge-correct">✅ 正确</span></td>
+  <td><span class="tier-tag tier-b">B 稳健</span></td>
+  <td class="roi-pos" style="font-weight:600;">+80%</td>
+  <td style="font-size:12px;">-2.2%</td>
+</tr>
+<tr>
+  <td>14</td>
+  <td style="white-space:nowrap">11-24</td>
+  <td style="text-align:right">葡萄牙</td>
+  <td style="text-align:center;font-weight:600;">3:2</td>
+  <td>加纳</td>
+  <td style="font-size:11px;white-space:nowrap">1.31/5.75/10.80</td>
+  <td><span class="badge home">主胜</span></td>
+  <td><span class="badge home">主胜</span></td>
+  <td><span class="badge badge-correct">✅ 正确</span></td>
+  <td><span class="tier-tag tier-a">A ★ 极稳</span></td>
+  <td class="roi-pos" style="font-weight:600;">+31%</td>
+  <td style="font-size:12px;">-3.1%</td>
+</tr>
+<tr style='background:#fff5f5'>
+  <td>15</td>
+  <td style="white-space:nowrap">11-24</td>
+  <td style="text-align:right">乌拉圭</td>
+  <td style="text-align:center;font-weight:600;">0:0</td>
+  <td>韩国</td>
+  <td style="font-size:11px;white-space:nowrap">1.81/3.60/5.26</td>
+  <td><span class="badge home">主胜</span></td>
+  <td><span class="badge draw">平局</span></td>
+  <td><span class="badge badge-wrong">❌ 错误</span></td>
+  <td><span class="tier-tag tier-b">B 稳健</span></td>
+  <td class="roi-neg" style="font-weight:600;">-100%</td>
+  <td style="font-size:12px;">-2.1%</td>
+</tr>
+<tr style='background:#fff5f5'>
+  <td>16</td>
+  <td style="white-space:nowrap">11-25</td>
+  <td style="text-align:right">荷兰</td>
+  <td style="text-align:center;font-weight:600;">1:1</td>
+  <td>厄瓜多尔</td>
+  <td style="font-size:11px;white-space:nowrap">1.89/3.44/4.99</td>
+  <td><span class="badge home">主胜</span></td>
+  <td><span class="badge draw">平局</span></td>
+  <td><span class="badge badge-wrong">❌ 错误</span></td>
+  <td><span class="tier-tag tier-b">B 稳健</span></td>
+  <td class="roi-neg" style="font-weight:600;">-100%</td>
+  <td style="font-size:12px;">-2.1%</td>
+</tr>
+<tr>
+  <td>17</td>
+  <td style="white-space:nowrap">11-25</td>
+  <td style="text-align:right">卡塔尔</td>
+  <td style="text-align:center;font-weight:600;">1:3</td>
+  <td>塞内加尔</td>
+  <td style="font-size:11px;white-space:nowrap">5.53/3.67/1.76</td>
+  <td><span class="badge away">客胜</span></td>
+  <td><span class="badge away">客胜</span></td>
+  <td><span class="badge badge-correct">✅ 正确</span></td>
+  <td><span class="tier-tag tier-b">B 稳健</span></td>
+  <td class="roi-pos" style="font-weight:600;">+76%</td>
+  <td style="font-size:12px;">-2.3%</td>
+</tr>
+<tr style='background:#fff5f5'>
+  <td>18</td>
+  <td style="white-space:nowrap">11-25</td>
+  <td style="text-align:right">威尔士</td>
+  <td style="text-align:center;font-weight:600;">0:2</td>
+  <td>伊朗</td>
+  <td style="font-size:11px;white-space:nowrap">2.20/3.21/3.96</td>
+  <td><span class="badge home">主胜</span></td>
+  <td><span class="badge away">客胜</span></td>
+  <td><span class="badge badge-wrong">❌ 错误</span></td>
+  <td><span class="tier-tag tier-c">C 谨慎</span></td>
+  <td class="roi-neg" style="font-weight:600;">-100%</td>
+  <td style="font-size:12px;">-1.9%</td>
+</tr>
+<tr>
+  <td>19</td>
+  <td style="white-space:nowrap">11-25</td>
+  <td style="text-align:right">巴西</td>
+  <td style="text-align:center;font-weight:600;">2:0</td>
+  <td>塞尔维亚</td>
+  <td style="font-size:11px;white-space:nowrap">1.51/4.65/6.90</td>
+  <td><span class="badge home">主胜</span></td>
+  <td><span class="badge home">主胜</span></td>
+  <td><span class="badge badge-correct">✅ 正确</span></td>
+  <td><span class="tier-tag tier-b">B 稳健</span></td>
+  <td class="roi-pos" style="font-weight:600;">+51%</td>
+  <td style="font-size:12px;">-2.4%</td>
+</tr>
+<tr style='background:#fff5f5'>
+  <td>20</td>
+  <td style="white-space:nowrap">11-26</td>
+  <td style="text-align:right">英格兰</td>
+  <td style="text-align:center;font-weight:600;">0:0</td>
+  <td>美国</td>
+  <td style="font-size:11px;white-space:nowrap">1.50/4.35/7.95</td>
+  <td><span class="badge home">主胜</span></td>
+  <td><span class="badge draw">平局</span></td>
+  <td><span class="badge badge-wrong">❌ 错误</span></td>
+  <td><span class="tier-tag tier-b">B 稳健</span></td>
+  <td class="roi-neg" style="font-weight:600;">-100%</td>
+  <td style="font-size:12px;">-2.4%</td>
+</tr>
+<tr>
+  <td>21</td>
+  <td style="white-space:nowrap">11-26</td>
+  <td style="text-align:right">波兰</td>
+  <td style="text-align:center;font-weight:600;">2:0</td>
+  <td>沙特</td>
+  <td style="font-size:11px;white-space:nowrap">1.73/3.75/5.70</td>
+  <td><span class="badge home">主胜</span></td>
+  <td><span class="badge home">主胜</span></td>
+  <td><span class="badge badge-correct">✅ 正确</span></td>
+  <td><span class="tier-tag tier-b">B 稳健</span></td>
+  <td class="roi-pos" style="font-weight:600;">+73%</td>
+  <td style="font-size:12px;">-2.1%</td>
+</tr>
+<tr>
+  <td>22</td>
+  <td style="white-space:nowrap">11-26</td>
+  <td style="text-align:right">法国</td>
+  <td style="text-align:center;font-weight:600;">2:1</td>
+  <td>丹麦</td>
+  <td style="font-size:11px;white-space:nowrap">1.85/3.61/4.92</td>
+  <td><span class="badge home">主胜</span></td>
+  <td><span class="badge home">主胜</span></td>
+  <td><span class="badge badge-correct">✅ 正确</span></td>
+  <td><span class="tier-tag tier-b">B 稳健</span></td>
+  <td class="roi-pos" style="font-weight:600;">+85%</td>
+  <td style="font-size:12px;">-2.2%</td>
+</tr>
+<tr style='background:#fff5f5'>
+  <td>23</td>
+  <td style="white-space:nowrap">11-26</td>
+  <td style="text-align:right">突尼斯</td>
+  <td style="text-align:center;font-weight:600;">0:1</td>
+  <td>澳大利亚</td>
+  <td style="font-size:11px;white-space:nowrap">2.23/3.46/3.54</td>
+  <td><span class="badge home">主胜</span></td>
+  <td><span class="badge away">客胜</span></td>
+  <td><span class="badge badge-wrong">❌ 错误</span></td>
+  <td><span class="tier-tag tier-c">C 谨慎</span></td>
+  <td class="roi-neg" style="font-weight:600;">-100%</td>
+  <td style="font-size:12px;">-2.0%</td>
+</tr>
+<tr>
+  <td>24</td>
+  <td style="white-space:nowrap">11-27</td>
+  <td style="text-align:right">阿根廷</td>
+  <td style="text-align:center;font-weight:600;">2:0</td>
+  <td>墨西哥</td>
+  <td style="font-size:11px;white-space:nowrap">1.61/4.00/6.50</td>
+  <td><span class="badge home">主胜</span></td>
+  <td><span class="badge home">主胜</span></td>
+  <td><span class="badge badge-correct">✅ 正确</span></td>
+  <td><span class="tier-tag tier-b">B 稳健</span></td>
+  <td class="roi-pos" style="font-weight:600;">+61%</td>
+  <td style="font-size:12px;">-2.6%</td>
+</tr>
+<tr style='background:#fff5f5'>
+  <td>25</td>
+  <td style="white-space:nowrap">11-27</td>
+  <td style="text-align:right">日本</td>
+  <td style="text-align:center;font-weight:600;">0:1</td>
+  <td>哥斯达黎加</td>
+  <td style="font-size:11px;white-space:nowrap">1.50/4.40/7.75</td>
+  <td><span class="badge home">主胜</span></td>
+  <td><span class="badge away">客胜</span></td>
+  <td><span class="badge badge-wrong">❌ 错误</span></td>
+  <td><span class="tier-tag tier-b">B 稳健</span></td>
+  <td class="roi-neg" style="font-weight:600;">-100%</td>
+  <td style="font-size:12px;">-2.4%</td>
+</tr>
+<tr>
+  <td>26</td>
+  <td style="white-space:nowrap">11-27</td>
+  <td style="text-align:right">克罗地亚</td>
+  <td style="text-align:center;font-weight:600;">4:1</td>
+  <td>加拿大</td>
+  <td style="font-size:11px;white-space:nowrap">2.28/3.36/3.54</td>
+  <td><span class="badge home">主胜</span></td>
+  <td><span class="badge home">主胜</span></td>
+  <td><span class="badge badge-correct">✅ 正确</span></td>
+  <td><span class="tier-tag tier-c">C 谨慎</span></td>
+  <td class="roi-pos" style="font-weight:600;">+128%</td>
+  <td style="font-size:12px;">-1.9%</td>
+</tr>
+<tr style='background:#fff5f5'>
+  <td>27</td>
+  <td style="white-space:nowrap">11-27</td>
+  <td style="text-align:right">比利时</td>
+  <td style="text-align:center;font-weight:600;">0:2</td>
+  <td>摩洛哥</td>
+  <td style="font-size:11px;white-space:nowrap">1.91/3.50/4.75</td>
+  <td><span class="badge home">主胜</span></td>
+  <td><span class="badge away">客胜</span></td>
+  <td><span class="badge badge-wrong">❌ 错误</span></td>
+  <td><span class="tier-tag tier-b">B 稳健</span></td>
+  <td class="roi-neg" style="font-weight:600;">-100%</td>
+  <td style="font-size:12px;">-2.1%</td>
+</tr>
+<tr style='background:#fff5f5'>
+  <td>28</td>
+  <td style="white-space:nowrap">11-28</td>
+  <td style="text-align:right">西班牙</td>
+  <td style="text-align:center;font-weight:600;">1:1</td>
+  <td>德国</td>
+  <td style="font-size:11px;white-space:nowrap">2.59/3.43/2.92</td>
+  <td><span class="badge home">主胜</span></td>
+  <td><span class="badge draw">平局</span></td>
+  <td><span class="badge badge-wrong">❌ 错误</span></td>
+  <td><span class="tier-tag tier-c">C 谨慎</span></td>
+  <td class="roi-neg" style="font-weight:600;">-100%</td>
+  <td style="font-size:12px;">-2.0%</td>
+</tr>
+<tr>
+  <td>29</td>
+  <td style="white-space:nowrap">11-28</td>
+  <td style="text-align:right">巴西</td>
+  <td style="text-align:center;font-weight:600;">1:0</td>
+  <td>瑞士</td>
+  <td style="font-size:11px;white-space:nowrap">1.51/4.35/8.00</td>
+  <td><span class="badge home">主胜</span></td>
+  <td><span class="badge home">主胜</span></td>
+  <td><span class="badge badge-correct">✅ 正确</span></td>
+  <td><span class="tier-tag tier-b">B 稳健</span></td>
+  <td class="roi-pos" style="font-weight:600;">+51%</td>
+  <td style="font-size:12px;">-1.8%</td>
+</tr>
+<tr style='background:#fff5f5'>
+  <td>30</td>
+  <td style="white-space:nowrap">11-28</td>
+  <td style="text-align:right">喀麦隆</td>
+  <td style="text-align:center;font-weight:600;">3:3</td>
+  <td>塞尔维亚</td>
+  <td style="font-size:11px;white-space:nowrap">5.60/3.95/1.69</td>
+  <td><span class="badge away">客胜</span></td>
+  <td><span class="badge draw">平局</span></td>
+  <td><span class="badge badge-wrong">❌ 错误</span></td>
+  <td><span class="tier-tag tier-b">B 稳健</span></td>
+  <td class="roi-neg" style="font-weight:600;">-100%</td>
+  <td style="font-size:12px;">-2.5%</td>
+</tr>
+<tr style='background:#fff5f5'>
+  <td>31</td>
+  <td style="white-space:nowrap">11-28</td>
+  <td style="text-align:right">韩国</td>
+  <td style="text-align:center;font-weight:600;">2:3</td>
+  <td>加纳</td>
+  <td style="font-size:11px;white-space:nowrap">2.78/3.16/2.93</td>
+  <td><span class="badge home">主胜</span></td>
+  <td><span class="badge away">客胜</span></td>
+  <td><span class="badge badge-wrong">❌ 错误</span></td>
+  <td><span class="tier-tag tier-c">C 谨慎</span></td>
+  <td class="roi-neg" style="font-weight:600;">-100%</td>
+  <td style="font-size:12px;">-1.7%</td>
+</tr>
+<tr>
+  <td>32</td>
+  <td style="white-space:nowrap">11-29</td>
+  <td style="text-align:right">卡塔尔</td>
+  <td style="text-align:center;font-weight:600;">0:2</td>
+  <td>荷兰</td>
+  <td style="font-size:11px;white-space:nowrap">23.32/7.18/1.18</td>
+  <td><span class="badge away">客胜</span></td>
+  <td><span class="badge away">客胜</span></td>
+  <td><span class="badge badge-correct">✅ 正确</span></td>
+  <td><span class="tier-tag tier-a">A ★ 极稳</span></td>
+  <td class="roi-pos" style="font-weight:600;">+18%</td>
+  <td style="font-size:12px;">-3.1%</td>
+</tr>
+<tr style='background:#fff5f5'>
+  <td>33</td>
+  <td style="white-space:nowrap">11-29</td>
+  <td style="text-align:right">厄瓜多尔</td>
+  <td style="text-align:center;font-weight:600;">1:2</td>
+  <td>塞内加尔</td>
+  <td style="font-size:11px;white-space:nowrap">2.43/3.29/3.20</td>
+  <td><span class="badge home">主胜</span></td>
+  <td><span class="badge away">客胜</span></td>
+  <td><span class="badge badge-wrong">❌ 错误</span></td>
+  <td><span class="tier-tag tier-c">C 谨慎</span></td>
+  <td class="roi-neg" style="font-weight:600;">-100%</td>
+  <td style="font-size:12px;">-2.8%</td>
+</tr>
+<tr>
+  <td>34</td>
+  <td style="white-space:nowrap">11-29</td>
+  <td style="text-align:right">葡萄牙</td>
+  <td style="text-align:center;font-weight:600;">2:0</td>
+  <td>乌拉圭</td>
+  <td style="font-size:11px;white-space:nowrap">1.94/3.41/4.69</td>
+  <td><span class="badge home">主胜</span></td>
+  <td><span class="badge home">主胜</span></td>
+  <td><span class="badge badge-correct">✅ 正确</span></td>
+  <td><span class="tier-tag tier-b">B 稳健</span></td>
+  <td class="roi-pos" style="font-weight:600;">+94%</td>
+  <td style="font-size:12px;">-2.3%</td>
+</tr>
+<tr>
+  <td>35</td>
+  <td style="white-space:nowrap">11-30</td>
+  <td style="text-align:right">伊朗</td>
+  <td style="text-align:center;font-weight:600;">0:1</td>
+  <td>美国</td>
+  <td style="font-size:11px;white-space:nowrap">4.52/3.52/1.92</td>
+  <td><span class="badge away">客胜</span></td>
+  <td><span class="badge away">客胜</span></td>
+  <td><span class="badge badge-correct">✅ 正确</span></td>
+  <td><span class="tier-tag tier-b">B 稳健</span></td>
+  <td class="roi-pos" style="font-weight:600;">+92%</td>
+  <td style="font-size:12px;">-2.7%</td>
+</tr>
+<tr>
+  <td>36</td>
+  <td style="white-space:nowrap">11-30</td>
+  <td style="text-align:right">威尔士</td>
+  <td style="text-align:center;font-weight:600;">0:3</td>
+  <td>英格兰</td>
+  <td style="font-size:11px;white-space:nowrap">8.56/4.53/1.45</td>
+  <td><span class="badge away">客胜</span></td>
+  <td><span class="badge away">客胜</span></td>
+  <td><span class="badge badge-correct">✅ 正确</span></td>
+  <td><span class="tier-tag tier-a">A ★ 极稳</span></td>
+  <td class="roi-pos" style="font-weight:600;">+45%</td>
+  <td style="font-size:12px;">-2.9%</td>
+</tr>
+<tr style='background:#fff5f5'>
+  <td>37</td>
+  <td style="white-space:nowrap">11-30</td>
+  <td style="text-align:right">突尼斯</td>
+  <td style="text-align:center;font-weight:600;">1:0</td>
+  <td>法国</td>
+  <td style="font-size:11px;white-space:nowrap">5.80/4.00/1.63</td>
+  <td><span class="badge away">客胜</span></td>
+  <td><span class="badge home">主胜</span></td>
+  <td><span class="badge badge-wrong">❌ 错误</span></td>
+  <td><span class="tier-tag tier-b">B 稳健</span></td>
+  <td class="roi-neg" style="font-weight:600;">-100%</td>
+  <td style="font-size:12px;">-3.7%</td>
+</tr>
+<tr style='background:#fff5f5'>
+  <td>38</td>
+  <td style="white-space:nowrap">11-30</td>
+  <td style="text-align:right">澳大利亚</td>
+  <td style="text-align:center;font-weight:600;">1:0</td>
+  <td>丹麦</td>
+  <td style="font-size:11px;white-space:nowrap">7.50/5.10/1.44</td>
+  <td><span class="badge away">客胜</span></td>
+  <td><span class="badge home">主胜</span></td>
+  <td><span class="badge badge-wrong">❌ 错误</span></td>
+  <td><span class="tier-tag tier-a">A ★ 极稳</span></td>
+  <td class="roi-neg" style="font-weight:600;">-100%</td>
+  <td style="font-size:12px;">-2.5%</td>
+</tr>
+<tr>
+  <td>39</td>
+  <td style="white-space:nowrap">12-01</td>
+  <td style="text-align:right">沙特</td>
+  <td style="text-align:center;font-weight:600;">1:2</td>
+  <td>墨西哥</td>
+  <td style="font-size:11px;white-space:nowrap">5.50/4.40/1.63</td>
+  <td><span class="badge away">客胜</span></td>
+  <td><span class="badge away">客胜</span></td>
+  <td><span class="badge badge-correct">✅ 正确</span></td>
+  <td><span class="tier-tag tier-b">B 稳健</span></td>
+  <td class="roi-pos" style="font-weight:600;">+63%</td>
+  <td style="font-size:12px;">-2.4%</td>
+</tr>
+<tr>
+  <td>40</td>
+  <td style="white-space:nowrap">12-01</td>
+  <td style="text-align:right">波兰</td>
+  <td style="text-align:center;font-weight:600;">0:2</td>
+  <td>阿根廷</td>
+  <td style="font-size:11px;white-space:nowrap">8.40/4.70/1.44</td>
+  <td><span class="badge away">客胜</span></td>
+  <td><span class="badge away">客胜</span></td>
+  <td><span class="badge badge-correct">✅ 正确</span></td>
+  <td><span class="tier-tag tier-a">A ★ 极稳</span></td>
+  <td class="roi-pos" style="font-weight:600;">+44%</td>
+  <td style="font-size:12px;">-2.8%</td>
+</tr>
+<tr style='background:#fff5f5'>
+  <td>41</td>
+  <td style="white-space:nowrap">12-01</td>
+  <td style="text-align:right">克罗地亚</td>
+  <td style="text-align:center;font-weight:600;">0:0</td>
+  <td>比利时</td>
+  <td style="font-size:11px;white-space:nowrap">3.17/3.46/2.42</td>
+  <td><span class="badge away">客胜</span></td>
+  <td><span class="badge draw">平局</span></td>
+  <td><span class="badge badge-wrong">❌ 错误</span></td>
+  <td><span class="tier-tag tier-c">C 谨慎</span></td>
+  <td class="roi-neg" style="font-weight:600;">-100%</td>
+  <td style="font-size:12px;">-1.8%</td>
+</tr>
+<tr>
+  <td>42</td>
+  <td style="white-space:nowrap">12-01</td>
+  <td style="text-align:right">加拿大</td>
+  <td style="text-align:center;font-weight:600;">1:2</td>
+  <td>摩洛哥</td>
+  <td style="font-size:11px;white-space:nowrap">4.79/3.54/1.88</td>
+  <td><span class="badge away">客胜</span></td>
+  <td><span class="badge away">客胜</span></td>
+  <td><span class="badge badge-correct">✅ 正确</span></td>
+  <td><span class="tier-tag tier-b">B 稳健</span></td>
+  <td class="roi-pos" style="font-weight:600;">+88%</td>
+  <td style="font-size:12px;">-2.4%</td>
+</tr>
+<tr>
+  <td>43</td>
+  <td style="white-space:nowrap">12-02</td>
+  <td style="text-align:right">哥斯达黎加</td>
+  <td style="text-align:center;font-weight:600;">2:4</td>
+  <td>德国</td>
+  <td style="font-size:11px;white-space:nowrap">21.00/11.50/1.12</td>
+  <td><span class="badge away">客胜</span></td>
+  <td><span class="badge away">客胜</span></td>
+  <td><span class="badge badge-correct">✅ 正确</span></td>
+  <td><span class="tier-tag tier-a">A ★ 极稳</span></td>
+  <td class="roi-pos" style="font-weight:600;">+12%</td>
+  <td style="font-size:12px;">-2.8%</td>
+</tr>
+<tr style='background:#fff5f5'>
+  <td>44</td>
+  <td style="white-space:nowrap">12-02</td>
+  <td style="text-align:right">日本</td>
+  <td style="text-align:center;font-weight:600;">2:1</td>
+  <td>西班牙</td>
+  <td style="font-size:11px;white-space:nowrap">6.57/4.41/1.56</td>
+  <td><span class="badge away">客胜</span></td>
+  <td><span class="badge home">主胜</span></td>
+  <td><span class="badge badge-wrong">❌ 错误</span></td>
+  <td><span class="tier-tag tier-b">B 稳健</span></td>
+  <td class="roi-neg" style="font-weight:600;">-100%</td>
+  <td style="font-size:12px;">-2.1%</td>
+</tr>
+<tr>
+  <td>45</td>
+  <td style="white-space:nowrap">12-02</td>
+  <td style="text-align:right">加纳</td>
+  <td style="text-align:center;font-weight:600;">0:2</td>
+  <td>乌拉圭</td>
+  <td style="font-size:11px;white-space:nowrap">4.93/3.99/1.76</td>
+  <td><span class="badge away">客胜</span></td>
+  <td><span class="badge away">客胜</span></td>
+  <td><span class="badge badge-correct">✅ 正确</span></td>
+  <td><span class="tier-tag tier-b">B 稳健</span></td>
+  <td class="roi-pos" style="font-weight:600;">+76%</td>
+  <td style="font-size:12px;">-2.3%</td>
+</tr>
+<tr style='background:#fff5f5'>
+  <td>46</td>
+  <td style="white-space:nowrap">12-02</td>
+  <td style="text-align:right">韩国</td>
+  <td style="text-align:center;font-weight:600;">2:1</td>
+  <td>葡萄牙</td>
+  <td style="font-size:11px;white-space:nowrap">4.37/3.87/1.86</td>
+  <td><span class="badge away">客胜</span></td>
+  <td><span class="badge home">主胜</span></td>
+  <td><span class="badge badge-wrong">❌ 错误</span></td>
+  <td><span class="tier-tag tier-b">B 稳健</span></td>
+  <td class="roi-neg" style="font-weight:600;">-100%</td>
+  <td style="font-size:12px;">-2.6%</td>
+</tr>
+<tr style='background:#fff5f5'>
+  <td>47</td>
+  <td style="white-space:nowrap">12-03</td>
+  <td style="text-align:right">塞尔维亚</td>
+  <td style="text-align:center;font-weight:600;">2:3</td>
+  <td>瑞士</td>
+  <td style="font-size:11px;white-space:nowrap">2.54/3.54/2.92</td>
+  <td><span class="badge home">主胜</span></td>
+  <td><span class="badge away">客胜</span></td>
+  <td><span class="badge badge-wrong">❌ 错误</span></td>
+  <td><span class="tier-tag tier-c">C 谨慎</span></td>
+  <td class="roi-neg" style="font-weight:600;">-100%</td>
+  <td style="font-size:12px;">-1.9%</td>
+</tr>
+<tr style='background:#fff5f5'>
+  <td>48</td>
+  <td style="white-space:nowrap">12-03</td>
+  <td style="text-align:right">喀麦隆</td>
+  <td style="text-align:center;font-weight:600;">1:0</td>
+  <td>巴西</td>
+  <td style="font-size:11px;white-space:nowrap">8.75/5.50/1.36</td>
+  <td><span class="badge away">客胜</span></td>
+  <td><span class="badge home">主胜</span></td>
+  <td><span class="badge badge-wrong">❌ 错误</span></td>
+  <td><span class="tier-tag tier-a">A ★ 极稳</span></td>
+  <td class="roi-neg" style="font-weight:600;">-100%</td>
+  <td style="font-size:12px;">-3.3%</td>
+</tr>
+<tr>
+  <td>49</td>
+  <td style="white-space:nowrap">12-03</td>
+  <td style="text-align:right">荷兰</td>
+  <td style="text-align:center;font-weight:600;">3:1</td>
+  <td>美国</td>
+  <td style="font-size:11px;white-space:nowrap">1.95/3.44/4.60</td>
+  <td><span class="badge home">主胜</span></td>
+  <td><span class="badge home">主胜</span></td>
+  <td><span class="badge badge-correct">✅ 正确</span></td>
+  <td><span class="tier-tag tier-b">B 稳健</span></td>
+  <td class="roi-pos" style="font-weight:600;">+95%</td>
+  <td style="font-size:12px;">-2.2%</td>
+</tr>
+<tr>
+  <td>50</td>
+  <td style="white-space:nowrap">12-04</td>
+  <td style="text-align:right">阿根廷</td>
+  <td style="text-align:center;font-weight:600;">2:1</td>
+  <td>澳大利亚</td>
+  <td style="font-size:11px;white-space:nowrap">1.30/6.90/9.25</td>
+  <td><span class="badge home">主胜</span></td>
+  <td><span class="badge home">主胜</span></td>
+  <td><span class="badge badge-correct">✅ 正确</span></td>
+  <td><span class="tier-tag tier-a">A ★ 极稳</span></td>
+  <td class="roi-pos" style="font-weight:600;">+30%</td>
+  <td style="font-size:12px;">-2.4%</td>
+</tr>
+<tr>
+  <td>51</td>
+  <td style="white-space:nowrap">12-04</td>
+  <td style="text-align:right">法国</td>
+  <td style="text-align:center;font-weight:600;">3:1</td>
+  <td>波兰</td>
+  <td style="font-size:11px;white-space:nowrap">1.40/4.95/9.50</td>
+  <td><span class="badge home">主胜</span></td>
+  <td><span class="badge home">主胜</span></td>
+  <td><span class="badge badge-correct">✅ 正确</span></td>
+  <td><span class="tier-tag tier-a">A ★ 极稳</span></td>
+  <td class="roi-pos" style="font-weight:600;">+40%</td>
+  <td style="font-size:12px;">-2.3%</td>
+</tr>
+<tr>
+  <td>52</td>
+  <td style="white-space:nowrap">12-05</td>
+  <td style="text-align:right">英格兰</td>
+  <td style="text-align:center;font-weight:600;">3:0</td>
+  <td>塞内加尔</td>
+  <td style="font-size:11px;white-space:nowrap">1.63/3.85/6.75</td>
+  <td><span class="badge home">主胜</span></td>
+  <td><span class="badge home">主胜</span></td>
+  <td><span class="badge badge-correct">✅ 正确</span></td>
+  <td><span class="tier-tag tier-b">B 稳健</span></td>
+  <td class="roi-pos" style="font-weight:600;">+63%</td>
+  <td style="font-size:12px;">-2.3%</td>
+</tr>
+<tr style='background:#fff5f5'>
+  <td>53</td>
+  <td style="white-space:nowrap">12-05</td>
+  <td style="text-align:right">日本</td>
+  <td style="text-align:center;font-weight:600;">1:1</td>
+  <td>克罗地亚</td>
+  <td style="font-size:11px;white-space:nowrap">3.89/3.33/2.16</td>
+  <td><span class="badge away">客胜</span></td>
+  <td><span class="badge draw">平局</span></td>
+  <td><span class="badge badge-wrong">❌ 错误</span></td>
+  <td><span class="tier-tag tier-c">C 谨慎</span></td>
+  <td class="roi-neg" style="font-weight:600;">-100%</td>
+  <td style="font-size:12px;">-2.1%</td>
+</tr>
+<tr style='background:#fff5f5'>
+  <td>54</td>
+  <td style="white-space:nowrap">12-06</td>
+  <td style="text-align:right">摩洛哥</td>
+  <td style="text-align:center;font-weight:600;">0:0</td>
+  <td>西班牙</td>
+  <td style="font-size:11px;white-space:nowrap">6.25/3.90/1.66</td>
+  <td><span class="badge away">客胜</span></td>
+  <td><span class="badge draw">平局</span></td>
+  <td><span class="badge badge-wrong">❌ 错误</span></td>
+  <td><span class="tier-tag tier-b">B 稳健</span></td>
+  <td class="roi-neg" style="font-weight:600;">-100%</td>
+  <td style="font-size:12px;">-2.0%</td>
+</tr>
+<tr>
+  <td>55</td>
+  <td style="white-space:nowrap">12-06</td>
+  <td style="text-align:right">巴西</td>
+  <td style="text-align:center;font-weight:600;">4:1</td>
+  <td>韩国</td>
+  <td style="font-size:11px;white-space:nowrap">1.25/6.60/13.00</td>
+  <td><span class="badge home">主胜</span></td>
+  <td><span class="badge home">主胜</span></td>
+  <td><span class="badge badge-correct">✅ 正确</span></td>
+  <td><span class="tier-tag tier-a">A ★ 极稳</span></td>
+  <td class="roi-pos" style="font-weight:600;">+25%</td>
+  <td style="font-size:12px;">-3.0%</td>
+</tr>
+<tr>
+  <td>56</td>
+  <td style="white-space:nowrap">12-07</td>
+  <td style="text-align:right">葡萄牙</td>
+  <td style="text-align:center;font-weight:600;">6:1</td>
+  <td>瑞士</td>
+  <td style="font-size:11px;white-space:nowrap">2.02/3.60/4.01</td>
+  <td><span class="badge home">主胜</span></td>
+  <td><span class="badge home">主胜</span></td>
+  <td><span class="badge badge-correct">✅ 正确</span></td>
+  <td><span class="tier-tag tier-c">C 谨慎</span></td>
+  <td class="roi-pos" style="font-weight:600;">+102%</td>
+  <td style="font-size:12px;">-2.3%</td>
+</tr>
+<tr style='background:#fff5f5'>
+  <td>57</td>
+  <td style="white-space:nowrap">12-09</td>
+  <td style="text-align:right">克罗地亚</td>
+  <td style="text-align:center;font-weight:600;">0:0</td>
+  <td>巴西</td>
+  <td style="font-size:11px;white-space:nowrap">9.00/4.85/1.41</td>
+  <td><span class="badge away">客胜</span></td>
+  <td><span class="badge draw">平局</span></td>
+  <td><span class="badge badge-wrong">❌ 错误</span></td>
+  <td><span class="tier-tag tier-a">A ★ 极稳</span></td>
+  <td class="roi-neg" style="font-weight:600;">-100%</td>
+  <td style="font-size:12px;">-2.8%</td>
+</tr>
+<tr style='background:#fff5f5'>
+  <td>58</td>
+  <td style="white-space:nowrap">12-10</td>
+  <td style="text-align:right">荷兰</td>
+  <td style="text-align:center;font-weight:600;">2:2</td>
+  <td>阿根廷</td>
+  <td style="font-size:11px;white-space:nowrap">3.65/3.19/2.32</td>
+  <td><span class="badge away">客胜</span></td>
+  <td><span class="badge draw">平局</span></td>
+  <td><span class="badge badge-wrong">❌ 错误</span></td>
+  <td><span class="tier-tag tier-c">C 谨慎</span></td>
+  <td class="roi-neg" style="font-weight:600;">-100%</td>
+  <td style="font-size:12px;">-1.9%</td>
+</tr>
+<tr style='background:#fff5f5'>
+  <td>59</td>
+  <td style="white-space:nowrap">12-10</td>
+  <td style="text-align:right">摩洛哥</td>
+  <td style="text-align:center;font-weight:600;">1:0</td>
+  <td>葡萄牙</td>
+  <td style="font-size:11px;white-space:nowrap">6.69/3.96/1.59</td>
+  <td><span class="badge away">客胜</span></td>
+  <td><span class="badge home">主胜</span></td>
+  <td><span class="badge badge-wrong">❌ 错误</span></td>
+  <td><span class="tier-tag tier-b">B 稳健</span></td>
+  <td class="roi-neg" style="font-weight:600;">-100%</td>
+  <td style="font-size:12px;">-3.2%</td>
+</tr>
+<tr>
+  <td>60</td>
+  <td style="white-space:nowrap">12-11</td>
+  <td style="text-align:right">英格兰</td>
+  <td style="text-align:center;font-weight:600;">1:2</td>
+  <td>法国</td>
+  <td style="font-size:11px;white-space:nowrap">2.92/3.15/2.79</td>
+  <td><span class="badge away">客胜</span></td>
+  <td><span class="badge away">客胜</span></td>
+  <td><span class="badge badge-correct">✅ 正确</span></td>
+  <td><span class="tier-tag tier-c">C 谨慎</span></td>
+  <td class="roi-pos" style="font-weight:600;">+179%</td>
+  <td style="font-size:12px;">-1.8%</td>
+</tr>
+<tr>
+  <td>61</td>
+  <td style="white-space:nowrap">12-14</td>
+  <td style="text-align:right">阿根廷</td>
+  <td style="text-align:center;font-weight:600;">3:0</td>
+  <td>克罗地亚</td>
+  <td style="font-size:11px;white-space:nowrap">2.04/3.09/4.86</td>
+  <td><span class="badge home">主胜</span></td>
+  <td><span class="badge home">主胜</span></td>
+  <td><span class="badge badge-correct">✅ 正确</span></td>
+  <td><span class="tier-tag tier-c">C 谨慎</span></td>
+  <td class="roi-pos" style="font-weight:600;">+104%</td>
+  <td style="font-size:12px;">-2.0%</td>
+</tr>
+<tr>
+  <td>62</td>
+  <td style="white-space:nowrap">12-15</td>
+  <td style="text-align:right">法国</td>
+  <td style="text-align:center;font-weight:600;">2:0</td>
+  <td>摩洛哥</td>
+  <td style="font-size:11px;white-space:nowrap">1.64/3.80/6.74</td>
+  <td><span class="badge home">主胜</span></td>
+  <td><span class="badge home">主胜</span></td>
+  <td><span class="badge badge-correct">✅ 正确</span></td>
+  <td><span class="tier-tag tier-b">B 稳健</span></td>
+  <td class="roi-pos" style="font-weight:600;">+64%</td>
+  <td style="font-size:12px;">-2.2%</td>
+</tr>
+<tr>
+  <td>63</td>
+  <td style="white-space:nowrap">12-17</td>
+  <td style="text-align:right">克罗地亚</td>
+  <td style="text-align:center;font-weight:600;">2:1</td>
+  <td>摩洛哥</td>
+  <td style="font-size:11px;white-space:nowrap">2.31/3.66/3.16</td>
+  <td><span class="badge home">主胜</span></td>
+  <td><span class="badge home">主胜</span></td>
+  <td><span class="badge badge-correct">✅ 正确</span></td>
+  <td><span class="tier-tag tier-c">C 谨慎</span></td>
+  <td class="roi-pos" style="font-weight:600;">+131%</td>
+  <td style="font-size:12px;">-2.3%</td>
+</tr>
+<tr style='background:#fff5f5'>
+  <td>64</td>
+  <td style="white-space:nowrap">12-18</td>
+  <td style="text-align:right">阿根廷</td>
+  <td style="text-align:center;font-weight:600;">2:2</td>
+  <td>法国</td>
+  <td style="font-size:11px;white-space:nowrap">2.67/3.20/3.04</td>
+  <td><span class="badge home">主胜</span></td>
+  <td><span class="badge draw">平局</span></td>
+  <td><span class="badge badge-wrong">❌ 错误</span></td>
+  <td><span class="tier-tag tier-c">C 谨慎</span></td>
+  <td class="roi-neg" style="font-weight:600;">-100%</td>
+  <td style="font-size:12px;">-1.6%</td>
+</tr>
+</table>
+</div>
+</div>
+
+<!-- === Footer === -->
+<div style="text-align:center;padding:30px 0;color:#999;font-size:12px;">
+  <p>数据源：500.com 百家欧赔 Pinnacle 收盘赔率 | 2022卡塔尔世界杯全部64场</p>
+  <p>概率计算：Shin de-vig 去抽水 | 仅供教育研究，不构成投注建议</p>
+  <p>生成时间：2026-06-21 13:40</p>
+</div>
+
+</div>
+</body>
+</html>

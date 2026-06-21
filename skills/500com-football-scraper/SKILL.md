@@ -2,7 +2,7 @@
 name: 500com-football-scraper
 description: "Scrape full football odds data from 500.com. Default deep mode (6 analysis pages per match: ouzhi/yazhi/rangqiu/daxiao/shuju/touzhu). Supports --quick fast mode. Outputs standardized JSON."
 agent_created: true
-version: "2.0"
+version: "2.1"
 ---
 
 # 500.com Football Odds Scraper v2.0
@@ -129,6 +129,129 @@ Expiration: 12 hours
 3. **Pinnacle row**: Row 10 in ouzhi page ("Pi****le"), same position in yazhi page.
 4. **Not-yet-open**: RQSPF showing "未开售" → set field to null.
 5. **Network**: 6 pages × N matches = many pages. Fetch 2-3 pages concurrently.
+
+---
+
+## Anti-Scraping Protection
+
+500.com has active anti-scraping measures. **Always follow these rules to avoid being blocked or rate-limited.**
+
+### Browser Simulation (Headers)
+
+Every HTTP request must simulate a real browser visit. Bare minimum headers:
+
+```python
+headers = {
+    'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
+    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
+    'Accept-Language': 'zh-CN,zh;q=0.9,en;q=0.8',
+    'Accept-Encoding': 'gzip, deflate, br',
+    'Referer': 'https://www.500.com/',
+    'Connection': 'keep-alive',
+    'Sec-Fetch-Dest': 'document',
+    'Sec-Fetch-Mode': 'navigate',
+    'Sec-Fetch-Site': 'same-site',
+    'Sec-Fetch-User': '?1',
+    'Upgrade-Insecure-Requests': '1',
+    'Cache-Control': 'max-age=0',
+}
+```
+
+Key rules:
+- **Referer chain**: Start from `https://www.500.com/` → `https://trade.500.com/jczq/` → deep pages. Always set Referer to the page the user would naturally be on before clicking through.
+- **User-Agent**: Must match a real browser. Update the Chrome version periodically.
+- **Accept-Encoding**: Include `gzip` so 500.com doesn't suspect raw script access.
+- **Cookie header**: Some requests require a session cookie from the homepage. Visit the homepage first and pass the Set-Cookie response on subsequent requests.
+
+### Request Timing
+
+```
+# Between individual page fetches (same match): 0.5-2.0s random delay
+import random, time
+delay = random.uniform(0.5, 2.0)
+time.sleep(delay)
+
+# Between different matches: 2.0-5.0s random delay
+delay = random.uniform(2.0, 5.0)
+time.sleep(delay)
+
+# Maximum concurrent: 2-3 pages per match, 1 match at a time
+# DO NOT use high-concurrency (>5) ThreadPoolExecutor for 500.com fetches
+```
+
+Never:
+- Fetch more than 6 pages per minute from the same IP
+- Use more than 3 concurrent connections
+- Skip delays between requests
+- Fetch during 500.com's peak traffic hours (weekend match times)
+
+### Cookie/Referer Chain
+
+```python
+# Step 1: Visit homepage to get session cookie
+import urllib.request, http.cookiejar
+
+cookie_jar = http.cookiejar.CookieJar()
+opener = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(cookie_jar))
+
+home_req = urllib.request.Request('https://www.500.com/', headers={
+    'User-Agent': '<browser UA>',
+    'Accept': 'text/html,...',
+})
+opener.open(home_req)  # Now cookie_jar has the session cookie
+
+# Step 2: Now scrape deep pages with the same opener
+fenxi_req = urllib.request.Request('https://odds.500.com/fenxi/ouzhi-{id}.shtml', headers={
+    **headers,
+    'Referer': 'https://trade.500.com/jczq/',
+})
+resp = opener.open(fenxi_req)
+```
+
+### Batch Size Limits
+
+- **Max 10 matches per batch**: After 10 matches, pause 30-60 seconds
+- **Max 50 matches per session**: After 50 matches, stop and resume at least 1 hour later
+- **Backoff on 403/429**: If you get a 403 Forbidden or 429 Too Many Requests, stop immediately and wait at least 30 minutes before retrying
+
+### Reuse the Safe Fetcher Module
+
+A pre-built `scripts/safe_fetcher.py` module is bundled with this skill. Use it instead of writing raw urllib code:
+
+```python
+from scripts.safe_fetcher import SafeFetcher
+
+fetcher = SafeFetcher()
+html, raw = fetcher.fetch(
+    'https://odds.500.com/fenxi/ouzhi-{id}.shtml',
+    referer='https://trade.500.com/jczq/'
+)
+```
+
+It handles: Cookie auto-collection, browser headers, random delays, gzip, and block detection. See the module docstring for all options.
+
+### Detect Block
+
+```python
+# Check for block indicators in response:
+block_indicators = [
+    '403 Forbidden' in str(resp.status),
+    len(html) < 1000,                          # Too small = captcha/block page
+    '验证' in html or 'captcha' in html.lower(),  # CAPTCHA triggered
+    '您访问过于频繁' in html,                     # Rate limit message
+    resp.headers.get('Content-Type', '') == 'text/html' and len(html) < 5000,  # Block page
+]
+if any(block_indicators):
+    raise Exception(f"Blocked by 500.com anti-scraping at {url}")
+```
+
+### Historical Data (Wanchang/Backtesting)
+
+For historical matches:
+1. **Prefer the liansai.500.com JSON API** (`/index.php?c=score&a=getmatch`) over scraping fenxi pages directly — it's lighter and less detectable
+2. Only fetch the fenxi pages for matches you actually need to analyze
+3. Space out historical fetches at 1 match per 5 seconds
+4. Cache the raw output aggressively (indefinitely for historical data — it never changes)
 
 ---
 

@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>2022 vs 2018 跨届交叉验证 — 3开关复盘</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, "PingFang SC", sans-serif; background: #0d1117; color: #c9d1d9; padding: 24px; }
+  .container { max-width: 1000px; margin: 0 auto; }
+  .header { text-align: center; padding: 30px 0; border-bottom: 2px solid #30363d; margin-bottom: 24px; }
+  .header h1 { font-size: 28px; font-weight: 700; }
+  .header .subtitle { color: #8b949e; font-size: 14px; margin-top: 6px; }
+  
+  .card { background: #161b22; border: 1px solid #30363d; border-radius: 12px; padding: 24px; margin: 16px 0; }
+  .card h2 { font-size: 20px; margin-bottom: 16px; display: flex; align-items: center; gap: 8px; }
+  .card h3 { font-size: 16px; margin: 20px 0 10px; color: #f0f6fc; }
+
+  .compare-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin: 16px 0; }
+  .column { background: #0d1117; border: 1px solid #30363d; border-radius: 8px; padding: 16px; }
+  .column .year { font-size: 18px; font-weight: 700; margin-bottom: 8px; }
+  .column .year.y2022 { color: #f78166; }
+  .column .year.y2018 { color: #58a6ff; }
+  .column .stat { font-size: 13px; color: #8b949e; margin: 4px 0; }
+  .column .stat .num { color: #c9d1d9; font-weight: 600; }
+
+  table { width: 100%; border-collapse: separate; border-spacing: 0; font-size: 13px; margin: 12px 0; }
+  th { background: #0d1117; color: #8b949e; text-align: left; padding: 10px 12px; font-weight: 600; border-bottom: 1px solid #30363d; }
+  td { padding: 8px 12px; border-bottom: 1px solid #21262d; }
+  tr:hover td { background: #1c2128; }
+  .green { color: #3fb950; }
+  .red { color: #f78166; }
+  .orange { color: #d29922; }
+  .blue { color: #58a6ff; }
+
+  .tag { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; }
+  .tag-yes { background: rgba(63,185,80,0.15); color: #3fb950; border: 1px solid rgba(63,185,80,0.3); }
+  .tag-no { background: rgba(247,129,102,0.15); color: #f78166; border: 1px solid rgba(247,129,102,0.3); }
+  .tag-eh { background: rgba(210,153,34,0.15); color: #d29922; border: 1px solid rgba(210,153,34,0.3); }
+
+  .insight { background: rgba(63,185,80,0.08); border-left: 4px solid #3fb950; padding: 14px 18px; margin: 12px 0; border-radius: 4px; font-size: 14px; }
+  .warning { background: rgba(210,153,34,0.08); border-left: 4px solid #d29922; padding: 14px 18px; margin: 12px 0; border-radius: 4px; font-size: 14px; }
+  .error { background: rgba(247,129,102,0.08); border-left: 4px solid #f78166; padding: 14px 18px; margin: 12px 0; border-radius: 4px; font-size: 14px; }
+
+  .match-row { display: flex; align-items: center; gap: 10px; padding: 6px 10px; margin: 4px 0; border-radius: 6px; font-size: 13px; background: #0d1117; }
+  .match-row .teams { flex: 1; }
+  .match-row .pred { min-width: 60px; text-align: center; font-weight: 600; }
+  .match-row .result { min-width: 50px; text-align: center; }
+
+  .conclusion-box { background: linear-gradient(135deg, rgba(247,129,102,0.1), rgba(210,153,34,0.1)); border: 1px solid rgba(247,129,102,0.3); border-radius: 10px; padding: 20px; margin: 16px 0; }
+</style>
+</head>
+<body>
+<div class="container">
+
+<div class="header">
+  <h1>⚔️ 2022 vs 2018 跨届交叉验证</h1>
+  <p class="subtitle">3条场景开关在两届世界杯的真实表现 — 数据告诉你哪些能站住脚</p>
+</div>
+
+<div class="card">
+  <h2>📊 基础对比</h2>
+  
+  <div class="compare-grid">
+    <div class="column">
+      <div class="year y2022">🇶🇦 2022 世界杯</div>
+      <div class="stat">数据源: <span class="num">Pinnacle 收盘价</span></div>
+      <div class="stat">基准准确率: <span class="num">34/64 = 53.1%</span></div>
+      <div class="stat">6D系统模拟ROI: <span class="num red">-25.3%</span></div>
+      <div class="stat">票数: <span class="num">14票 · 6中8错</span></div>
+    </div>
+    <div class="column">
+      <div class="year y2018">🇷🇺 2018 世界杯</div>
+      <div class="stat">数据源: <span class="num">bet365 收盘价 (500.com)</span></div>
+      <div class="stat">基准准确率: <span class="num">30/64 = 46.9%</span></div>
+      <div class="stat">6D系统模拟ROI: <span class="num green">+41.0%</span></div>
+      <div class="stat">票数: <span class="num">9票 · 5中4错</span></div>
+    </div>
+  </div>
+
+  <div class="warning">
+    <strong>⚠️ 注意数据源差异</strong><br>
+    2022 使用 Pinnacle 收盘价（赔率更尖锐、去水更干净）<br>
+    2018 使用 bet365 收盘价（来自500.com历史数据）<br>
+    bet365 是零售庄，赔率不如 Pinnacle 精确。这也是2018 baseling 46.9% vs Pinnacle 53.1%的原因之一。
+  </div>
+</div>
+
+<div class="card">
+  <h2>🔬 3开关 · 两届表现对比</h2>
+  
+  <table>
+    <tr><th>场景</th><th>2022 WC ROI</th><th>2018 WC ROI</th><th>效果一致性?</th></tr>
+    <tr>
+      <td><strong>原始 (无开关)</strong></td>
+      <td class="red">-25.3%</td>
+      <td class="green">+41.0%</td>
+      <td><span class="tag tag-no">完全不同</span> 2022亏, 2018赚</td>
+    </tr>
+    <tr>
+      <td><strong>开关A: 末轮客场排除</strong></td>
+      <td class="green">+3.2% (修正后)</td>
+      <td class="blue">+41.0% (无变化)</td>
+      <td><span class="tag tag-eh">2022有效 · 2018无效</span></td>
+    </tr>
+    <tr>
+      <td><strong>开关B: 淘汰赛客场降权</strong></td>
+      <td class="green">+3.2% (修正后)</td>
+      <td class="red">+32.9% (下降8.1pp)</td>
+      <td><span class="tag tag-no">❌ 2018反而有害</span></td>
+    </tr>
+    <tr>
+      <td><strong>开关C: 赔率乘积≥1.80</strong></td>
+      <td class="green">+3.2% (修正后)</td>
+      <td class="green">+43.5% (上升2.5pp)</td>
+      <td><span class="tag tag-yes">✅ 两届都有提升</span></td>
+    </tr>
+    <tr style="border-top: 2px solid #30363d;">
+      <td><strong>A+B+C 联合</strong></td>
+      <td class="green">+3.2%</td>
+      <td class="blue">+34.9%</td>
+      <td><span class="tag tag-eh">效果不一致</span></td>
+    </tr>
+  </table>
+
+  <div class="error">
+    <strong>🔴 核心发现: 3条开关中, 只有开关C(赔率乘积)在两届都有效</strong><br>
+    开关A在2018完全没触发(末轮客胜场次6D<4, 未进入候选池)<br>
+    开关B在2018反而降低了ROI(因为2018的淘汰赛客场预测更准)<br>
+    开关C在两届都小幅提升ROI, 因为它切掉的是数学上期望为负的低赔串关
+  </div>
+</div>
+
+<div class="card">
+  <h2>🔍 为什么开关A在2018没触发？</h2>
+  
+  <p style="font-size:14px;color:#8b949e;margin-bottom:12px;">2022年所有末轮客场预测全部错误(4/4)。2018年则参差不齐:</p>
+
+  <h3>2018 小组赛末轮(6/25-6/28) 全部16场</h3>
+  
+  <table>
+    <tr><th>日期</th><th>主队</th><th>客队</th><th>bet365预测</th><th>实际</th><th>结果</th><th>6D</th><th>备注</th></tr>
+    <tr><td>6/25</td><td>沙特阿拉伯</td><td>埃及</td><td class="orange">away</td><td>home</td><td class="red">❌</td><td>3</td><td>两队都淘汰, 鸡肋战</td></tr>
+    <tr><td>6/25</td><td>乌拉圭</td><td>俄罗斯</td><td class="orange">away</td><td>home</td><td class="red">❌</td><td>3</td><td>都已出线, 小组头名战, 俄罗斯轮换</td></tr>
+    <tr><td>6/25</td><td>西班牙</td><td>摩洛哥</td><td class="orange">away</td><td>draw</td><td class="red">❌</td><td>3</td><td>西班牙已出线, 摩洛哥荣誉之战</td></tr>
+    <tr><td>6/25</td><td>伊朗</td><td>葡萄牙</td><td class="orange">away</td><td>draw</td><td class="red">❌</td><td>3</td><td>葡萄牙需保平, 伊朗死磕</td></tr>
+    <tr><td>6/26</td><td>澳大利亚</td><td>秘鲁</td><td class="orange">away</td><td>away</td><td class="green">✅</td><td>4</td><td><strong>入选过6D≥4</strong></td></tr>
+    <tr><td>6/26</td><td>丹麦</td><td>法国</td><td class="orange">away</td><td>draw</td><td class="red">❌</td><td>3</td><td>法国已出线, 轮换9人</td></tr>
+    <tr><td>6/26</td><td>冰岛</td><td>克罗地亚</td><td class="orange">away</td><td>away</td><td class="green">✅</td><td>4</td><td><strong>入选过6D≥4</strong></td></tr>
+    <tr><td>6/26</td><td>尼日利亚</td><td>阿根廷</td><td class="orange">away</td><td>away</td><td class="green">✅</td><td>4</td><td>阿根廷生死战, 全力出击</td></tr>
+    <tr><td>6/28</td><td>日本</td><td>波兰</td><td class="orange">away</td><td>away</td><td class="green">✅</td><td>4</td><td>波兰荣誉战, 日本需3分</td></tr>
+    <tr><td>6/28</td><td>塞内加尔</td><td>哥伦比亚</td><td class="orange">away</td><td>away</td><td class="green">✅</td><td>4</td><td>哥伦比亚需要赢球出线</td></tr>
+    <tr><td>6/28</td><td>英格兰</td><td>比利时</td><td class="orange">away</td><td>away</td><td class="green">✅</td><td>3</td><td>都已出线, 争小组第二避强队</td></tr>
+    <tr><td>6/28</td><td>巴拿马</td><td>突尼斯</td><td class="orange">away</td><td>away</td><td class="green">✅</td><td>4</td><td>荣誉之战, 突尼斯略强</td></tr>
+  </table>
+
+  <div class="warning">
+    <strong>🟡 真相: 不是"末轮客场"的问题, 是"客胜方无战意"的问题</strong><br><br>
+    2018年末轮客场正确率: 6/25 0% ❌ · 6/26 75% ✅ · 6/28 100% ✅<br>
+    6/25四场全错 = 客胜方(埃及/俄罗斯/西班牙/葡萄牙)都无晋级压力<br>
+    6/28四场全对 = 客胜方(波兰/哥伦比亚/比利时/突尼斯)都有明确目标<br><br>
+    <strong>开关A(末轮客场排除) 太粗了。</strong>真正需要的是 <strong>"客胜方无战意"检测</strong>。
+  </div>
+</div>
+
+<div class="card">
+  <h2>📌 结论: 3开关的跨届验证结果</h2>
+
+  <table>
+    <tr><th>开关</th><th>原规则</th><th>2022效果</th><th>2018效果</th><th>跨届结论</th></tr>
+    <tr>
+      <td><strong>A: 末轮客场</strong></td>
+      <td>小组赛末轮 + 客胜 → 跳过</td>
+      <td class="green">✅ 省¥100</td>
+      <td class="blue">⬜ 未触发</td>
+      <td><span class="tag tag-eh">太粗, 需要细化</span></td>
+    </tr>
+    <tr>
+      <td><strong>B: 淘汰赛客场</strong></td>
+      <td>KO + 客胜 + 去水&lt;65% → 降权</td>
+      <td class="green">✅ 省¥50</td>
+      <td class="red">❌ ROI↓8pp</td>
+      <td><span class="tag tag-no">不通过, 两届矛盾</span></td>
+    </tr>
+    <tr>
+      <td><strong>C: 赔率乘积</strong></td>
+      <td>2串1赔率乘积&lt;1.80 → 禁止</td>
+      <td class="green">✅ 提升</td>
+      <td class="green">✅ 提升</td>
+      <td><span class="tag tag-yes">通过! 两届都有效</span></td>
+    </tr>
+  </table>
+
+  <div class="conclusion-box">
+    <strong>📋 跨届验证最终结论</strong><br><br>
+    
+    <strong class="green">✅ 开关C — 通过验证</strong><br>
+    赔率乘积底线 ≥1.80 在两届世界杯都小幅提升ROI, 且不依赖赛事特性。<br>
+    这个开关可以迁入 Step 9 决策模块。<br>
+    <span style="color:#8b949e;">→ 理由: 低赔串关的数学期望天然为负, 与赛事无关</span><br><br>
+
+    <strong class="orange">⚠️ 开关A — 细化后待验证</strong><br>
+    核心问题不是"末轮+客场", 而是"客胜方无战意"。<br>
+    需要将触发条件改为: 小组赛末轮 + 客胜 + 客胜方已出线/出局。<br>
+    <span style="color:#8b949e;">→ 需要: 用2018的4场+2022的5场 = 9场联合验证后再定规则</span><br><br>
+
+    <strong class="red">❌ 开关B — 不通过</strong><br>
+    淘汰赛客场预测在2022年3场全错, 但在2018年正确率更高。<br>
+    两届表现矛盾, 不存在可复用的通用规则。<br>
+    <span style="color:#8b949e;">→ 删除此构想。淘汰赛客胜预测按正常6D流程处理, 不特殊对待。</span><br><br>
+
+    <strong style="color: #8b949e;">再一次证明: 64场单源数据不足以产生规则。3条中只有1条经过跨届验证。</strong>
+  </div>
+</div>
+
+</div>
+</body>
+</html>

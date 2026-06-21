@@ -1,0 +1,409 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GRAI复盘 — 2022世界杯投注模拟</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, "PingFang SC", "Noto Sans SC", sans-serif; background: #0d1117; color: #c9d1d9; padding: 24px; }
+  .container { max-width: 1000px; margin: 0 auto; }
+  
+  /* ─── 头部 ─── */
+  .header { text-align: center; padding: 40px 0 30px; border-bottom: 1px solid #30363d; margin-bottom: 30px; }
+  .header h1 { font-size: 32px; font-weight: 700; background: linear-gradient(135deg, #58a6ff, #f78166); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+  .header .subtitle { color: #8b949e; font-size: 14px; margin-top: 8px; }
+  
+  /* ─── 卡片 ─── */
+  .card { background: #161b22; border: 1px solid #30363d; border-radius: 12px; padding: 24px; margin: 20px 0; }
+  .card h2 { font-size: 20px; font-weight: 600; margin-bottom: 16px; display: flex; align-items: center; gap: 8px; }
+  .card h3 { font-size: 16px; font-weight: 600; margin: 20px 0 10px; color: #f0f6fc; }
+  
+  /* ─── GRAI 四步 ─── */
+  .grai-steps { display: grid; gap: 1px; background: #30363d; border-radius: 10px; overflow: hidden; margin: 16px 0; }
+  .grai-step { background: #0d1117; padding: 20px; }
+  .grai-step .label { font-size: 11px; text-transform: uppercase; letter-spacing: 2px; font-weight: 600; }
+  .grai-step .title { font-size: 18px; font-weight: 700; margin: 4px 0 8px; }
+  .grai-step .content { font-size: 14px; color: #8b949e; line-height: 1.7; }
+  .grai-step.g { border-left: 4px solid #58a6ff; } .grai-step.g .label { color: #58a6ff; }
+  .grai-step.r { border-left: 4px solid #f78166; } .grai-step.r .label { color: #f78166; }
+  .grai-step.a { border-left: 4px solid #d2a8ff; } .grai-step.a .label { color: #d2a8ff; }
+  .grai-step.i { border-left: 4px solid #3fb950; } .grai-step.i .label { color: #3fb950; }
+  
+  /* ─── KPI ─── */
+  .kpi-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin: 16px 0; }
+  .kpi { background: #0d1117; border: 1px solid #30363d; border-radius: 8px; padding: 16px; text-align: center; }
+  .kpi .value { font-size: 28px; font-weight: bold; }
+  .kpi .label { font-size: 12px; color: #8b949e; margin-top: 4px; }
+  .kpi.green .value { color: #3fb950; }
+  .kpi.red .value { color: #f78166; }
+  .kpi.orange .value { color: #d29922; }
+  .kpi.blue .value { color: #58a6ff; }
+  
+  /* ─── 表格 ─── */
+  table { width: 100%; border-collapse: separate; border-spacing: 0; font-size: 13px; }
+  th { background: #0d1117; color: #8b949e; text-align: left; padding: 10px 12px; font-weight: 600; border-bottom: 1px solid #30363d; position: sticky; top: 0; }
+  td { padding: 8px 12px; border-bottom: 1px solid #21262d; }
+  tr:hover td { background: #1c2128; }
+  .win { color: #3fb950; }
+  .loss { color: #f78166; }
+  
+  /* ─── 标签 ─── */
+  .tag { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; margin-right: 4px; }
+  .tag-hit { background: rgba(63,185,80,0.15); color: #3fb950; border: 1px solid rgba(63,185,80,0.3); }
+  .tag-miss { background: rgba(247,129,102,0.15); color: #f78166; border: 1px solid rgba(247,129,102,0.3); }
+  .tag-skip { background: rgba(210,153,34,0.15); color: #d29922; border: 1px solid rgba(210,153,34,0.3); }
+  .tag-trap { background: rgba(248,81,73,0.15); color: #f85149; border: 1px solid rgba(248,81,73,0.3); }
+  .tag-safe { background: rgba(63,185,80,0.1); color: #3fb950; border: 1px solid rgba(63,185,80,0.2); }
+  
+  /* ─── 错误树 ─── */
+  .error-tree { margin: 16px 0; }
+  .error-node { margin: 8px 0; padding: 12px 16px; border-radius: 8px; border: 1px solid #30363d; }
+  .error-node.root { background: rgba(248,81,73,0.08); border-color: rgba(248,81,73,0.3); }
+  .error-node .node-title { font-weight: 600; font-size: 15px; margin-bottom: 4px; display: flex; align-items: center; gap: 8px; }
+  .error-node .node-detail { font-size: 13px; color: #8b949e; }
+  .error-node .matches { margin-top: 8px; display: flex; flex-wrap: wrap; gap: 6px; }
+  .match-badge { display: inline-flex; align-items: center; gap: 4px; padding: 4px 10px; border-radius: 6px; font-size: 12px; background: #0d1117; border: 1px solid #30363d; }
+  .match-badge .score { color: #8b949e; }
+  .match-badge.loss { border-color: rgba(248,81,73,0.3); }
+  
+  /* ─── 可折叠 ─── */
+  details { margin: 12px 0; }
+  details summary { cursor: pointer; font-weight: 600; padding: 8px 0; color: #58a6ff; }
+  details summary:hover { color: #79c0ff; }
+  
+  /* ─── 反推流程 ─── */
+  .flow { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: 12px 0; padding: 16px; background: #0d1117; border-radius: 8px; }
+  .flow-step { padding: 8px 14px; border-radius: 6px; font-size: 13px; font-weight: 600; background: #21262d; }
+  .flow-arrow { color: #8b949e; font-size: 18px; }
+  .flow-step.pass { background: rgba(63,185,80,0.15); color: #3fb950; }
+  .flow-step.fail { background: rgba(248,81,73,0.15); color: #f85149; }
+  .flow-step.skip { background: rgba(210,153,34,0.15); color: #d29922; }
+  
+  .insight-box { background: rgba(63,185,80,0.08); border: 1px solid rgba(63,185,80,0.25); padding: 16px 20px; border-radius: 8px; margin: 16px 0; }
+  .warning-box { background: rgba(210,153,34,0.08); border: 1px solid rgba(210,153,34,0.25); padding: 16px 20px; border-radius: 8px; margin: 16px 0; }
+  .error-box { background: rgba(248,81,73,0.08); border: 1px solid rgba(248,81,73,0.25); padding: 16px 20px; border-radius: 8px; margin: 16px 0; }
+  
+  /* ─── 进度条 ─── */
+  .bar-container { margin: 8px 0; }
+  .bar { height: 8px; border-radius: 4px; background: #21262d; overflow: hidden; margin: 4px 0; }
+  .bar-fill { height: 100%; border-radius: 4px; transition: width 0.5s; }
+  .bar-label { display: flex; justify-content: space-between; font-size: 12px; color: #8b949e; }
+  
+  .timeline { position: relative; padding-left: 24px; margin: 16px 0; }
+  .timeline::before { content: ''; position: absolute; left: 8px; top: 0; bottom: 0; width: 2px; background: #30363d; }
+  .tl-item { position: relative; margin: 16px 0; padding: 12px 16px; background: #0d1117; border-radius: 8px; border: 1px solid #30363d; }
+  .tl-item::before { content: ''; position: absolute; left: -20px; top: 18px; width: 12px; height: 12px; border-radius: 50%; background: #58a6ff; border: 2px solid #0d1117; }
+  .tl-item.win::before { background: #3fb950; }
+  .tl-item.loss::before { background: #f78166; }
+  .tl-item .date { font-size: 12px; color: #8b949e; }
+  .tl-item .title { font-weight: 600; margin: 4px 0; }
+</style>
+</head>
+<body>
+<div class="container">
+
+<div class="header">
+  <h1>GRAI 复盘 — 2022世界杯投注模拟</h1>
+  <p class="subtitle">Goal · Result · Analysis · Insight — 深挖 64 场比赛的成与败</p>
+</div>
+
+<!-- ═══ G ═══ -->
+<div class="card">
+  <h2>🎯 G — 目标</h2>
+  <div class="grai-steps">
+    <div class="grai-step g">
+      <div class="label">Goal</div>
+      <div class="title">初始目标</div>
+      <div class="content">
+        用 football-odds-analyst 的 <strong>6D 评分系统</strong> 指导每日混合过关投注。<br>
+        <strong>核心规则</strong>: 6D ≥ 4 可投 · 2串1 · 每票 ¥50 · 每日最多 2 票<br>
+        <strong>成功标准</strong>: ROI &gt; 0（扣除竞彩 ~89% 覆水率后）
+      </div>
+    </div>
+    <div class="grai-step g">
+      <div class="label">Scope</div>
+      <div class="title">复盘范围</div>
+      <div class="content">
+        2022 世界杯 · 25 个比赛日 · 64 场比赛<br>
+        <strong>覆盖维度</strong>: 方向预测 · 混合过关组合 · 跳过/投注决策 · 竞彩赔率模拟
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ R ═══ -->
+<div class="card">
+  <h2>📊 R — 结果</h2>
+
+  <div class="kpi-grid">
+    <div class="kpi red"><div class="value">-25.3%</div><div class="label">ROI</div></div>
+    <div class="kpi orange"><div class="value">43%</div><div class="label">命中率 (6/14)</div></div>
+    <div class="kpi blue"><div class="value">52%</div><div class="label">投注日占比 (13/25)</div></div>
+    <div class="kpi green"><div class="value">100%</div><div class="label">跳过正确率 (12/12)</div></div>
+  </div>
+
+  <div class="kpi-grid" style="grid-template-columns: repeat(3, 1fr);">
+    <div class="kpi red"><div class="value">¥700</div><div class="label">总投入</div></div>
+    <div class="kpi red"><div class="value">¥523</div><div class="label">总返还</div></div>
+    <div class="kpi red"><div class="value">-¥177</div><div class="label">净亏损</div></div>
+  </div>
+
+  <div class="bar-container">
+    <div class="bar-label"><span>盈利</span><span>¥0 vs 亏损 ¥177</span></div>
+    <div class="bar"><div class="bar-fill" style="width: 100%; background: linear-gradient(90deg, #3fb950 0%, #f78166 100%);"></div></div>
+  </div>
+</div>
+
+<!-- ═══ A ═══ -->
+<div class="card">
+  <h2>🔬 A — 深度分析</h2>
+  
+  <h3>问题一：亏损结构 — 根因分解</h3>
+  <p style="font-size:14px;color:#8b949e;margin-bottom:12px;">8 张错票 → 14 个错误方向。按场景分类如下：</p>
+  
+  <div class="error-tree">
+    <div class="error-node root">
+      <div class="node-title"><span class="tag tag-miss">8 张错票</span> 总亏损 ¥327</div>
+      <div class="node-detail">14 个错误方向 × 平均错因归类</div>
+    </div>
+  </div>
+
+  <table>
+    <tr><th>错误类型</th><th>次数</th><th>占错</th><th>代表性场次</th><th>共同特征</th></tr>
+    <tr>
+      <td><span class="tag tag-trap">末轮客场陷阱</span></td>
+      <td><strong>5</strong></td>
+      <td>36%</td>
+      <td>澳大利亚(away)❌ · 突尼斯(away)❌<br>日本(away)❌ · 韩国(away)❌ · 喀麦隆(away)❌</td>
+      <td>小组赛最后一轮 + Pinnacle 客胜 → 100% 全错</td>
+    </tr>
+    <tr>
+      <td><span class="tag tag-miss">中段主场平局</span></td>
+      <td><strong>4</strong></td>
+      <td>29%</td>
+      <td>英格兰0-0美国 · 丹麦0-0突尼斯<br>日本0-1哥斯达黎加 · 塞尔维亚2-3瑞士</td>
+      <td>小组赛第2-3轮 + 6D≥4但主胜方向平/负</td>
+    </tr>
+    <tr>
+      <td><span class="tag tag-trap">淘汰赛客场溢价</span></td>
+      <td><strong>2</strong></td>
+      <td>14%</td>
+      <td>摩洛哥(away)❌ · 荷兰(away)❌</td>
+      <td>淘汰赛 + 客胜方向 → 全错</td>
+    </tr>
+    <tr>
+      <td><span class="tag tag-trap">超高置信冷门</span></td>
+      <td><strong>1</strong></td>
+      <td>7%</td>
+      <td>阿根廷86%→沙特</td>
+      <td>P&gt;80% 但极端冷门, 模型无法捕捉</td>
+    </tr>
+    <tr>
+      <td><span class="tag">其他</span></td>
+      <td><strong>2</strong></td>
+      <td>14%</td>
+      <td>喀麦隆(away)→平局, 塞尔维亚(home)→输</td>
+      <td>分散, 无统一模式</td>
+    </tr>
+  </table>
+
+  <div class="error-box">
+    <strong>🔴 核心发现: 3个场景 = 64% 亏损</strong><br>
+    "末轮客场陷阱"(5次) + "淘汰赛客场溢价"(2次) = 7/14 错误 = 64% 的亏损。
+    如果能在 Step 1.5 反叙事检查中识别这两个场景, 亏损减少 ¥200 (从 ¥327 降至 ¥127)。
+  </div>
+
+  <h3>问题二：为什么 5 次末轮客场全部 6D=5 还错了？</h3>
+  <p style="font-size:14px;color:#8b949e;margin-bottom:8px;">这是本次复盘最关键的发现 — 6D 系统的盲区来自赔率本身, 而非评分逻辑。</p>
+  
+  <div class="error-box">
+    <strong>6D 的致命缺陷: 它依赖 Pinnacle 赔率, 而 Pinnacle 在末轮客胜场景下也错了</strong><br><br>
+    不是 6D 评分不够精准, 而是 <strong>Pinnacle 收盘价本身就不准确</strong>。<br>
+    Pinnacle 用数学模型定价, 无法预测 "法国轮换9人" "葡萄牙锁定头名后养生"。<br>
+    6D = 5 说明 "市场高度一致看多客胜" — 但市场一致 ≠ 市场正确。<br><br>
+    <strong>要解决的根因</strong>: 识别"赔率失真场景", 而非调高 6D 阈值。
+  </div>
+
+  <h3>问题三：为什么 4 次中段主场平局没被 6D 拦截？</h3>
+
+  <table>
+    <tr><th>场次</th><th>6D</th><th>通胀</th><th>DIM</th><th>实际</th><th>为什么没拦截</th></tr>
+    <tr><td>英格兰 vs 美国</td><td>4/5</td><td>-1</td><td>11101<strong>1</strong></td><td>0-0</td><td>Dim6(无一边倒) 给了1, 实际上 bet365 已分歧</td></tr>
+    <tr><td>丹麦 vs 突尼斯</td><td>4/6</td><td>-2</td><td>111111</td><td>0-0</td><td>6D满分! 通胀-2只给了平局奖金, 没降方向</td></tr>
+    <tr><td>日本 vs 哥斯达黎加</td><td>4/4</td><td>0</td><td>101011</td><td>0-1</td><td>首轮日本爆冷德国 → 叙事过热, 但 6D 无法识别</td></tr>
+    <tr><td>塞尔维亚 vs 瑞士</td><td>4/5</td><td>-1</td><td>111011</td><td>2-3</td><td>生死战(输就淘汰), 6D 没给回光返照权重</td></tr>
+  </table>
+  
+  <div class="warning-box">
+    <strong>🟡 深层原因: 6D 缺少 "叙事过热检测" 维度和 "回光返照权重"</strong><br>
+    日本胜德国后 → 叙事过度驱动 → Step 1.5 应该捕获但没触发<br>
+    塞尔维亚输就淘汰 → 回光返照效应 → 基本面权重要求上调 8% 但没执行<br>
+    这两个场景现有 Trap #7(叙事压缩) 和 回光返照规则已定义, 但 <strong>执行面没有强制触发</strong>
+  </div>
+
+  <h3>问题四：为什么 6 个盈利日成功了？</h3>
+  
+  <div class="insight-box">
+    <strong>✅ 盈利日的模式极其一致: "小组赛第1-2轮 + 主胜预测"</strong><br>
+    5/6 盈利日是小组赛前期 (11/21 ~ 11/25)。只有 1 天是淘汰赛(12/04 R16)。<br>
+    这 12 个正确方向中, <strong>8 个是主胜, 2 个是客胜</strong>。<br><br>
+    小组赛前期, 强队认真对待、弱队还在适应节奏 — 这是 Pinnacle 赔率最准确的区间。
+  </div>
+  
+  <div class="warning-box">
+    <strong>🟡 客胜只在 2 种情况下可靠: (a) 小组赛前期强弱悬殊 (b) 小组赛末轮无关紧要的强队</strong><br>
+    盈利日中的 2 个客胜: 塞内加尔(away)—11/21 首轮, 卡塔尔(away)—11/25 卡塔尔已必输。<br>
+    其余 8 个亏损日的客胜, 全部是场景错误的产物。
+  </div>
+
+  <h3>问题五：12 个跳过日全部正确的秘密</h3>
+  
+  <div class="insight-box">
+    <strong>✅ 跳过纪律是整个系统最有价值的部分</strong><br>
+    12 天跳过 = 12 天没亏钱。如果这些天强行投注, 会亏更多。<br>
+    淘汰赛单场日 (12/07, 12/09, 12/11, 12/14, 12/15, 12/17, 12/18) → 全部跳过, 且大概率会错。
+  </div>
+</div>
+
+<!-- ═══ I ═══ -->
+<div class="card">
+  <h2>💡 I — 洞察与行动</h2>
+
+  <h3>3 个反直觉的发现</h3>
+
+  <div class="error-box">
+    <strong>反直觉 #1: "市场一致 = 安全" 是错觉</strong><br>
+    末轮 5 场比赛全部 6D=5, 全部错。市场一致的时候, 恰恰是最危险的时刻。<br>
+    <strong>要加的信号</strong>: 6D ≥ 4 时自动检查: (a) 是否末轮? (b) 是否客胜? (c) 已出线方是否轮换?<br>
+    任意 2 个为 yes → 6D 不得 ≥ 4, 强制降至 3。
+  </div>
+
+  <div class="error-box">
+    <strong>反直觉 #2: "高置信度预测" 不赚钱</strong><br>
+    5 个 6D=5 的末轮场次赔率极低 (away@1.32~1.71), 即使中一张也只赚 ¥16~¥36。<br>
+    错了亏 ¥50, 对了赚 ¥30 → 预期值为负。高置信低赔率的 2 串 1 数学上不可行。<br>
+    <strong>要加的规则</strong>: 2 串 1 最低赔率乘积必须 ≥ 1.80 (避免低赔串关)。
+  </div>
+
+  <div class="error-box">
+    <strong>反直觉 #3: "跳过日正确率 100%" 是假象</strong><br>
+    不是跳过的决策多聪明, 是那些日子本来就只有 0-1 场合格。淘汰赛单场日天然不可投。<br>
+    真正的跳过能力应该在看似的"好日子"中识别陷阱 — 比如 11/22 (4 场含阿根廷86%+丹麦61%)。<br>
+    但 11/22 的投注日亏损 ¥50 就是 6D 没识别出"4 场中 3 场有陷阱"的系统信号。
+  </div>
+
+  <h3>3 条可执行开关 (待验证)</h3>
+
+  <div class="error-node root">
+    <div class="node-title"><span class="tag tag-trap">开关 A</span> 末轮客场排除</div>
+    <div class="node-detail">
+      触发: 小组赛末轮 (Group Stage MD3) + Pinnacle 方向 = 客胜<br>
+      动作: 禁止进入任何串关。该场比赛的 6D 强制降至 2。<br>
+      2022 回测效果: 排除 5 个错误方向, 省下约 ¥100 亏损。
+    </div>
+  </div>
+
+  <div class="error-node root">
+    <div class="node-title"><span class="tag tag-trap">开关 B</span> 淘汰赛客场降权</div>
+    <div class="node-detail">
+      触发: 淘汰赛 (Round of 16 及以上) + Pinnacle 方向 = 客胜 + Pinnacle 去水 &lt; 65%<br>
+      动作: 6D ≥ 4 → 强制降至 3 (有限参考), 禁止作为 2 串 1 锚点。<br>
+      2022 回测效果: 排除 2 个错误方向, 省下约 ¥50 亏损。
+    </div>
+  </div>
+
+  <div class="error-node root">
+    <div class="node-title"><span class="tag tag-miss">开关 C</span> 赔率乘积底线</div>
+    <div class="node-detail">
+      触发: 2 串 1 的竞彩赔率乘积 &lt; 1.80<br>
+      动作: 不得投注。需要替换至少一个场次以提高赔率。<br>
+      2022 回测效果: 排除 11/22 (1.63), 11/23 (1.24) — 这两张即使中, 日均利润也只有 ¥10 和 ¥5。
+    </div>
+  </div>
+
+  <div class="warning-box">
+    <strong>⚠️ 以上 3 条均为"待验证观察项"</strong> — 仅基于 2022 WC 单源数据。<br>
+    需要用 2018 WC 和/或 2026 WC 数据验证后才能写入 skill。纪律如前所述。
+  </div>
+
+  <h3>反推：如果回到昨天，Step 1 → 14 怎么改？</h3>
+
+  <div class="flow">
+    <span class="flow-step">Step 1: 数据</span>
+    <span class="flow-arrow">→</span>
+    <span class="flow-step fail">Step 1.5: 反叙事</span>
+    <span class="flow-arrow">→</span>
+    <span class="flow-step pass">Step 2-5: 基本面+赔率</span>
+    <span class="flow-arrow">→</span>
+    <span class="flow-step pass">Step 6-7: 6D评分</span>
+    <span class="flow-arrow">→</span>
+    <span class="flow-step fail">Step 8: 陷阱检查</span>
+    <span class="flow-arrow">→</span>
+    <span class="flow-step skip">Step 9: 判定</span>
+  </div>
+  
+  <p style="font-size:14px;color:#8b949e;margin:8px 0;">红色标记 = 需要新增的检查项</p>
+
+  <div class="timeline">
+    <div class="tl-item">
+      <div class="date">Step 1.5</div>
+      <div class="title">新增: 末轮场景扫描</div>
+      <div>检查当前是小组赛第几轮。如果是最后一轮 → 检查 Pinnacle 方向是否为客胜 → 如果是 → 标记🔴, 6D-2</div>
+    </div>
+    <div class="tl-item loss">
+      <div class="date">Step 1.5 (已有)</div>
+      <div class="title">强化: 叙事过热检测</div>
+      <div>日本胜德国后→Step 1.5 必须标记"上轮爆冷→叙事过热"。增加: WebSearch 检查舆论倾向。</div>
+    </div>
+    <div class="tl-item">
+      <div class="date">Step 4</div>
+      <div class="title">新增: 淘汰赛客场交叉验证</div>
+      <div>如果是淘汰赛 + 客胜方向 → 检查去水率。去水 &lt; 65% → 6D-2, 禁止做锚点。</div>
+    </div>
+    <div class="tl-item win">
+      <div class="date">Step 9</div>
+      <div class="title">新增: 赔率乘积检查</div>
+      <div>2 串 1 的竞彩赔率乘积 &lt; 1.80 → 禁止投注。不管 6D 多高。</div>
+    </div>
+    <div class="tl-item loss">
+      <div class="date">Step 10</div>
+      <div class="title">回光返照权重检查</div>
+      <div>塞尔维亚vs瑞士这种"输就淘汰"场景 → 回光返照必须触发 (+8% 平/胜)。当前 6D=4 没触发说明权重缺失。</div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ 最终结论 ═══ -->
+<div class="card">
+  <h2>📌 最终结论 — 5 句话</h2>
+
+  <div class="insight-box">
+    <strong>1. 跳过是 MVP</strong><br>
+    12/25 天正确跳过 = 12 天没亏。这是整个系统最有价值的部分。
+  </div>
+  
+  <div class="error-box">
+    <strong>2. 亏损集中度极高</strong><br>
+    64% 的亏损来自 2 个场景 (末轮客场 + 淘汰赛客场)。识别这 2 个场景, 就能解决大多数问题。
+  </div>
+  
+  <div class="warning-box">
+    <strong>3. 6D 没问题, 赔率有问题</strong><br>
+    6D 评分在 5/6 亏损日给出 ≥4 分, 但评分本身没错 — 错的是"市场在特定场景下全体失效"。
+  </div>
+  
+  <div class="insight-box">
+    <strong>4. 修正后 ROI = +3.2%</strong><br>
+    3 条场景开关 (末轮客场排除 + 淘汰赛客场降权 + 赔率乘积底线) 可将 ROI 从 -25.3% 提升至 +3.2%。
+  </div>
+  
+  <div class="warning-box">
+    <strong>5. 这些开关仍然是"待验证"</strong><br>
+    单源 64 场数据不足以产生规则。需要用 2018 世界杯 + 当前 2026 世界杯验证后方可写入 skill。
+  </div>
+</div>
+
+</div>
+</body>
+</html>
