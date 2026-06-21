@@ -3,7 +3,7 @@ name: football-odds-analyst
 description: "Football odds analyst v3.0 — MBI multi-bookmaker intelligence. Auto-pipeline with 500com-football-scraper. 500.com 30-bookmaker native data. Trigger: analyze match, odds analysis, handicap analysis, 竞彩. W/L 79.2% (28 matches). Mixed parlay +107.8% ROI."
 allowed-tools: Read, Write, Bash, WebSearch, WebFetch
 agent_created: true
-version: "3.0"
+version: "3.0.3-final"
 released: 2026-06-21
 references: references/knowledge-base.md
 dependencies:
@@ -202,27 +202,30 @@ Odds Structure Defense (NEW v3.0.3):
 
 ---
 
-## KNOWLEDGE BASE INDEX
+## KNOWLEDGE BASE INDEX (v3.0.3 Final — 13 modules)
 
 | $KB | Content | When |
 |:---:|---------|------|
 | KB-0 | Pre-flight: team name map + verification protocol | Step 1 |
-| KB-1 | Math formulas + Euro→Asian conversion table | Step 3b |
-| KB-2 | 15 Euro-Asian traps (full triggers) | Step 4 |
+| KB-1 | Math: Shin de-vig, logit-space corrections, Euro→Asian | Step 3b |
+| KB-2 | 15 Euro-Asian traps | Step 4 |
 | KB-3 | 28 universal trap rules | Step 8 |
-| KB-4 | 6D scoring (full criteria + thresholds + inflation) | Step 7 |
-| KB-5 | Fundamental weights + compression grades + Back-to-Wall | Steps 2,5 |
-| KB-6 | Probability synthesis (11 corrections + normalization) | Step 10 |
+| KB-4 | 6D continuous scoring v3.0 | Step 7 |
+| KB-5 | Fundamental weights + compression + Back-to-Wall | Steps 2,5 |
+| KB-6 | Probability synthesis (12 corrections in logit space) | Step 10 |
 | KB-7 | Score refinements (14.0–14.11) | Step 10 |
-| KB-8 | Methodology: Kelly, AH patterns, OU, league traits, bankroll | Supplementary |
-| KB-9 | Post-mortem: 28-match cycle, root causes, key lessons | Retrospective |
-| **KB-10** | **MBI framework (NEW v3.0): tiers, SCS, DRI, Lead-Lag, 4 new traps** | **Step 3a, 4, 8** |
+| KB-8 | Methodology: Kelly, AH patterns, OU, league traits | Supplementary |
+| KB-9 | Post-mortem: 28-match cycle | Retrospective |
+| KB-10 | MBI framework: SCS, DRI, Lead-Lag, WaterFlow, Exchange, Kelly, traps #16-#21 | Step 3a, 4, 8 |
+| **KB-11** | **Data calibration: dedup, water normalization, true opening, event tiering** | **Pre-Step 1** |
+| **KB-12** | **Advanced signals: retracement, AH break, order book, open-gap, draw diversion** | **Step 4, 6** |
+| **KB-13** | **Risk & iron rules: slippage, confidence tiering, circuit breakers, risk day, blacklist** | **Portfolio + Always** |
 
 ---
-
-## BOUNDARIES
-- Educational only. No betting advice.
-- xG: market-derived base + team form, no Opta/StatsBomb.
-- Comply with local laws. Confidence <50% → force warning.
-- **Data source**: 500.com native (30 bookmakers, zero quota).
-- W/L direction first, score second. Never skip normalization.
+## BOUNDARIES & IRON RULES
+- Educational only. No betting advice. Data source: 500.com native (30 bookmakers, zero quota).
+- xG: market-derived, no Opta. W/L direction first.
+- **Iron Rule**: 临场 30min 禁令。禁止倍投。禁止无意义对冲。
+- **Circuit Breaker**: 单日亏 3%→停。单周亏 8%→影子测试。单模块连错 7 场→禁用。
+- **Confidence Tier**: A(0.25×Kelly,可做胆) / B(0.15×,仅搭配) / C(0.08×,仅单关)。
+- **Shadow Testing**: A类 ≥65% + 反向 ≥70% + EV ≥−3% → 方可实盘。`
