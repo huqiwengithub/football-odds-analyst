@@ -1,6 +1,6 @@
 ---
 name: football-odds-analyst
-description: "Football odds analyst v3.0 — MBI multi-bookmaker intelligence framework. Auto-dependency on 500com-football-scraper. Trigger: analyze match, odds analysis, handicap analysis, trap detection, 竞彩. 500.com 30-bookmaker data native. OddsPapi optional fallback. W/L 79.2% (28 matches). Mixed parlay +107.8% ROI."
+description: "Football odds analyst v3.0 — MBI multi-bookmaker intelligence. Auto-pipeline with 500com-football-scraper. 500.com 30-bookmaker native data. Trigger: analyze match, odds analysis, handicap analysis, 竞彩. W/L 79.2% (28 matches). Mixed parlay +107.8% ROI."
 allowed-tools: Read, Write, Bash, WebSearch, WebFetch
 agent_created: true
 version: "3.0"
@@ -155,5 +155,5 @@ Rules 1-7 as before. v3.0 adds: if DRI > 40 on any leg, reduce that leg's weight
 - Educational only. No betting advice.
 - xG: market-derived base + team form, no Opta/StatsBomb.
 - Comply with local laws. Confidence <50% → force warning.
-- **Data source**: 500.com native (30 bookmakers). OddsPapi API optional fallback only if 500.com unavailable.
+- **Data source**: 500.com native (30 bookmakers, zero quota).
 - W/L direction first, score second. Never skip normalization.
