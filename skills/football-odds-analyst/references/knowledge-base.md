@@ -169,31 +169,69 @@ Each HIT → ±10% correction. ≥2 traps on same match → 🔴 HIGH severity.
 
 ---
 
-## KB-4: Six-Dimension Scoring Model v2.0
+## KB-4: Six-Dimension Scoring Model v3.0 — Continuous
 
-| Dim | Criterion | Score 1 (PASS) | Score 0 (FAIL) |
-|:---:|-----------|----------------|----------------|
-| 1 | Fundamental logic | Injuries/motivation/form/H2H align with market + Back-to-Wall passed + narrative clean | (a) Back-to-Wall seeker unaccounted, (b) favorite narrative-driven, (c) fundamentals contradict market |
-| 2 | Euro-Asian match | AH gap ≤0.25 for ALL 3 bookmakers + no bookmaker diverges >0.50 | Any gap >0.25 or bookmaker diverges >0.50 |
-| 3 | Opening objective | Opening matches strength (no artificial >0.25 ball) + narrative check passed | Opening deliberately deep/shallow OR compression from "known news" |
-| 4 | Late movement clean | No trap triggered + no harvest pattern + late 1h passes authenticity rules | Any trap or harvest pattern detected |
-| 5 | Water level logical | Changes explainable by fundamentals + draw prob ≤25% + water σ <0.06 | Unexplained water changes OR draw prob >25% with favorite <2.00 OR water σ >0.06 |
-| 6 | No one-sided hype | Multi-bookmaker consistent + SBOBet gap <0.25 + bet365 spread <0.05 + no anomalous limit drops | Bookmaker diverges >0.25 OR bet365 spread >0.10 OR limit drops >30% in 6h |
+> **v3.0.1 重大升级**: 从二值(0/1)改为 0–1 连续分。移除重叠维度（原 D2 和 D6 都衡量机构一致性，合并）。满分反向惩罚改为权重重校准。
 
-### Thresholds Summary
+### Scoring Dimensions
 
-| Dim | Metric | Pass | Data |
-|:---:|--------|:---:|------|
-| 2 | Max AH gap (theoretical vs actual) | ≤0.25 | All 3 bookmakers |
-| 4 | Traps hit | 0 | KB-2 + KB-3 |
-| 5 | Draw probability | ≤25% | De-vigged from Step 3 |
-| 5 | Water σ | <0.06 | 24 data points |
-| 6 | SBOBet-Pinnacle AH gap | <0.25 | 3-bookmaker comparison |
-| 6 | bet365-Pinnacle 1X2 spread | <0.05 | 3-bookmaker 1X2 |
+| Dim | Criterion | Score 0.0 (worst) | Score 1.0 (best) | Interpolation |
+|:---:|-----------|-------------------|-------------------|:---|
+| **D1** | Fundamental logic | Fundamentals contradict market | Perfect alignment: injuries/form/H2H all agree | Linear by # of aligned sub-factors ÷ total |
+| **D2** | Market consensus (MERGE old D2+D6) | AH gap >0.50 OR DRI >60 OR >2 books diverge | AH gap ≤0.15 AND DRI <20 AND all books within 0.10 spread | 1 − (gap/0.50 + DRI_norm/2 + spread_norm)/3 |
+| **D3** | Opening objectivity | Opening ≥0.50 ball from fair value OR compressed by "known news" | Opening within 0.15 ball of fair value AND no narrative compression | 1 − deviation/0.50 |
+| **D4** | Late movement clean | ≥3 traps triggered OR harvest pattern detected | 0 traps + late 1h passes authenticity rules | 1 − traps_hit/4 |
+| **D5** | Water & draw logic | Water σ >0.08 OR draw prob >30% with fav<2.00 | Water σ<0.04 AND draw prob≤22% AND water changes explainable | mean of (1−σ/0.08, 1−draw/0.30) |
+| — | ~~D6 removed~~ | Merged into D2. Old D6 measured "no one-sided hype" = same as consensus | — | — |
 
-### Inflation Penalty
-- **Raw score of 6 → effective score = 5** (6/6 paradoxically indicates overconfident narrative; historically 0% accuracy)
-- Score ≥4 → direction confidence +3%. Score ≤2 → all degrade.
+### Continuous Score Formula
+
+```
+Per dimension:
+  score_i = clamp(mapped_value, 0.0, 1.0)
+
+Total = Σ(score_i × weight_i) / Σ(weight_i)
+
+Default weights (v3.0.1, pending backtest calibration):
+  D1: 0.25  D2: 0.25  D3: 0.15  D4: 0.15  D5: 0.20
+  (Total = 5 dimensions, no D6)
+
+Final 6D Score = Total × 6  (scale to traditional 0-6 range for legacy compatibility)
+```
+
+### Application
+
+```
+6D ≥ 4.5 (legacy scale) → direction confidence +3%
+6D 3.0–4.5 → no adjustment
+6D 2.0–3.0 → confidence −3%, ⚠️ low confidence warning
+6D < 2.0 → skip match entirely (auto-degrade)
+```
+
+### Inflation Penalty (REPLACED v3.0.1)
+
+**旧规则**（6/6→5）已被移除。该现象说明的是模型校准偏差，而非「满分不可信」。解决方式：
+- 通过历史回测重校准各维度权重
+- 如果某维度与结果负相关 → 翻转或删除该维度
+- Pending 500+ match backtest
+
+### Dimension Overlap Resolution (v3.0.1)
+
+| Old Dim Pair | Overlap | Resolution |
+|:---|:---|:---|
+| D2 (Euro-Asian) + D6 (no hype) | Both measure institutional consensus | **Merged into new D2** |
+| D1 (fundamentals) + D3 (opening) | Both involve strength assessment | D1: team-side; D3: market-side. Keep separate, apply 0.8× dampening if both in same direction |
+| D4 (traps) + D2 (consensus) | Traps often detected from AH divergence | D4 triggered → D2 floor at 0.3 (trap implies disagreement) |
+
+### Minimum Data Requirements
+
+```
+D1: requires shuju page (H2H + recent form) → if missing, D1 = 0.5 (neutral)
+D2: requires ouzhi + yazhi pages → if missing, skip scoring entirely
+D3: requires yazhi opening handicap → if missing, D3 = 0.5
+D4: requires yazhi change timestamps → if missing, D4 = 0.5
+D5: requires yazhi water data → if missing, D5 = 0.5
+```
 
 ---
 
@@ -552,21 +590,57 @@ Flow Ratio ≥ 0.75 (强流向):
 < 0.50 → 分散，无信号
 ```
 
-### 10.5 Exchange-Traditional Divergence
+### 10.5 Exchange-Traditional Divergence — v3.0.1 upgraded
 
 ```
 From touzhu data (必发 Betfair exchange):
-  volume_ratio = volume_favorite / total_volume
-  
-  volume_ratio > 0.80 AND Pinnacle odds static >4h:
-    → RESISTANCE: big money buying but price not moving → caution (−5%)
-  
-  volume_ratio > 0.80 AND Pinnacle odds dropping:
-    → BREAKOUT: money flow confirmed by sharp bookmaker (+5%)
-  
-  volume_ratio < 0.50:
-    → LOW CONVICTION: market interest thin → confidence × 0.90
+
+┌─ Three-Layer Exchange Analysis ──────────────────────────┐
+│ Layer 1: Volume Ratio (成交量占比)                         │
+│   volume_ratio = volume_favorite / total_volume            │
+│   volume_ratio > 0.80 → heavy interest (don't skip)       │
+│   volume_ratio < 0.50 → thin market, confidence ×0.90     │
+│                                                           │
+│ Layer 2: VWAP vs Bookmaker (成交量加权均价偏离)  NEW       │
+│   VWAP = Σ(price_i × volume_i) / Σ(volume_i)              │
+│   divergence = (VWAP_favorite / Pinnacle_favorite − 1)     │
+│   divergence ≤ −0.03 (VWAP significantly lower):           │
+│     → SMART MONEY: big buyers got better price than mkt    │
+│     → logit +0.25 (institutional conviction)              │
+│   divergence ≥ +0.03 (VWAP higher than Pinnacle):          │
+│     → DUMB MONEY: retail paying premium, no conviction     │
+│     → logit −0.15                                         │
+│   −0.03 < divergence < +0.03:                              │
+│     → NEUTRAL: volume at market price, no edge            │
+│                                                           │
+│ Layer 3: Bookmaker P&L Exposure (庄家盈亏敞口)  NEW       │
+│   pl_exposure = bookmaker_PL / total_volume × 100%         │
+│   pl_exposure < −20% on favorite:                          │
+│     → BOOKMAKER EXPOSED: 庄家在热门方严重亏损敞口          │
+│     → 可能触发赔率上调以平衡风险 → logit −0.10 (caution)   │
+│   pl_exposure > +50% on underdog:                          │
+│     → BOOKMAKER HEDGED: 庄家在冷门方盈利充足               │
+│     → no signal (bookmaker already protected)             │
+│                                                           │
+│ Match Size Weighting (赛事体量折扣)  NEW                   │
+│   total_volume > £500K  → weight 1.00 (major event)       │
+│   total_volume £100K–500K → weight 0.70 (medium)          │
+│   total_volume £50K–100K → weight 0.40 (small)            │
+│   total_volume < £50K  → weight 0.10 (micro, skip)        │
+│                                                           │
+│   ALL exchange signals × match_size_weight                 │
+└───────────────────────────────────────────────────────────┘
+
+Exchange Composite Signal:
+  exchange_logit = (vwap_signal + exposure_signal) × volume_confidence × match_weight
+  where volume_confidence = min(1.0, volume_ratio / 0.80)
 ```
+
+**v3.0.1 新增**：
+- VWAP（成交量加权均价）替代单纯的成交量占比，区分「聪明钱」vs「跟风盘」
+- 庄家盈亏敞口检测——庄家亏损侧需要调整赔率，影响后续价格走向
+- 赛事体量折扣——小众赛事必发成交量极低，参考价值接近零
+- 复合信号：多个维度合成而非单独使用
 
 ### 10.6 Kelly Consensus (CORRECTED v3.0.1)
 

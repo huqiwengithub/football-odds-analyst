@@ -123,9 +123,63 @@ All three tiers move simultaneously → GENUINE EVENT (+5%)
 
 ---
 
-## PORTFOLIO CONSTRUCTION (unchanged from v2.9)
+## PORTFOLIO CONSTRUCTION (v3.0.1 — Fractional Kelly + Risk Controls)
 
-Rules 1-7 as before. v3.0 adds: if DRI > 40 on any leg, reduce that leg's weight by 30% in allocation.
+### Rule 0: Bankroll Management (NEW v3.0.1)
+
+```
+Fractional Kelly (0.25×):
+  f* = (p × odds − 1) / (odds − 1)    // Full Kelly
+  stake = 0.25 × f* × bankroll         // Conservative fractional
+
+Max Drawdown Limits:
+  Single day: max 15% bankroll loss → stop
+  Single week: max 30% bankroll loss → stop
+  Single match exposure: max 8% bankroll
+
+Slippage Discount:
+  actual_odds = quoted_odds × (1 − slippage)
+  slippage_default = 0.03 (竞彩无滑点，此参数为外围参考)
+  EV must be computed with actual_odds, not quoted_odds
+```
+
+### Rule 1-7 (same as v2.9) + v3.0.1 additions
+
+| Rule | v3.0.1 改动 |
+|:---:|------|
+| **1** | Single-Point Failure Audit — unchanged |
+| **2** | P(全灭) — now includes **match correlation adjustment**: same-league same-day matches ×1.15 correlation factor |
+| **3** | Pairwise Coverage — unchanged |
+| **4** | **Pyramid → Fractional Kelly**: 不用「最高概率方案覆盖本金」，改用 Kelly 比例分配每注金额 |
+| **5** | JQS Precision — unchanged |
+| **6** | Output Language — unchanged |
+| **7** | Profit Range Output — now includes **slippage-adjusted EV** and **max drawdown scenario** |
+
+### Match Correlation Adjustment (NEW v3.0.1)
+
+```
+Same league + same day: correlation_factor = 1.15
+  P(both_fail) = P(A_fail) × P(B_fail) × correlation_factor
+
+Same group (World Cup group stage): correlation_factor = 1.25
+  (group dynamics create dependency between matches)
+
+Different continent/league: correlation_factor = 1.00 (independent)
+
+Applied to Rule 2 P(全灭) enumeration — inflates joint failure probability
+```
+
+### Risk Day Skip (unchanged from v2.9)
+
+### Selection + Allocation (v3.0.1 revision)
+
+```
+单注 Kelly = 0.25 × f* × bankroll, capped at 8% max exposure
+过关注额 = 单注 Kelly 的 0.6× (multi-leg variance penalty)
+对冲注额 = 单注 Kelly 的 0.3× (hedge purpose only)
+
+总日预算 ≤ 15% bankroll (硬上限)
+```
 
 ---
 
