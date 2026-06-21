@@ -1,0 +1,362 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>2026世界杯 · 6月22日赔率数据</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif; background: #f0f2f5; color: #333; line-height: 1.6; }
+header { background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%); color: #fff; padding: 32px 20px; text-align: center; }
+header h1 { font-size: 28px; font-weight: 700; margin-bottom: 6px; }
+header .sub { font-size: 14px; opacity: 0.75; }
+header .update { font-size: 12px; opacity: 0.5; margin-top: 4px; }
+.container { max-width: 900px; margin: 0 auto; padding: 20px; }
+
+/* Match Card */
+.match-card { background: #fff; border-radius: 12px; box-shadow: 0 2px 12px rgba(0,0,0,0.06); margin-bottom: 20px; overflow: hidden; }
+.match-header { padding: 20px 24px; cursor: pointer; display: flex; align-items: center; justify-content: space-between; gap: 12px; border-bottom: 1px solid #f0f0f0; }
+.match-header:hover { background: #fafbfc; }
+.match-header .code { font-size: 13px; color: #999; font-weight: 600; min-width: 52px; }
+.match-header .teams { flex: 1; text-align: center; }
+.match-header .teams .vs-line { font-size: 20px; font-weight: 700; display: flex; align-items: center; justify-content: center; gap: 10px; }
+.match-header .teams .vs-line .team { display: inline-flex; align-items: center; gap: 6px; }
+.match-header .teams .vs-line .rank { font-size: 11px; color: #999; background: #f5f5f5; padding: 1px 6px; border-radius: 10px; }
+.match-header .teams .vs-line .vs { color: #ccc; font-size: 14px; }
+.match-header .teams .time { font-size: 12px; color: #888; margin-top: 4px; }
+.match-header .hcap { text-align: right; min-width: 80px; }
+.match-header .hcap .hc { display: inline-block; font-size: 13px; font-weight: 700; padding: 4px 10px; border-radius: 6px; }
+.match-header .hcap .hc.minus { background: #fff2f0; color: #cf1322; }
+.match-header .hcap .hc.plus { background: #f6ffed; color: #389e0d; }
+.match-header .arrow { color: #bbb; font-size: 16px; transition: transform 0.2s; }
+.match-header .arrow.open { transform: rotate(90deg); }
+
+.match-body { padding: 0 24px 24px; display: none; }
+.match-body.show { display: block; }
+
+/* Section */
+.section { margin-top: 20px; }
+.section-title { font-size: 14px; font-weight: 700; color: #555; margin-bottom: 10px; padding-bottom: 6px; border-bottom: 2px solid #1677ff; display: inline-block; }
+
+/* Compact grid for multiple sub-tables */
+.sub-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; }
+
+/* Tables */
+table { width: 100%; border-collapse: collapse; font-size: 13px; }
+table th, table td { padding: 7px 10px; text-align: center; border-bottom: 1px solid #f0f0f0; }
+table th { background: #fafafa; color: #666; font-weight: 600; font-size: 12px; white-space: nowrap; }
+table td { font-variant-numeric: tabular-nums; }
+table .hi { color: #cf1322; font-weight: 600; }
+table .lo { color: #389e0d; }
+table .mid { color: #d48806; }
+
+/* BQC Grid */
+.bqc-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; max-width: 320px; }
+.bqc-item { padding: 8px 10px; background: #fafafa; border-radius: 6px; text-align: center; }
+.bqc-item .bqc-label { font-size: 12px; color: #666; }
+.bqc-item .bqc-odds { font-size: 15px; font-weight: 700; }
+.bqc-item .bqc-odds.hi { color: #cf1322; }
+.bqc-item .bqc-odds.lo { color: #389e0d; }
+
+/* BF grid */
+.bf-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 3px; max-width: 520px; }
+.bf-item { padding: 4px 6px; background: #fafafa; border-radius: 4px; text-align: center; font-size: 11px; }
+.bf-item .bf-score { color: #666; font-size: 10px; }
+.bf-item .bf-odds { font-weight: 600; color: #333; }
+.bf-item .bf-odds.hi { color: #cf1322; }
+
+/* Prob Bar */
+.prob-bar-wrap { display: flex; align-items: center; gap: 12px; margin: 8px 0; }
+.prob-bar-wrap .label { font-size: 12px; color: #666; min-width: 36px; }
+.prob-bar-wrap .bar { flex: 1; height: 22px; border-radius: 4px; overflow: hidden; display: flex; }
+.prob-bar-wrap .bar .h { background: #cf1322; height: 100%; display: flex; align-items: center; justify-content: center; color: #fff; font-size: 11px; font-weight: 600; }
+.prob-bar-wrap .bar .d { background: #d48806; height: 100%; display: flex; align-items: center; justify-content: center; color: #fff; font-size: 11px; font-weight: 600; }
+.prob-bar-wrap .bar .a { background: #389e0d; height: 100%; display: flex; align-items: center; justify-content: center; color: #fff; font-size: 11px; font-weight: 600; }
+
+/* OU2.5 visual */
+.ou-bar { display: flex; align-items: center; gap: 8px; margin: 8px 0; font-size: 12px; }
+.ou-bar .ou-track { flex: 1; height: 18px; border-radius: 9px; overflow: hidden; display: flex; background: #f0f0f0; }
+.ou-bar .ou-track .under { background: #389e0d; height: 100%; display: flex; align-items: center; justify-content: center; color: #fff; font-size: 11px; font-weight: 600; }
+.ou-bar .ou-track .over { background: #cf1322; height: 100%; display: flex; align-items: center; justify-content: center; color: #fff; font-size: 11px; font-weight: 600; }
+
+/* JQS highlight */
+.jqs-table td { font-weight: 600; }
+
+/* Stats row */
+.stats-row { display: flex; gap: 16px; flex-wrap: wrap; }
+.stat-item { background: #f5f7fa; border-radius: 8px; padding: 12px 16px; text-align: center; min-width: 100px; }
+.stat-item .stat-val { font-size: 20px; font-weight: 700; color: #1677ff; }
+.stat-item .stat-lbl { font-size: 11px; color: #888; margin-top: 2px; }
+
+/* Tabs */
+.tabs { display: flex; gap: 4px; margin-bottom: 12px; }
+.tab { padding: 6px 14px; border-radius: 6px; font-size: 13px; cursor: pointer; background: #f0f2f5; color: #666; border: none; }
+.tab.active { background: #1677ff; color: #fff; }
+
+/* expand all */
+.toolbar { display: flex; justify-content: flex-end; margin-bottom: 12px; }
+.toolbar button { padding: 6px 14px; border-radius: 6px; font-size: 13px; cursor: pointer; border: 1px solid #d9d9d9; background: #fff; color: #555; }
+.toolbar button:hover { border-color: #1677ff; color: #1677ff; }
+
+footer { text-align: center; padding: 20px; color: #bbb; font-size: 12px; }
+footer a { color: #999; }
+
+/* Not yet open */
+.badge-ns { display: inline-block; background: #fff7e6; color: #d48806; font-size: 11px; padding: 2px 8px; border-radius: 4px; font-weight: 600; }
+</style>
+</head>
+<body>
+<header>
+  <h1>⚽ 2026世界杯 · 6月22日赔率</h1>
+  <div class="sub">竞彩足球 · 混合过关数据</div>
+  <div class="update">数据来源: 500.com 竞彩 | 更新于 2026-06-21 07:51</div>
+</header>
+
+<div class="container">
+  <div class="toolbar">
+    <button id="btnToggleAll">展开/收起 全部</button>
+  </div>
+  <div id="matches"></div>
+  <footer>
+    <p>赔率数据仅供参考，投注需谨慎。数据来源: <a href="https://trade.500.com/jczq/" target="_blank">500.com 竞彩足球</a></p>
+    <p>SPF百家平均来自威廉希尔/澳门/立博/bet365/皇冠 | JQS/BF/BQC 为竞彩官方赔率</p>
+  </footer>
+</div>
+
+<script>
+const DATA = [
+  {"code":"周日037","datetime":"2026-06-22 00:00","home_team":"西班牙","away_team":"沙特阿拉伯","home_rank":3,"away_rank":2,"league":"世界杯","handicap_rqspf":-2,"spf_lc":{"home":1.77,"draw":4.05,"away":3.15},"spf_avg":{"home":1.1,"draw":9.82,"away":24.54},"spf_wl":{"home":1.08,"draw":10.0,"away":29.0},"spf_am":{"home":1.07,"draw":8.5,"away":18.0},"spf_lb":{"home":1.11,"draw":10.0,"away":21.0},"spf_bet365":{"home":1.09,"draw":10.0,"away":26.0},"spf_hg":{"home":1.11,"draw":9.2,"away":23.0},"rqspf_avg":{"home":1.95,"draw":3.92,"away":2.99},"ah_am":{"home_water":0.98,"handicap":2.5,"away_water":0.86},"ah_bet365":{"home_water":1.0,"handicap":2.5,"away_water":0.85},"ah_hg":{"home_water":1.0,"handicap":2.5,"away_water":0.87},"ou_am":{"over_water":0.94,"line":3.25,"under_water":0.86},"ou_bet365":{"over_water":1.0,"line":3.25,"under_water":0.85},"prob_avg":{"home":86.32,"draw":9.73,"away":3.95},"jqs":{"0":26.0,"1":7.75,"2":4.5,"3":3.6,"4":4.2,"5":6.3,"6":9.7,"7":11.5},"jqs_derived":{"expected_goals":3.5,"over_2.5_pct":68.9,"under_2.5_pct":31.1,"overround_pct":25.4},"bf":{"1:0":8.0,"2:0":5.5,"2:1":10.5,"3:0":5.5,"3:1":10.5,"3:2":40.0,"4:0":6.85,"4:1":14.0,"4:2":60.0,"5:0":10.0,"5:1":24.0,"5:2":100.0,"胜其它":8.75,"0:0":26.0,"1:1":15.0,"2:2":45.0,"3:3":200.0,"平其它":800.0,"0:1":40.0,"0:2":150.0,"1:2":50.0,"0:3":500.0,"1:3":300.0,"2:3":200.0,"0:4":800.0,"1:4":800.0,"2:4":600.0,"0:5":800.0,"1:5":800.0,"2:5":800.0,"负其它":500.0},"bqc":{"胜胜":1.26,"胜平":35.0,"胜负":120.0,"平胜":4.0,"平平":14.0,"平负":50.0,"负胜":30.0,"负平":35.0,"负负":50.0}},
+  {"code":"周日038","datetime":"2026-06-22 03:00","home_team":"比利时","away_team":"伊朗","home_rank":3,"away_rank":1,"league":"世界杯","handicap_rqspf":-1,"spf_lc":{"home":2.04,"draw":3.5,"away":2.83},"spf_avg":{"home":1.43,"draw":4.54,"away":7.5},"spf_wl":{"home":1.44,"draw":4.33,"away":7.0},"spf_am":{"home":1.38,"draw":4.1,"away":7.0},"spf_lb":{"home":1.44,"draw":4.5,"away":7.0},"spf_bet365":{"home":1.42,"draw":4.5,"away":8.0},"spf_hg":{"home":1.42,"draw":4.7,"away":7.3},"rqspf_lc":{"home":1.32,"draw":4.25,"away":7.3},"rqspf_avg":{"home":2.17,"draw":3.48,"away":2.79},"ah_am":{"home_water":0.98,"handicap":1.25,"away_water":0.86},"ah_bet365":{"home_water":0.97,"handicap":1.25,"away_water":0.87},"ah_hg":{"home_water":1.0,"handicap":1.25,"away_water":0.88},"ou_am":{"over_water":0.8,"line":2.5,"under_water":1.0},"ou_bet365":{"over_water":0.88,"line":2.5,"under_water":0.98},"prob_avg":{"home":66.45,"draw":20.9,"away":12.66},"jqs":{"0":13.0,"1":5.4,"2":3.65,"3":3.4,"4":4.9,"5":9.0,"6":15.0,"7":24.0},"jqs_derived":{"expected_goals":2.9,"over_2.5_pct":57.2,"under_2.5_pct":42.8,"overround_pct":25.4},"bf":{"1:0":6.5,"2:0":6.5,"2:1":6.75,"3:0":8.75,"3:1":9.5,"3:2":25.0,"4:0":16.0,"4:1":19.0,"4:2":45.0,"5:0":35.0,"5:1":45.0,"5:2":90.0,"胜其它":29.0,"0:0":13.0,"1:1":7.6,"2:2":17.0,"3:3":80.0,"平其它":400.0,"0:1":18.0,"0:2":45.0,"1:2":20.0,"0:3":150.0,"1:3":80.0,"2:3":70.0,"0:4":500.0,"1:4":300.0,"2:4":300.0,"0:5":800.0,"1:5":600.0,"2:5":600.0,"负其它":300.0},"bqc":{"胜胜":1.83,"胜平":19.0,"胜负":55.0,"平胜":3.8,"平平":6.95,"平负":16.0,"负胜":26.0,"负平":19.0,"负负":13.0}},
+  {"code":"周日039","datetime":"2026-06-22 06:00","home_team":"乌拉圭","away_team":"佛得角","home_rank":1,"away_rank":4,"league":"世界杯","handicap_rqspf":-1,"spf_lc":{"home":2.14,"draw":3.23,"away":2.84},"spf_avg":{"home":1.45,"draw":4.13,"away":8.1},"spf_wl":{"home":1.44,"draw":4.0,"away":7.5},"spf_am":{"home":1.36,"draw":4.2,"away":7.3},"spf_lb":{"home":1.44,"draw":4.2,"away":7.5},"spf_bet365":{"home":1.44,"draw":4.1,"away":8.5},"spf_hg":{"home":1.44,"draw":4.25,"away":8.2},"rqspf_lc":{"home":1.31,"draw":4.0,"away":8.6},"rqspf_avg":{"home":2.37,"draw":3.23,"away":2.69},"ah_am":{"home_water":0.8,"handicap":1.0,"away_water":1.04},"ah_bet365":{"home_water":1.1,"handicap":1.25,"away_water":0.78},"ah_hg":{"home_water":0.83,"handicap":1.0,"away_water":1.05},"ou_am":{"over_water":0.96,"line":2.25,"under_water":0.84},"ou_bet365":{"over_water":1.0,"line":2.25,"under_water":0.85},"prob_avg":{"home":65.37,"draw":22.91,"away":11.72},"jqs":{"0":8.5,"1":3.9,"2":3.1,"3":3.75,"4":6.5,"5":14.0,"6":26.0,"7":36.0},"jqs_derived":{"expected_goals":2.5,"over_2.5_pct":44.5,"under_2.5_pct":55.5,"overround_pct":25.5},"bf":{"1:0":4.6,"2:0":5.0,"2:1":7.25,"3:0":7.5,"3:1":12.0,"3:2":50.0,"4:0":17.0,"4:1":29.0,"4:2":100.0,"5:0":50.0,"5:1":75.0,"5:2":250.0,"胜其它":50.0,"0:0":8.5,"1:1":7.1,"2:2":27.0,"3:3":150.0,"平其它":800.0,"0:1":15.0,"0:2":50.0,"1:2":26.0,"0:3":300.0,"1:3":150.0,"2:3":150.0,"0:4":600.0,"1:4":500.0,"2:4":500.0,"0:5":800.0,"1:5":800.0,"2:5":800.0,"负其它":500.0},"bqc":{"胜胜":1.9,"胜平":22.0,"胜负":60.0,"平胜":3.5,"平平":5.45,"平负":17.0,"负胜":34.0,"负平":22.0,"负负":16.0}},
+  {"code":"周日040","datetime":"2026-06-22 09:00","home_team":"新西兰","away_team":"埃及","home_rank":2,"away_rank":4,"league":"世界杯","handicap_rqspf":1,"spf_lc":{"home":2.3,"draw":3.4,"away":2.5},"spf_avg":{"home":5.62,"draw":3.98,"away":1.59},"spf_wl":{"home":5.0,"draw":3.9,"away":1.6},"spf_am":{"home":5.33,"draw":3.63,"away":1.54},"spf_lb":{"home":5.5,"draw":3.8,"away":1.6},"spf_bet365":{"home":5.75,"draw":4.1,"away":1.57},"spf_hg":{"home":5.9,"draw":4.05,"away":1.57},"rqspf_lc":{"home":5.7,"draw":3.72,"away":1.46},"rqspf_avg":{"home":2.3,"draw":3.33,"away":2.68},"ah_am":{"home_water":0.8,"handicap":-1.0,"away_water":1.04},"ah_bet365":{"home_water":0.77,"handicap":-1.0,"away_water":1.1},"ah_hg":{"home_water":0.83,"handicap":-1.0,"away_water":1.05},"ou_am":{"over_water":0.82,"line":2.25,"under_water":0.98},"ou_bet365":{"over_water":0.92,"line":2.25,"under_water":0.92},"prob_avg":{"home":16.85,"draw":23.82,"away":59.33},"jqs":{"0":10.0,"1":4.3,"2":3.2,"3":3.6,"4":6.0,"5":12.0,"6":21.0,"7":30.0},"jqs_derived":{"expected_goals":2.6,"over_2.5_pct":48.6,"under_2.5_pct":51.4,"overround_pct":25.4},"bf":{"1:0":13.0,"2:0":30.0,"2:1":16.0,"3:0":100.0,"3:1":75.0,"3:2":75.0,"4:0":500.0,"4:1":300.0,"4:2":300.0,"5:0":800.0,"5:1":600.0,"5:2":800.0,"胜其它":400.0,"0:0":10.0,"1:1":7.0,"2:2":17.0,"3:3":80.0,"平其它":500.0,"0:1":5.75,"0:2":5.8,"1:2":6.75,"0:3":9.5,"1:3":12.0,"2:3":30.0,"0:4":21.0,"1:4":28.0,"2:4":75.0,"0:5":60.0,"1:5":75.0,"2:5":200.0,"负其它":50.0},"bqc":{"胜胜":10.5,"胜平":19.0,"胜负":27.0,"平胜":12.0,"平平":5.5,"平负":4.1,"负胜":50.0,"负平":19.0,"负负":2.05}}
+];
+
+function fmtHC(h) {
+  if (h < 0) return '<span class="hc minus">让'+Math.abs(h)+'球</span>';
+  if (h > 0) return '<span class="hc plus">受'+h+'球</span>';
+  return '<span class="hc">0</span>';
+}
+
+function fmtOdds(v, isHome, isAway) {
+  if (v == null) return '-';
+  let cls = '';
+  if (isHome) cls = 'hi';
+  else if (isAway) cls = 'lo';
+  return '<span class="'+cls+'">'+v.toFixed(2)+'</span>';
+}
+
+function findMin(m, keys) {
+  let minK = null, minV = Infinity;
+  for (let k of keys) {
+    let v = m[k]?.home;
+    if (v != null && v < minV) { minV = v; minK = k; }
+  }
+  return minK;
+}
+
+function renderMatch(m) {
+  let homeIsFav = (m.prob_avg?.home || 0) > (m.prob_avg?.away || 0);
+  let awayIsFav = (m.prob_avg?.away || 0) > (m.prob_avg?.home || 0);
+  
+  let html = '<div class="match-card">';
+  
+  // Header
+  html += '<div class="match-header" data-toggle="match">';
+  html += '<span class="code">'+m.code+'</span>';
+  html += '<div class="teams">';
+  html += '<div class="vs-line">';
+  html += '<span class="team"><span class="rank">'+m.home_rank+'</span> '+m.home_team+'</span>';
+  html += '<span class="vs">VS</span>';
+  html += '<span class="team"><span class="rank">'+m.away_rank+'</span> '+m.away_team+'</span>';
+  html += '</div>';
+  html += '<div class="time">'+m.datetime+'</div>';
+  html += '</div>';
+  html += '<div class="hcap">'+fmtHC(m.handicap_rqspf)+'</div>';
+  html += '<span class="arrow">▶</span>';
+  html += '</div>';
+  
+  // Body
+  html += '<div class="match-body">';
+  
+  // Key stats
+  html += '<div class="stats-row">';
+  html += '<div class="stat-item"><div class="stat-val">'+m.jqs_derived.expected_goals+'</div><div class="stat-lbl">预期进球 xG</div></div>';
+  html += '<div class="stat-item"><div class="stat-val">'+(100-m.jqs_derived.overround_pct).toFixed(1)+'%</div><div class="stat-lbl">覆水率</div></div>';
+  if (m.ou_bet365) {
+    html += '<div class="stat-item"><div class="stat-val">'+m.ou_bet365.line+'</div><div class="stat-lbl">大小球盘口</div></div>';
+  }
+  html += '</div>';
+  
+  // Implied probability bar
+  if (m.prob_avg) {
+    html += '<div class="section"><div class="section-title">隐含概率（百家平均）</div>';
+    html += '<div class="prob-bar-wrap">';
+    html += '<span class="label">'+m.home_team+'</span>';
+    html += '<div class="bar"><div class="h" style="width:'+m.prob_avg.home+'%">'+m.prob_avg.home.toFixed(0)+'%</div><div class="d" style="width:'+m.prob_avg.draw+'%">'+m.prob_avg.draw.toFixed(0)+'%</div><div class="a" style="width:'+m.prob_avg.away+'%">'+m.prob_avg.away.toFixed(0)+'%</div></div>';
+    html += '<span class="label">'+m.away_team+'</span>';
+    html += '</div></div>';
+  }
+  
+  // OU2.5 bar
+  if (m.jqs_derived) {
+    html += '<div class="section"><div class="section-title">大小球 OU2.5 倾向</div>';
+    html += '<div class="ou-bar">';
+    html += '<span>小球<br>'+m.jqs_derived["under_2.5_pct"]+'%</span>';
+    html += '<div class="ou-track"><div class="under" style="width:'+m.jqs_derived["under_2.5_pct"]+'%">U</div><div class="over" style="width:'+m.jqs_derived["over_2.5_pct"]+'%">O '+m.jqs_derived["over_2.5_pct"]+'%</div></div>';
+    html += '<span>大球<br>'+m.jqs_derived["over_2.5_pct"]+'%</span>';
+    html += '</div></div>';
+  }
+  
+  // SPF + AH + OU
+  html += '<div class="section"><div class="section-title">胜平负 SPF</div>';
+  html += '<div class="sub-grid">';
+  
+  // SPF 百家
+  html += '<div><table><thead><tr><th>博彩公司</th><th>主胜</th><th>平局</th><th>客胜</th></tr></thead><tbody>';
+  const spfKeys = [
+    {k:'spf_avg', n:'百家平均'},
+    {k:'spf_lc', n:'竞彩官方'},
+    {k:'spf_wl', n:'威廉希尔'},
+    {k:'spf_am', n:'澳门'},
+    {k:'spf_lb', n:'立博'},
+    {k:'spf_bet365', n:'bet365'},
+    {k:'spf_hg', n:'皇冠'}
+  ];
+  for (let s of spfKeys) {
+    let v = m[s.k];
+    if (!v) continue;
+    html += '<tr><td>'+s.n+'</td>';
+    html += '<td>'+fmtOdds(v.home, homeIsFav, false)+'</td>';
+    html += '<td>'+fmtOdds(v.draw, false, false)+'</td>';
+    html += '<td>'+fmtOdds(v.away, false, awayIsFav)+'</td>';
+    html += '</tr>';
+  }
+  html += '</tbody></table></div>';
+  
+  // AH
+  html += '<div><table><thead><tr><th>亚洲盘</th><th>水位</th><th>盘口</th><th>水位</th></tr></thead><tbody>';
+  const ahKeys = [{k:'ah_am', n:'澳门'},{k:'ah_bet365', n:'bet365'},{k:'ah_hg', n:'皇冠'}];
+  for (let a of ahKeys) {
+    let v = m[a.k];
+    if (!v) continue;
+    html += '<tr><td>'+a.n+'</td>';
+    html += '<td>'+v.home_water.toFixed(2)+'</td>';
+    html += '<td style="font-weight:700;color:#1677ff">'+(v.handicap>0?'+':'')+v.handicap+'</td>';
+    html += '<td>'+v.away_water.toFixed(2)+'</td></tr>';
+  }
+  html += '</tbody></table></div>';
+  
+  // OU
+  html += '<div><table><thead><tr><th>大小球</th><th>大球</th><th>盘口</th><th>小球</th></tr></thead><tbody>';
+  const ouKeys = [{k:'ou_am', n:'澳门'},{k:'ou_bet365', n:'bet365'}];
+  for (let o of ouKeys) {
+    let v = m[o.k];
+    if (!v) continue;
+    html += '<tr><td>'+o.n+'</td>';
+    html += '<td>'+v.over_water.toFixed(2)+'</td>';
+    html += '<td style="font-weight:700;color:#1677ff">'+v.line+'</td>';
+    html += '<td>'+v.under_water.toFixed(2)+'</td></tr>';
+  }
+  html += '</tbody></table></div>';
+  
+  html += '</div></div>';
+  
+  // RQSPF
+  html += '<div class="section"><div class="section-title">让球胜平负 RQSPF ('+fmtHC(m.handicap_rqspf)+')</div>';
+  html += '<div class="sub-grid"><div><table><thead><tr><th>来源</th><th>主胜</th><th>平局</th><th>客胜</th></tr></thead><tbody>';
+  if (m.rqspf_lc) {
+    html += '<tr><td>竞彩官方</td>';
+    html += '<td>'+fmtOdds(m.rqspf_lc.home, homeIsFav, false)+'</td>';
+    html += '<td>'+fmtOdds(m.rqspf_lc.draw, false, false)+'</td>';
+    html += '<td>'+fmtOdds(m.rqspf_lc.away, false, awayIsFav)+'</td></tr>';
+  } else {
+    html += '<tr><td>竞彩官方</td><td colspan="3"><span class="badge-ns">未开售</span></td></tr>';
+  }
+  if (m.rqspf_avg) {
+    html += '<tr><td>百家平均</td>';
+    html += '<td>'+fmtOdds(m.rqspf_avg.home, homeIsFav, false)+'</td>';
+    html += '<td>'+fmtOdds(m.rqspf_avg.draw, false, false)+'</td>';
+    html += '<td>'+fmtOdds(m.rqspf_avg.away, false, awayIsFav)+'</td></tr>';
+  }
+  html += '</tbody></table></div></div></div>';
+  
+  // JQS
+  if (m.jqs) {
+    html += '<div class="section"><div class="section-title">总进球数 JQS</div>';
+    html += '<table class="jqs-table"><thead><tr><th>0球</th><th>1球</th><th>2球</th><th>3球</th><th>4球</th><th>5球</th><th>6球</th><th>7+球</th></tr></thead><tbody><tr>';
+    let jqsVals = [];
+    for (let k of ['0','1','2','3','4','5','6','7']) {
+      jqsVals.push({k, v: m.jqs[k]});
+    }
+    let jqsMin = Infinity;
+    for (let j of jqsVals) if (j.v < jqsMin) jqsMin = j.v;
+    for (let j of jqsVals) {
+      let cls = j.v === jqsMin ? 'hi' : '';
+      html += '<td class="'+cls+'">'+j.v.toFixed(2)+'</td>';
+    }
+    html += '</tr></tbody></table></div>';
+  }
+  
+  // BQC
+  if (m.bqc) {
+    html += '<div class="section"><div class="section-title">半全场 BQC</div>';
+    html += '<div class="bqc-grid">';
+    const bqcOrder = ['胜胜','胜平','胜负','平胜','平平','平负','负胜','负平','负负'];
+    let bqcMin = Infinity;
+    for (let k of bqcOrder) { if (m.bqc[k] && m.bqc[k] < bqcMin) bqcMin = m.bqc[k]; }
+    for (let k of bqcOrder) {
+      let v = m.bqc[k];
+      let cls = v === bqcMin ? 'hi' : 'lo';
+      html += '<div class="bqc-item"><div class="bqc-label">'+k+'</div><div class="bqc-odds '+cls+'">'+v.toFixed(2)+'</div></div>';
+    }
+    html += '</div></div>';
+  }
+  
+  // BF - show top 12
+  if (m.bf) {
+    html += '<div class="section"><div class="section-title">比分 BF（低赔 TOP 12）</div>';
+    let bfEntries = Object.entries(m.bf).sort((a,b) => a[1] - b[1]).slice(0, 12);
+    html += '<div style="display:flex;flex-wrap:wrap;gap:6px;">';
+    for (let [score, odds] of bfEntries) {
+      html += '<span style="display:inline-block;padding:4px 10px;background:#fafafa;border-radius:6px;font-size:12px;">';
+      html += '<span style="color:#666;">'+score+'</span> ';
+      html += '<span style="font-weight:700;color:#cf1322;">'+odds.toFixed(2)+'</span></span>';
+    }
+    html += '</div></div>';
+  }
+  
+  html += '</div></div>';
+  return html;
+}
+
+function toggleAll() {
+  let bodies = document.querySelectorAll('.match-body');
+  let arrows = document.querySelectorAll('.match-header .arrow');
+  let allOpen = [...bodies].every(function(b) { return b.classList.contains('show'); });
+  bodies.forEach(function(b) { b.classList.toggle('show', !allOpen); });
+  arrows.forEach(function(a) { a.classList.toggle('open', !allOpen); });
+}
+
+document.getElementById('matches').innerHTML = DATA.map(renderMatch).join('');
+
+// Event delegation for match toggle
+document.getElementById('matches').addEventListener('click', function(e) {
+  var header = e.target.closest('.match-header');
+  if (!header) return;
+  var body = header.nextElementSibling;
+  var arrow = header.querySelector('.arrow');
+  if (body) body.classList.toggle('show');
+  if (arrow) arrow.classList.toggle('open');
+});
+
+// Open first match by default
+var firstBody = document.querySelector('.match-body');
+var firstArrow = document.querySelector('.match-header .arrow');
+if (firstBody) firstBody.classList.add('show');
+if (firstArrow) firstArrow.classList.add('open');
+
+// Toggle all button
+document.getElementById('btnToggleAll').addEventListener('click', toggleAll);
+</script>
+</body>
+</html>
