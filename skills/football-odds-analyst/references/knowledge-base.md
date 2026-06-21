@@ -35,15 +35,66 @@ Austria=奥地利, Ukraine=乌克兰, Turkey=土耳其, Greece=希腊, Scotland=
 
 ## KB-1: Core Math & Conversion
 
-### Formulas
+### De-vig Methods
+
+**v3.0.1**: 升级为 Shin 去抽水算法。简单比例法会系统性高估热门方概率（热门-长偏差随赔率差距扩大）。
+
+```
+Shin's method:
+  Minimize |Σ(1 / (z + (1-z) × odds_i)) − 1| over z ∈ [0, 1)
+  where z = proportion of insider trading in market (Shin parameter)
+  
+  De-vigged prob_i = (1 − z) / (odds_i − z × odds_i + z)
+
+Practical approximation (sufficient for most matches):
+  z ≈ max(0, (overround_simple − 1) / 2)
+  Then: prob_i = (1 − z) / ((1 − z) × odds_i + z)
+```
+
+**Fallback**: If Shin computation not feasible, use proportional method with bias correction:
+```
+proportional_prob = (1/odds) / overround
+bias_correction = −(proportional_prob − 0.33) × 0.05  // −5% for heavy fav, +5% for underdog
+corrected = proportional_prob + bias_correction
+```
+
+### Logit-space Correction (v3.0.1 CORE CHANGE)
+
+**原 v3.0 在概率空间做 p ± X% 的加法校正，违反概率公理。修正为 logit 空间**：
+
+```
+Step 1: De-vig → base probability P
+Step 2: Convert to logit space
+  logit(P) = ln(P / (1 − P))
+  
+Step 3: Apply all corrections in logit space
+  logit' = logit + Σ(Δlogit_i)
+  其中 Δlogit_i 为各校正因子的 logit 偏移量
+
+Step 4: Convert back to probability
+  P' = 1 / (1 + e^(−logit'))
+
+Step 5: Normalize across H/D/A
+  P_final[i] = P'[i] / Σ(P')
+```
+
+| Logit Δ | 对应概率偏移 (以 50% 为中心) | 典型信号 |
+|:---:|:---|:---|
+| +0.10 | +2.5pp | 弱正向信号 |
+| +0.20 | +5.0pp | 中正向信号 |
+| +0.40 | +10.0pp | 强正向信号 |
+| +0.70 | +17.0pp | 极强正向（仅用于多重确认）|
+
+**logit 空间优势**：概率天然有界 (0,1)，等价于贝叶斯更新，极端概率附近校正幅度自动压缩。
+
+### Fundamental formulas
 ```
 Overround (vig) = 1/home_price + 1/draw_price + 1/away_price
-True de-vigged probability = (1/outcome_price) / overround
 Payout rate = 1 / overround
 
-Normalization (MANDATORY after all corrections):
-  adjusted_p[i] = base_p[i] + Σ(corrections_i)
-  normalized_p[i] = adjusted_p[i] / Σ(adjusted_p[j])
+Dampening for correlated factors:
+  if factor_A and factor_B are in same signal group:
+    combined = max(Δ_A, Δ_B) + 0.3 × min(Δ_A, Δ_B)
 ```
 
 ### Euro→Asian Conversion Table
@@ -385,81 +436,120 @@ OU pathways:
 | **Asian** | 0.25 | 澳门, 皇冠, 利记, 易胜博, 12bet, 18bet | Regional capital flow, water-level sensitive, macro-policy influenced |
 | **Retail** | 0.20 | 威廉希尔, 立博, Interwetten, 必发(exchange), 伟德, Bwin | Public sentiment, recreational volume, exchange reveals real money |
 
-### 10.1 Sharp Consensus Score (SCS)
+### 10.1 Sharp Consensus Score (SCS) — v3.0.1 revised
 
 ```
 For each outcome (H/D/A), across all 30 bookmakers:
   SCS_outcome = Σ(tier_weight_i × direction_i) / Σ(tier_weight_i)
+
+  direction_i: +1 if odds↓, −1 if odds↑, 0 if |change|<noise_threshold
   
-  direction_i:
-    odds_current < odds_open → +1 (odds tightening = confidence increasing)
-    odds_current > odds_open → −1 (odds drifting = confidence decreasing)
-    |change| < 2% → 0 (noise)
-  
-Final SCS = SCS_home × 0.6 + SCS_draw × 0.2 + SCS_away × 0.2
-  (home-weighted because most matches have a favorite)
+  noise_threshold = max(0.02 × odds_current, 1.5 × σ_historical)
+    (自适应阈值: 至少 2% 变动, 且超过该结果的历史波动率 1.5σ)
+
+  magnitude_weight = min(|change_pct| / 0.10, 1.0)
+    (幅度加权: 变动越大权重越高, 10% 变动达到满权重)
+
+  time_decay = exp(−hours_since_change / 24)
+    (时间衰减: 24 小时前半衰, 越靠近开赛权重越高)
+
+  direction_i_weighted = direction_i × magnitude_weight × time_decay
+
+Final SCS = SCS_favorite × 0.6 + SCS_draw × 0.2 + SCS_underdog × 0.2
+  (favorite = lowest current odds among H/D/A, not fixed to home)
 ```
+
+**v3.0.1 改进**：
+- 热门方动态判定（不再固定主胜），客场热门时自动调整
+- 加入变动幅度加权（0.01 vs 0.1 的信号强度不同）
+- 加入时间衰减（临场变动权重大于早期变动）
+- 自适应噪音阈值（深盘/浅盘不同标准）
 
 **Thresholds**:
 - SCS ≥ 0.70 → Strong consensus → Step 10 correction +10%
 - SCS 0.40–0.70 → Moderate → no adjustment
 - SCS < 0.40 → Weak consensus → Step 10 penalty −5%
 
-### 10.2 Dispersion Risk Index (DRI)
+### 10.2 Dispersion Risk Index (DRI) — v3.0.1 revised
 
 ```
-DRI = normalized(
-  500com_ouzhi_dispersion_home × 0.5 +
-  500com_ouzhi_dispersion_draw × 0.3 +
-  500com_ouzhi_dispersion_away × 0.2
-)
+DRI_raw = ouzhi.dispersion.home × 0.5 + ouzhi.dispersion.draw × 0.3 + ouzhi.dispersion.away × 0.2
 
-Normalization: DRI / 100 (500.com dispersion values range 0–400+)
+联赛校准: DRI_calibrated = DRI_raw / league_median_DRI × 30
+  (各联赛取 500+ 场历史比赛的中位数 DRI 作为基准，消除联赛间天然差异)
+  WC/EPL/UCL 中位数 ~12-18; 低级别联赛中位数 ~25-40
+
+阈值 (以 WC/top5 联赛为默认):
+  DRI_cal < 12 → Tight consensus → confidence × 1.05
+  DRI_cal 12–35 → Normal → no adjustment
+  DRI_cal 35–60 → High dispersion → confidence × 0.85, ⚠️ warning
+  DRI_cal > 60 → Extreme → confidence × 0.70, 🔴 systemic risk flag
+
+信息驱动 vs 混乱型离散 (v3.0.1 NEW):
+  如果 DRI 高 AND Pinnacle 领涨 (Lead-Lag STRONG):
+    → 信息驱动型离散（市场正在重新定价），DRI_signal 减半处理
+  如果 DRI 高 AND Lead-Lag = NOISE:
+    → 混乱型离散（散户无序波动），DRI_signal 全额计入
 ```
 
-**Thresholds**:
-- DRI ≤ 15 → Tight consensus → confidence × 1.05
-- DRI 15–40 → Normal → no adjustment
-- DRI 40–70 → High dispersion → confidence × 0.85, ⚠️ warning
-- DRI > 70 → Extreme dispersion → confidence × 0.70, 🔴 systemic risk flag
+**v3.0.1 改进**：
+- 联赛层级分位数校准（消除天然差异）
+- 区分信息驱动 vs 混乱型离散
+- 权重跟随热门方动态调整
 
-### 10.3 Lead-Lag Chain Detection
-
-```
-Parse change_time from yazhi page (format: "MM-DD HH:MM") for Pinnacle and top 5 others.
-
-Chain types:
-1. Pinnacle leads → bet365 follows <2h → 澳门 follows <4h
-   → STRONG SIGNAL, Step 10 correction +10%
-
-2. Pinnacle leads → NO follow within 4h by majority
-   → WEAK SIGNAL, ignore the movement
-
-3. Retail bookmaker leads → Pinnacle static >4h
-   → NOISE, ignore
-
-4. All three tiers move simultaneously (within 1h window)
-   → GENUINE EVENT, Step 10 correction +5%
-
-Default (no clear chain) → no adjustment
-```
-
-### 10.4 Water Flow Analysis (from yazhi 16 bookmakers)
+### 10.3 Lead-Lag Chain Detection — v3.0.1 revised
 
 ```
-Count direction of water changes across all 16 AH bookmakers:
-  flowing_in: home water ↓ OR away water ↑ = confidence in home
-  flowing_out: home water ↑ OR away water ↓ = confidence fading in home
+Parse change_time from yazhi page (format: "MM-DD HH:MM").
+时间戳质量校验: 如果 500.com 抓取延迟 >1h，降级为低置信。
 
-Flow Ratio = |flowing_in − flowing_out| / 16
+领先机构优先级（按赛事类型）:
+  欧美赛事 (WC/Euro/EPL/UCL): Pinnacle > bet365 > 澳门
+  亚洲赛事 (亚冠/J联赛/K联赛): 沙巴/IBC > 澳门 > Pinnacle
+  世界杯: Pinnacle = 沙巴 (权重相等，世界杯全球定价)
 
-Flow Ratio ≥ 0.70 (>11 of 16 same direction) → coordinated flow
-  flowing_in + Pinnacle leading → STRONG (+8%)
-  flowing_in + Pinnacle static → SUSPICIOUS (potential manipulation, −5%)
-  flowing_out → confidence penalty (−8%)
+链类型:
+1. 领先机构先动 → 次级机构 2h 内跟进 → 第三层 4h 内跟进
+   → STRONG SIGNAL, logit +0.40
+   幅度加权: 如果领头机构调整 ≥5%，额外 +0.10
 
-Flow Ratio 0.50–0.70 → moderate
-Flow Ratio < 0.50 → scattered, no signal
+2. 领先机构动了 → 多数机构 4h 内未跟进
+   → WEAK SIGNAL, 忽略
+
+3. 非领先机构先动 → 领先机构长时间静态
+   → NOISE, 忽略
+
+4. 三层同时动 (1h 窗口内)
+   → GENUINE EVENT, logit +0.20
+
+Default: no clear chain → 0
+```
+
+### 10.4 Water Flow Analysis — v3.0.1 revised
+
+**v3.0.1 重大修正**：水位变动必须先控制在相同盘口档位下比较，否则盘口升/降带来的水位变化会被误判为资金流向。
+
+```
+前提: 仅统计「盘口档位未变」的机构的 AH 水位变化。
+      盘口升/降的机构单独标记，不计入流向统计。
+
+机构去重: 16 家亚盘公司中存在同集团白标（皇冠/利记/易胜博共用赔率源）。
+          先对赔率向量做聚类（correlation > 0.95 视为同源），
+          每个聚类只取一个代表。独立数据源数量通常为 6-9 个。
+
+统计规则 (锁定盘口后):
+  flowing_in:  home water↓ OR away water↑ = 看好主队
+  flowing_out: home water↑ OR away water↓ = 看淡主队
+
+Flow Ratio = |flowing_in − flowing_out| / N_independent_sources
+
+Flow Ratio ≥ 0.75 (强流向):
+  + Pinnacle 领涨 → STRONG，logit +0.30
+  + Pinnacle 静态 → SUSPICIOUS，logit −0.20
+  flowing_out → logit −0.30
+
+0.50–0.75 → 中度，logit ±0.10
+< 0.50 → 分散，无信号
 ```
 
 ### 10.5 Exchange-Traditional Divergence
@@ -478,7 +568,9 @@ From touzhu data (必发 Betfair exchange):
     → LOW CONVICTION: market interest thin → confidence × 0.90
 ```
 
-### 10.6 Kelly Consensus
+### 10.6 Kelly Consensus (CORRECTED v3.0.1)
+
+**原理纠错**：凯利指数 = 机构在该结果上的赔付比例。指数越**低**，说明机构赔付控制越严格，对其打出信心越强。指数越**高**，说明机构愿意给出更高赔付吸引投注，本质是不看好。之前 v3.0 版本将此逻辑完全写反，属于方向性错误。
 
 ```
 From ouzhi data (30 bookmakers each with Kelly index):
@@ -486,15 +578,24 @@ From ouzhi data (30 bookmakers each with Kelly index):
 Avg_Kelly_favorite = mean(Kelly on predicted winning outcome)
 Avg_Kelly_others = mean(Kelly on other two outcomes)
 
-Avg_Kelly_favorite > 1.05 AND Avg_Kelly_others < 0.90:
-  → VALUE SIGNAL: bookmakers collectively see value on favorite (+5%)
+CORRECT interpretation:
+  热门方凯利 < 0.92 AND 其他两方凯利 > 热门方凯利:
+    → CONTROL SIGNAL: 机构一致压低热门方赔付，高度看好 (+5%)
+  
+  热门方凯利 > 1.00:
+    → NO CONTROL: 机构未压低热门赔付，存在诱盘风险 (−8%, 降为 amber warning)
+  
+  热门方凯利介于 0.92–1.00:
+    → NEUTRAL: 市场定价均衡，无额外信号
 
-All three Avg_Kelly < 0.90:
-  → HIGH VIG: weak signals, confidence × 0.90
+  三方凯利均 < 0.85:
+    → HIGH VIG: 整体抽水过高，信号可信度下降，confidence × 0.88
 
-Avg_Kelly_favorite < 0.85:
-  → OVERROUND TRAP: bookmaker margin too high, downgrade all signals
+  热门方凯利为三方最低（与另两方差 ≥0.05）:
+    → CONFIRMATION: 赔付集中在非热门方，机构集体看好热门 (+3%)
 ```
+
+**逻辑依据**：博彩公司通过调低某个结果的赔率（对应凯利下降）来限制赔付风险——这是他们对该结果信心的真实表达。赔率给得越高（凯利越高），越是想吸引资金流向该结果，本质是不看好。
 
 ### 10.7 Four New MBI Trap Rules
 
@@ -502,22 +603,85 @@ Avg_Kelly_favorite < 0.85:
 |:--:|------|---------|:------:|--------|
 | 16 | **Tier Divergence** | Sharp tier vs Asian tier AH gap ≥0.25 ball | 🔴 systemic | Confidence ×0.85, flag match |
 | 17 | **Exchange-Volume Spike** | 必发 volume >2× previous + odds static | ⚠️ resistance | Direction confidence −5% |
-| 18 | **Kelly Consensus Gap** | Kelly fav >1.05 + Kelly others <0.85 | ✅ value | Direction confidence +5% |
+| 18 | **Kelly Control Gap** | Kelly fav <0.92 + others > fav (CORRECTED: low Kelly = control = confidence) | ✅ value | Direction confidence +5% |
 | 19 | **Water Flow Anomaly** | Flow Ratio ≥0.70 + Pinnacle static | ⚠️ suspicious | Flag for manipulation risk |
 
 ### 10.8 Integration into Step 10 (Probability Synthesis)
 
-MBI corrections are applied as correction factor #12 in KB-6:
+**v3.0.1 重大修正**：原 v3.0 在概率空间做加法校正（p ± X%）违反概率公理（有界性破坏、非贝叶斯更新）。修正为 **logit 空间校正**：
 
 ```
-#12 MBI Composite:
-  base_mbi = SCS_adjustment + DRI_adjustment + LeadLag_adjustment
-  where:
-    SCS_adjustment = (SCS − 0.50) × 0.20  // maps to ±10%
-    DRI_adjustment = (0.30 − DRI) × 0.30  // maps to ±10%
-    LeadLag_adjustment = from 10.3
-  → Apply base_mbi as probability shift to predicted outcome
-  → If DRI > 70, confidence × 0.70 OVERRIDE (safety floor)
+Step A: 基础概率 → logit 转换
+  logit_h = ln(P_h / (1 − P_h))
+  logit_d = ln(P_d / (1 − P_d))
+  logit_a = ln(P_a / (1 − P_a))
+
+Step B: 在 logit 空间叠加所有校正
+  logit_h' = logit_h + Σ(correction_i)
+  其中 correction_i 为各校正因子的 logit 偏移量（来自 KB-6 各条）
+
+Step C: sigmoid 转回概率
+  P_h' = 1 / (1 + e^(−logit_h'))
+  P_d' = 1 / (1 + e^(−logit_d'))
+  P_a' = 1 / (1 + e^(−logit_a'))
+
+Step D: 归一化
+  total = P_h' + P_d' + P_a'
+  final = [P_h'/total, P_d'/total, P_a'/total]
+```
+
+**logit 空间的优势**：
+- 概率始终在 (0, 1) 区间，永不越界
+- 等价于贝叶斯更新中对数几率乘法，数学上正确
+- 极端概率（如 90%+）附近校正幅度自然压缩，符合直觉
+
+### MBI Composite (#12) in logit space
+
+```
+#12 MBI Composite 作为 logit 偏移量:
+  mbi_logit = SCS_signal + DRI_signal + LeadLag_signal + Kelly_signal + WaterFlow_signal
+
+  SCS_signal:
+    SCS ≥ 0.70 → +0.40  (strong consensus)
+    SCS 0.40–0.70 → 0
+    SCS < 0.40 → −0.20  (weak consensus)
+
+  DRI_signal:
+    DRI < 15 → +0.20   (tight)
+    DRI 15–40 → 0
+    DRI 40–70 → −0.35  (high dispersion)
+    DRI > 70 → −0.70   (extreme, plus confidence × 0.70 override)
+
+  LeadLag_signal:
+    STRONG chain → +0.40
+    GENUINE EVENT → +0.20
+    NOISE/WEAK → 0
+
+  Kelly_signal (CORRECTED):
+    fav Kelly < 0.92 + lowest → +0.20  (institution control)
+    fav Kelly > 1.00 → −0.35  (no control, potential trap)
+    neutral → 0
+
+  WaterFlow_signal:
+    Flow ≥ 0.70 + Pinnacle leads → +0.30
+    Flow ≥ 0.70 + Pinnacle static → −0.20 (suspicious)
+    Flow < 0.50 → 0
+
+  Apply: logit_h' = logit_h + mbi_logit
+```
+
+### Factor Correlation Dampening (v3.0.1 NEW)
+
+SCS、DRI、Water Flow 本质上都衡量「市场共识强度」，高度相关。直接叠加会导致重复计数。
+
+```
+Dampening rule:
+  如果 SCS_signal 和 WaterFlow_signal 同向（都正或都负）:
+    叠加值 = max(SCS_signal, WaterFlow_signal) + 0.3 × min(SCS_signal, WaterFlow_signal)
+  （较大信号全额计入，较小信号打 3 折，避免 1+1=2 的线性放大）
+
+  如果 DRI_signal < −0.35（高离散）且 SCS_signal > 0:
+    DRI_signal 减半（信息驱动的离散不等同于混乱型离散）
 ```
 
 ### 10.9 Quick MBI Assessment (for report)
