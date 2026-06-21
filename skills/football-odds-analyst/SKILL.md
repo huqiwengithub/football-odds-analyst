@@ -172,7 +172,33 @@ Applied via:
 
 ---
 
-## MIXED PARLAY (same as v2.9)
+## MIXED PARLAY (v3.0.3 — + Odds Structure Defense)
+
+### Play Types (same)
+```
+SPF(8关)⭐main | RSPF(8关)⭐when SPF too low | JQS(6关)⭐exact only | BQC(4关) | BF(4关)❌
+```
+
+### Selection (updated v3.0.3)
+
+```
+Basic filters:
+  6D≥3 only. Draw>27%→skip. Probs within 15pp→skip. <2 matches→skip.
+
+Odds Structure Defense (NEW v3.0.3):
+  Parlay geo-mean ≥ 1.50 (2串1 total ≥ 2.50, 3串1 ≥ 3.38)
+  FORBIDDEN: 3+ legs all odds <1.35 (竞彩 0.89 return rate → EV deeply negative)
+  Ultra-low odds (<1.35): single bet only OR M串N fault-tolerant base
+  Rationale: 1.20×1.25×1.30 = 1.95 total. After 0.89 return rate → effective 1.74.
+            One miss = total loss with near-zero recovery potential.
+
+分配 (Fractional Kelly):
+  stake = 0.25 × (p×odds−1)/(odds−1) × bankroll | cap 5% per match | cap 5% daily
+  过关注额 = 0.6× | 对冲 = 0.3×
+
+校验:
+  distinct anchors ≥2 | P(total loss) ≤30% | all EV ×0.89 (竞彩 return rate)
+```
 
 ---
 

@@ -535,6 +535,29 @@ DRI_raw = ouzhi.dispersion.home × 0.5 + ouzhi.dispersion.draw × 0.3 + ouzhi.di
 - 区分信息驱动 vs 混乱型离散
 - 权重跟随热门方动态调整
 
+#### 10.2.1 DRI Tier-Variance Analysis (NEW v3.0.3)
+
+```
+信息型离散（派系分歧）检测:
+  条件: Sharp层内部离散 < 10 AND Retail层内部离散 < 10
+        BUT |Sharp均值 − Retail均值| > 0.15
+
+  含义: Sharp层(平博/bet365/IBC)意见统一，Retail层(威廉/立博)意见统一，
+        但两层方向相反。Sharp层拿到了核心内幕，Retail层还在按旧信息定价。
+
+  处理: DRI 惩罚减半 (×0.5)
+        额外 Sharp跟随校正: logit +0.20（跟随Sharp方向）
+        标记为「信息型分歧 — 跟随Sharp」
+
+混乱型离散检测:
+  条件: 不满足信息型条件，且 DRI > 40
+
+  含义: 30家机构杂乱无章，上下交错，无层级规律。
+        机构自身也没把握，纯噪音。
+
+  处理: DRI 惩罚全额生效
+```
+
 ### 10.3 Lead-Lag Chain Detection — v3.0.1 revised
 
 ```
@@ -588,6 +611,22 @@ Flow Ratio ≥ 0.75 (强流向):
 
 0.50–0.75 → 中度，logit ±0.10
 < 0.50 → 分散，无信号
+
+#### 10.4.1 Sharp Counter-Betting Asian Heat (NEW v3.0.3)
+
+```
+Asian Heat vs Sharp Counter-Bet Detection:
+
+触发条件: Flow Ratio ≥ 0.70 (Asian层: 澳门/皇冠/利记/12bet)
+          AND (Pinnacle 反向变动 ≥0.03 OR Pinnacle 极度静态 >4h)
+
+含义: 亚洲层散户热钱同向涌入（水位狂降），
+      但 Sharp 层 Pinnacle 不仅不跟进，反而在对面吃货/阻盘。
+      经典「散户热 vs 机构冷」——Sharp 层在对赌亚洲热钱。
+
+处理: 热门方 logit −0.35（强反向）
+      标记为 🔴 反向信号，考虑博弈下盘
+      对应 Trap #19 修正
 ```
 
 ### 10.5 Exchange-Traditional Divergence — v3.0.1 upgraded
@@ -750,7 +789,7 @@ Apply: logit' = logit + kelly_effective
 | 16 | **Tier Divergence** | Sharp tier vs Asian tier AH gap ≥0.25 ball | 🔴 systemic | Confidence ×0.85, flag match |
 | 17 | **Exchange-Volume Spike** | 必发 volume >2× previous + odds static | ⚠️ resistance | Direction confidence −5% |
 | 18 | **Kelly Context Gap** | 焦点赛受注阶段：热门方凯利不降反升 + 3+ Sharp层同步走高 + 必发成交量>70% | ✅ context signal | Direction +5%, logit +0.20 (需交叉验证: Lead-Lag/WaterFlow同向才生效) |
-| 19 | **Water Flow Anomaly** | Flow Ratio ≥0.70 + Pinnacle static | ⚠️ suspicious | Flag for manipulation risk |
+| 19 | **Sharp Counter-Betting** | Flow Ratio ≥0.70 (Asian层) + Pinnacle 反向或极度静态>4h | 🔴 counter-bet | 热门方 logit −0.35, 考虑博弈下盘 |
 
 ### 10.8 Integration into Step 10 (Probability Synthesis)
 

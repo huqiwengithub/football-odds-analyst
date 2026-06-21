@@ -104,7 +104,26 @@ DRI = normalized(
 - DRI 40–70 → 高分歧 → 置信 × 0.85，⚠️ 警告
 - DRI > 70 → 极端分歧 → 置信 × 0.70，🔴 系统风险
 
-**实例**：新西兰 vs 埃及 DRI = 49.53 → 置信 68% × 0.85 = 58%
+**v3.0.3 升级 — 信息型 vs 混乱型离散区分**：
+
+高离散度有两种本质不同的成因，必须区分处理：
+
+```
+混乱型离散:
+  30家机构赔率杂乱无章，上下交错，无层级规律
+  → 机构自身也没把握，纯噪音
+  → DRI 惩罚全额生效
+
+信息型离散（派系分歧）:
+  Sharp层内部离散 < 10 AND Retail层内部离散 < 10
+  BUT |Sharp均值 − Retail均值| > 0.15
+  → Sharp层意见统一，Retail层意见统一，但两层方向相反
+  → Sharp层拿到了核心内幕（如主力突然伤停、战术泄密）
+  → 这不是系统风险，而是高价值的方向信号！
+  → DRI 惩罚减半；额外触发 Sharp跟随校正: logit +0.20（跟随Sharp方向）
+```
+
+**实例**：新西兰 vs 埃及 DRI = 49.53 → 置信 68% × 0.85 = 58%（混乱型则全额；若为信息型→ 仅 × 0.925 + Sharp跟随）
 
 ### 2.4 模块三：Lead-Lag Chain Detection（抢先-跟随链）
 
@@ -134,20 +153,31 @@ DRI = normalized(
 **目的**：检测 16 家 AH 博彩公司的水位是否存在同向流动，判断是否有协调性资金入场。
 
 ```
-统计 16 家 yazhi 博彩公司的水位变动方向:
-  flowing_in:  home water↓（主水降）OR away water↑（客水升）= 看好主队
-  flowing_out: home water↑（主水升）OR away water↓（客水降）= 看淡主队
+前提: 先锁定同一盘口档位再统计（排除因盘口升降导致的水位自然变动）
+机构去重: 聚类合并同集团白标（皇冠/利记/易胜博 = 同一赔率源）
 
-Flow Ratio = |flowing_in − flowing_out| / 16
+统计独立数据源的水位变动方向:
+  flowing_in:  home water↓ OR away water↑ = 看好主队
+  flowing_out: home water↑ OR away water↓ = 看淡主队
 
-Flow Ratio ≥ 0.70（>11/16 同向）:
-  + Pinnacle 领涨 → STRONG，概率 +8%
-  + Pinnacle 静态 → SUSPICIOUS（可能操控盘），概率 −5%
-  flowing_out → 概率 −8%
+Flow Ratio = |flowing_in − flowing_out| / N_independent_sources
 
-0.50–0.70 → 中度，不调整
+Flow Ratio ≥ 0.75:
+  + Pinnacle 领涨 → STRONG，logit +0.30
+  + Pinnacle 静态 → SUSPICIOUS，logit −0.20
+  flowing_out → logit −0.30
+
+v3.0.3 新增 — Sharp对赌亚洲热钱陷阱:
+  Flow Ratio ≥ 0.70 (Asian层) AND Pinnacle 反向变动或极度静态 >4h
+  → 亚洲散户热钱涌入，Sharp机构在对面吃货（阻盘/诱盘）
+  → 🔴 触发反向信号: 热门方 logit −0.35，考虑反向博弈下盘
+  → 对应 Trap #19 修正
+
+0.50–0.75 → 中度，logit ±0.10
 < 0.50 → 分散，无信号
 ```
+
+**逻辑依据**：亚洲博彩市场（澳门/皇冠）承接大量散户资金，水位变动反映散户情绪。Pinnacle 如果在此过程中不跟进甚至反向操作，说明 Sharp 层在对面承接散户筹码，是经典的「散户热 vs 机构冷」信号。
 
 ### 2.6 模块五：Exchange-Traditional Divergence（必发偏离）
 
@@ -172,46 +202,81 @@ volume_ratio < 0.50:
 
 ### 2.7 模块六：Kelly Consensus（凯利共识）
 
-**目的**：凯利指数衡量博彩公司在该赔率上的赔付压力。多家凯利同时偏高 = 机构集体承担风险。
+**目的**：凯利指数衡量机构赔付比例。但不存在绝对的判读方向——同一数值在不同场景含义完全相反。v3.0.2 采用**两框架分场景**判读。
+
+#### 两套判读框架
+
+| 框架 | 核心前提 | 适用场景 | 信号解读 |
+|:---|:---|:---|:---|
+| **做市逻辑** | 庄家平衡投注、靠抽水盈利 | 90%普通联赛、资金平稳赛事 | 凯利越低 → 赔付压力越小 → 市场共识强 → 看好打出 |
+| **博弈逻辑** | 庄家放弃平衡、利用认知差做盘 | 焦点赛淘汰赛、豪门德比、大资金涌入 | 热门涌入但凯利不降反升 → 庄家不惧赔付，真实看好 |
+
+#### 场景判定三步
 
 ```
-从 ouzhi 页提取 30 家的凯利指数:
+1. 赛事分级: 焦点赛(世界杯淘汰赛/欧冠淘汰赛/争冠保级战/德比/必发>£2M) → 博弈逻辑
+              其余 → 做市逻辑
 
-Avg_Kelly_favorite = 预测胜出方的凯利均值
-Avg_Kelly_others = 另外两方的凯利均值
+2. 时间阶段: 初盘(>24h) → 做市逻辑
+              受注高峰(<24h) → 焦点赛切换博弈逻辑
 
-Avg_Kelly_favorite > 1.05 AND Avg_Kelly_others < 0.90:
-  → VALUE SIGNAL: 机构集体看到热门方价值，概率 +5%
-
-全部三方 Avg_Kelly < 0.90:
-  → HIGH VIG: 利润率过高，信号减弱，置信 × 0.90
-
-Avg_Kelly_favorite < 0.85:
-  → OVERROUND TRAP: 庄家抽水太重，所有信号降级
+3. 成交量校验: 必发>£1M → 博弈逻辑全权重
+               £200K–£1M → 博弈逻辑信号减半
+               <£200K → 博弈逻辑不启用，回落做市逻辑
 ```
 
-### 2.8 四條新增 MBI 陷阱规则（#16–#19）
-
-| # | 规则 | 触发条件 | 严重度 |
-|:--:|------|---------|:---:|
-| 16 | **层级分歧** | Sharp 层与 Asian 层 AH 盘口差距 ≥0.25 球 | 🔴 系统风险 |
-| 17 | **必发成交量异动** | 必发成交量 > 前值 2× + 赔率静止 | ⚠️ 阻力位 |
-| 18 | **凯利共识缺口** | fav Kelly >1.05 + others <0.85 | ✅ 价值信号 |
-| 19 | **水位异常流动** | Flow Ratio ≥0.70 + Pinnacle 未动 | ⚠️ 操控嫌疑 |
-
-配合原 v2.9 的 15 条欧亚陷阱 + 28 条通用规则，共计 **19 条陷阱 + 28 条通用 = 47 条规则**。
-
-### 2.9 MBI 合成（Step 10 第 12 项校正）
+#### 阈值规则（v3.0.2：返还率相对阈值，非固定绝对值）
 
 ```
-#12 MBI Composite = SCS_adjustment + DRI_adjustment + LeadLag_adjustment
+Pinnacle 返还率 ~98% → "高" = Kelly > 0.98
+竞彩返还率 ~89%     → "高" = Kelly > 0.89
+threshold = bookmaker_return_rate × 1.02
 
-  SCS_adjustment = (SCS − 0.50) × 0.20    → 映射到 ±10%
-  DRI_adjustment = (0.30 − DRI) × 0.30     → 映射到 ±10%
-  LeadLag_adjustment = 根据链类型 ±5-10%
+普通赛事(做市逻辑):
+  热门凯利 < (返还率−0.05) AND 三方最低 → 机构控赔看好，logit +0.15
+  热门凯利 > (返还率+0.05) → 未控赔，logit −0.20
+  三方凯利均 < (返还率−0.10) → 抽水过重，置信 × 0.88
 
-最终: base_mbi 作为概率偏移量加到预测结果上
-      如果 DRI > 70 → 强制覆盖: 置信 × 0.70
+焦点赛受注高峰(博弈逻辑):
+  热门涌入(>70%vol) + 凯利较初盘↑ → 庄家不惧赔付，logit +0.20
+  热门涌入(>70%vol) + 凯利较初盘持续↓ → 诱多陷阱，logit −0.25
+  凯利↑ + 3+ Sharp层同步走高 → 尖峰确认，额外 +0.10
+```
+
+#### 强制交叉验证（凯利不能单独用）
+
+```
+✅ 凯利正向 + LeadLag确认 + WaterFlow同向 → 信号生效，拉满
+⚠️ DRI > 40 → 凯利降级，幅度减半
+❌ 与 SCS/WaterFlow/VWAP 背离 → 凯利信号无效，以真金白银数据为准
+```
+
+### 2.8 四條新增 MBI 陷阱规则（#16–#19, v3.0.2）
+
+| # | 规则 | 触发条件 | 严重度 | v3.0.2 处理 |
+|:--:|------|---------|:---:|:---|
+| 16 | **层级分歧** | Sharp 层与 Asian 层 AH 盘口差距 ≥0.25 球 | 🔴 | 置信 ×0.85，标记比赛 |
+| 17 | **必发成交量异动** | 必发 volume >2× previous + odds static | ⚠️ | 方向置信 −5% |
+| 18 | **Kelly 场景缺口** | 焦点赛受注阶段：热门凯利不降反升 + 3+Sharp层同步走高 + 必发>70%vol | ✅ | logit +0.20，**需交叉验证确认** |
+| 19 | **Sharp 对赌亚洲热钱** (v3.0.3) | Flow Ratio≥0.70(Asian层) + Pinnacle 反向变动或极度静态>4h | 🔴 | 热门方 −8%，考虑反向博弈下盘 |
+
+### 2.9 MBI 合成（Step 10 第 12 项校正, v3.0.2 logit 空间）
+
+```
+MBI 各模块输出 logit 偏移量（非概率百分比），在 logit 空间叠加：
+
+  mbi_logit = SCS_signal + DRI_signal + LeadLag_signal + Kelly_effective + WaterFlow_signal
+
+  Kelly_effective 需经过交叉验证后才算入:
+    if kelly_signal × (LeadLag or WaterFlow) ≥ 0: 计入
+    else: kelly_effective = 0
+
+相关因子 dampening:
+  SCS_signal 和 WaterFlow_signal 同向 →
+    叠加值 = max(SCS, WF) + 0.3 × min(SCS, WF)
+
+应用: logit' = logit + mbi_logit → sigmoid → 概率
+DRI > 70 → 强制覆盖: 置信 × 0.70
 ```
 
 ---
@@ -325,17 +390,23 @@ normalized[i] = raw[i] / Σ(raw) × 100%
   - 平局 de-vig >27% → 跳过
   - 双方概率差 <15pp → 跳过
   - <2 场可选 → 整体跳过
+  - v3.0.3 赔率结构底线（NEW）:
+    串关几何平均赔率 ≥ 1.50（2串1总赔率 ≥ 2.50，3串1 ≥ 3.38）
+    禁止 3 场以上赔率 <1.35 的「稳胆」串关（竞彩 0.89 返还率下 EV 深度负数）
+    超低赔（<1.35）仅作为单场或 M串N 容错底座
 
 分配:
-  Alloc_i = P_hit,i / ΣP_hit × Budget → 取整到 ¥2 的倍数
-  保守方案: Alloc × Odds ≥ Budget（覆盖本金）
-  P_hit 来源: Pinnacle de-vig × Poisson，不用竞彩隐含概率
+  Fractional Kelly 0.25×:
+    stake = 0.25 × (p×odds−1)/(odds−1) × bankroll
+    单场 cap: 5% bankroll | 单日 cap: 5% bankroll
+  过关注额 = 单注 Kelly 的 0.6× (multi-leg variance penalty)
 
 校验:
   独立锚点数 ≥ 2
   P(全灭) ≤ 30%（否则加对冲）
   保守 P_hit < 0.10 → 跳过
   激进 P_hit < 0.02 → 合并
+  所有 EV 计入竞彩 0.89 返还率折扣
 ```
 
 ### 6.3 风险日跳过规则
