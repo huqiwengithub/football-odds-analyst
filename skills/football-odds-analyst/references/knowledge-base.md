@@ -642,34 +642,106 @@ Exchange Composite Signal:
 - 赛事体量折扣——小众赛事必发成交量极低，参考价值接近零
 - 复合信号：多个维度合成而非单独使用
 
-### 10.6 Kelly Consensus (CORRECTED v3.0.1)
+### 10.6 Kelly Consensus (v3.0.2 — Two-Framework Approach)
 
-**原理纠错**：凯利指数 = 机构在该结果上的赔付比例。指数越**低**，说明机构赔付控制越严格，对其打出信心越强。指数越**高**，说明机构愿意给出更高赔付吸引投注，本质是不看好。之前 v3.0 版本将此逻辑完全写反，属于方向性错误。
+**核心修正**：凯利指数不存在绝对的方向判读——同样的数值在不同场景下含义完全相反。必须分场景、分阶段、交叉验证。
+
+#### 10.6.1 基础定义
 
 ```
-From ouzhi data (30 bookmakers each with Kelly index):
+Kelly = 赔率 × 市场去抽水真实概率
+含义: 该结果打出时机构对该赛果的赔付比例
 
-Avg_Kelly_favorite = mean(Kelly on predicted winning outcome)
-Avg_Kelly_others = mean(Kelly on other two outcomes)
-
-CORRECT interpretation:
-  热门方凯利 < 0.92 AND 其他两方凯利 > 热门方凯利:
-    → CONTROL SIGNAL: 机构一致压低热门方赔付，高度看好 (+5%)
-  
-  热门方凯利 > 1.00:
-    → NO CONTROL: 机构未压低热门赔付，存在诱盘风险 (−8%, 降为 amber warning)
-  
-  热门方凯利介于 0.92–1.00:
-    → NEUTRAL: 市场定价均衡，无额外信号
-
-  三方凯利均 < 0.85:
-    → HIGH VIG: 整体抽水过高，信号可信度下降，confidence × 0.88
-
-  热门方凯利为三方最低（与另两方差 ≥0.05）:
-    → CONFIRMATION: 赔付集中在非热门方，机构集体看好热门 (+3%)
+关键认知: Kelly 的绝对值无意义 → 必须相对该机构的返还率来判读
+  Pinnacle 返还率 ~98%  → "高" = Kelly > 0.98
+  竞彩返还率 ~89%      → "高" = Kelly > 0.89
+  threshold = bookmaker_return_rate × 1.02
 ```
 
-**逻辑依据**：博彩公司通过调低某个结果的赔率（对应凯利下降）来限制赔付风险——这是他们对该结果信心的真实表达。赔率给得越高（凯利越高），越是想吸引资金流向该结果，本质是不看好。
+#### 10.6.2 两套判读框架（不是"选哪个"，是"分场景用哪个"）
+
+| 框架 | 核心前提 | 适用场景 | 信号解读 |
+|:---|:---|:---|:---|
+| **理论做市逻辑** | 庄家平衡投注、靠抽水盈利、不主动坐庄 | 90%普通联赛、非焦点战、资金平稳赛事 | 凯利越低 → 机构赔付压力越小 → 市场共识越强 → 赛果打出概率越高 |
+| **博弈坐庄逻辑** | 庄家放弃平衡投注，利用散户认知差做盘诱注 | 顶级杯赛淘汰赛、豪门德比等资金暴增焦点战 | 热门方资金大量涌入但凯利不降反升 → 庄家不惧赔付，真实看好；凯利持续走低 → 诱多陷阱 |
+
+#### 10.6.3 场景判定规则
+
+```
+Phase 1: 赛事分级
+  焦点赛事 (启用博弈逻辑):
+    - 世界杯淘汰赛阶段 (R16+)
+    - 欧冠淘汰赛
+    - 五大联赛争冠/保级关键战
+    - 豪门德比 (任何赛事)
+    - 必发成交量 > £2M 的任何赛事
+  
+  普通赛事 (启用理论逻辑):
+    - 所有非焦点赛事
+    - 联赛中游无欲无求的场次
+    - 友谊赛（无论成交量多少，凯利信号不适用）
+
+Phase 2: 时间阶段
+  初盘阶段 (开赛 >24h): 仅用理论逻辑（初盘定价反映基本面判断）
+  受注高峰 (开赛 <24h): 焦点赛事切换到博弈逻辑，普通赛事保持理论逻辑
+
+Phase 3: 成交量校验
+  必发成交量 > £1M: 博弈逻辑可用
+  必发成交量 £200K–£1M: 博弈逻辑 → 信号减半
+  必发成交量 < £200K: 博弈逻辑不启用，退回到理论逻辑
+```
+
+#### 10.6.4 核心判定规则
+
+**普通赛事（理论逻辑）**:
+
+| 条件 | 信号 | Logit Δ |
+|:---|:---|:---:|
+| 热门方凯利 < (返还率 − 0.05) AND 为三方最低 | 机构控赔，看好热门 | +0.15 |
+| 热门方凯利 > (返还率 + 0.05) | 机构未控赔，热门存疑 | −0.20 |
+| 热门方凯利介于区间内 | 中性 | 0 |
+| 三方凯利均 < (返还率 − 0.10) | 抽水过重，信号降级 | 置信 ×0.88 |
+
+**焦点赛事受注高峰（博弈逻辑）**:
+
+| 条件 | 信号 | Logit Δ |
+|:---|:---|:---:|
+| 热门方资金涌入 (>70% vol) + 凯利较初盘上升 | 庄家不惧赔付，真实看好 | +0.20 |
+| 热门方资金涌入 (>70% vol) + 凯利较初盘持续下降 | 诱多陷阱，热门存疑 | −0.25 |
+| 热门方凯利较初盘上升 + 3+ Sharp层机构同步走高 | 尖峰机构共识确认 | +0.10 (叠加) |
+| 成交量不足（<£200K）| 博弈逻辑不适用 | 退回到理论逻辑 |
+
+#### 10.6.5 交叉验证规则（MANDATORY）
+
+```
+凯利信号不可单独生效，必须与 MBI 其他模块共振:
+
+✅ 凯利正向 + Lead-Lag 确认 (STRONG or GENUINE) + 水位同向流入
+   → 信号生效，校正幅度拉满
+
+⚠️ 凯利正向 但 DRI > 40（高分歧）
+   → 凯利信号降级，校正幅度减半
+
+❌ 凯利信号与 SCS 共识、Water Flow 方向背离
+   → 凯利信号无效，以水位+必发数据为准
+
+❌ 凯利信号与必发 VWAP 方向背离
+   → 凯利信号无效，VWAP 为真金白银投票，优先级更高
+```
+
+#### 10.6.6 在 Step 10 中的应用
+
+```
+kelly_logit = applicable_framework(category, phase, volume) → signal
+
+Cross-validation check:
+  if kelly_signal × (LeadLag or WaterFlow) ≥ 0:
+    kelly_effective = kelly_logit
+  else:
+    kelly_effective = 0  (signal invalidated by conflict)
+
+Apply: logit' = logit + kelly_effective
+```
 
 ### 10.7 Four New MBI Trap Rules
 
@@ -677,7 +749,7 @@ CORRECT interpretation:
 |:--:|------|---------|:------:|--------|
 | 16 | **Tier Divergence** | Sharp tier vs Asian tier AH gap ≥0.25 ball | 🔴 systemic | Confidence ×0.85, flag match |
 | 17 | **Exchange-Volume Spike** | 必发 volume >2× previous + odds static | ⚠️ resistance | Direction confidence −5% |
-| 18 | **Kelly Control Gap** | Kelly fav <0.92 + others > fav (CORRECTED: low Kelly = control = confidence) | ✅ value | Direction confidence +5% |
+| 18 | **Kelly Context Gap** | 焦点赛受注阶段：热门方凯利不降反升 + 3+ Sharp层同步走高 + 必发成交量>70% | ✅ context signal | Direction +5%, logit +0.20 (需交叉验证: Lead-Lag/WaterFlow同向才生效) |
 | 19 | **Water Flow Anomaly** | Flow Ratio ≥0.70 + Pinnacle static | ⚠️ suspicious | Flag for manipulation risk |
 
 ### 10.8 Integration into Step 10 (Probability Synthesis)
@@ -773,3 +845,35 @@ Each match report MUST include an MBI panel:
 │ MBI Verdict:  CONFIRM (all signals aligned)   │
 └───────────────────────────────────────────────┘
 ```
+
+### 10.11 Data Quality Validation (NEW v3.0.2)
+
+```
+Before applying ANY MBI module, validate input data quality:
+
+1. Bookmaker Count Check:
+   ouzhi requires ≥20 of 30 bookmakers with valid data
+   yazhi requires ≥12 of 16 bookmakers with valid data
+   < threshold → module marked DEGRADED, confidence ×0.85
+
+2. Timestamp Freshness:
+   yazhi change_time within 6h of current time → FULL weight
+   within 6–12h → 0.7× weight
+   >12h or missing → DEGRADED, 0.4× weight
+
+3. Data Completeness per Match:
+   All 6 pages present → FULL analysis
+   5/6 → min 4 core modules (ouzhi+yazhi+touzhu+shuju), others skipped
+   <4/6 → match flagged LOW QUALITY, confidence ×0.80
+
+4. Betfair Volume Sanity:
+   total_volume > £50K → exchange modules enabled
+   total_volume < £50K → exchange modules DISABLED for this match
+   volume spike >5× league average → suspicious, flag but don't skip
+
+5. Bookmaker Consistency:
+   If >5 bookmakers show identical odds (potential data mirroring):
+     deduplicate before SCS calculation
+     lower effective N in consensus scoring
+```
+

@@ -123,60 +123,49 @@ All three tiers move simultaneously → GENUINE EVENT (+5%)
 
 ---
 
-## PORTFOLIO CONSTRUCTION (v3.0.1 — Fractional Kelly + Risk Controls)
+## PORTFOLIO CONSTRUCTION (v3.0.2 — Tighter Controls + Correlation)
 
-### Rule 0: Bankroll Management (NEW v3.0.1)
+### Rule 0: Bankroll Management (v3.0.2)
 
 ```
 Fractional Kelly (0.25×):
   f* = (p × odds − 1) / (odds − 1)    // Full Kelly
   stake = 0.25 × f* × bankroll         // Conservative fractional
 
-Max Drawdown Limits:
-  Single day: max 15% bankroll loss → stop
-  Single week: max 30% bankroll loss → stop
-  Single match exposure: max 8% bankroll
+Max Drawdown Limits (TIGHTENED v3.0.2):
+  Single day: max 5% bankroll loss → stop
+  Single week: max 15% bankroll loss → stop for rest of week
+  Single match: max 5% bankroll exposure
 
-Slippage Discount:
-  actual_odds = quoted_odds × (1 − slippage)
-  slippage_default = 0.03 (竞彩无滑点，此参数为外围参考)
-  EV must be computed with actual_odds, not quoted_odds
+Slippage & Return Rate Discount:
+  actual_odds = quoted_odds × (1 − slippage) × return_rate
+  slippage_default = 0.00 (竞彩无滑点); 0.03 (外围)
+  return_rate_default = 0.89 (竞彩); 0.97 (外围)
+  EV must be computed with actual_odds, NOT quoted_odds
 ```
 
-### Rule 1-7 (same as v2.9) + v3.0.1 additions
-
-| Rule | v3.0.1 改动 |
-|:---:|------|
-| **1** | Single-Point Failure Audit — unchanged |
-| **2** | P(全灭) — now includes **match correlation adjustment**: same-league same-day matches ×1.15 correlation factor |
-| **3** | Pairwise Coverage — unchanged |
-| **4** | **Pyramid → Fractional Kelly**: 不用「最高概率方案覆盖本金」，改用 Kelly 比例分配每注金额 |
-| **5** | JQS Precision — unchanged |
-| **6** | Output Language — unchanged |
-| **7** | Profit Range Output — now includes **slippage-adjusted EV** and **max drawdown scenario** |
-
-### Match Correlation Adjustment (NEW v3.0.1)
+### Rule 2: Match Correlation (UPDATED v3.0.2)
 
 ```
-Same league + same day: correlation_factor = 1.15
-  P(both_fail) = P(A_fail) × P(B_fail) × correlation_factor
+Correlation coefficients (not multipliers):
+  Same league + same day: corr = 0.25
+  Derby / 派系战: corr = 0.55
+  Same group (World Cup group stage): corr = 0.30
+  Different continent/league: corr = 0.00 (independent)
 
-Same group (World Cup group stage): correlation_factor = 1.25
-  (group dynamics create dependency between matches)
-
-Different continent/league: correlation_factor = 1.00 (independent)
-
-Applied to Rule 2 P(全灭) enumeration — inflates joint failure probability
+Applied via:
+  P_both_fail = P(A_fail) × P(B_fail) + corr × min(P(A_fail), P(B_fail))
+  This inflates joint failure prob without going above individual probs.
 ```
 
-### Risk Day Skip (unchanged from v2.9)
-
-### Selection + Allocation (v3.0.1 revision)
+### Selection + Allocation (v3.0.2)
 
 ```
-单注 Kelly = 0.25 × f* × bankroll, capped at 8% max exposure
+单注 Kelly = 0.25 × f* × bankroll, capped at 5% max per match
 过关注额 = 单注 Kelly 的 0.6× (multi-leg variance penalty)
 对冲注额 = 单注 Kelly 的 0.3× (hedge purpose only)
+
+总日预算 ≤ 5% bankroll (硬上限)
 
 总日预算 ≤ 15% bankroll (硬上限)
 ```
