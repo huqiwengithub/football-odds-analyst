@@ -37,7 +37,7 @@ Austria=奥地利, Ukraine=乌克兰, Turkey=土耳其, Greece=希腊, Scotland=
 
 ### De-vig Methods
 
-**v3.0.1**: 升级为 Shin 去抽水算法。简单比例法会系统性高估热门方概率（热门-长偏差随赔率差距扩大）。
+**v3.0.1**: Upgraded to Shin de-vigging algorithm. Simple proportional method systematically overestimates favorite probabilities (favorite-longshot bias widens as odds gap grows).
 
 ```
 Shin's method:
@@ -60,7 +60,7 @@ corrected = proportional_prob + bias_correction
 
 ### Logit-space Correction (v3.0.1 CORE CHANGE)
 
-**原 v3.0 在概率空间做 p ± X% 的加法校正，违反概率公理。修正为 logit 空间**：
+**Original v3.0 applied p ± X% additive correction in probability space, violating probability axioms. Corrected to logit space**:
 
 ```
 Step 1: De-vig → base probability P
@@ -69,7 +69,7 @@ Step 2: Convert to logit space
   
 Step 3: Apply all corrections in logit space
   logit' = logit + Σ(Δlogit_i)
-  其中 Δlogit_i 为各校正因子的 logit 偏移量
+  where Δlogit_i is the logit offset for each correction factor
 
 Step 4: Convert back to probability
   P' = 1 / (1 + e^(−logit'))
@@ -78,14 +78,14 @@ Step 5: Normalize across H/D/A
   P_final[i] = P'[i] / Σ(P')
 ```
 
-| Logit Δ | 对应概率偏移 (以 50% 为中心) | 典型信号 |
+| Logit Δ | Corresponding Probability Shift (centered at 50%) | Typical Signal |
 |:---:|:---|:---|
-| +0.10 | +2.5pp | 弱正向信号 |
-| +0.20 | +5.0pp | 中正向信号 |
-| +0.40 | +10.0pp | 强正向信号 |
-| +0.70 | +17.0pp | 极强正向（仅用于多重确认）|
+| +0.10 | +2.5pp | Weak positive signal |
+| +0.20 | +5.0pp | Medium positive signal |
+| +0.40 | +10.0pp | Strong positive signal |
+| +0.70 | +17.0pp | Extremely strong positive (multi-confirmation only) |
 
-**logit 空间优势**：概率天然有界 (0,1)，等价于贝叶斯更新，极端概率附近校正幅度自动压缩。
+**logit space advantages**: Probabilities are naturally bounded (0,1), equivalent to Bayesian updating, correction magnitude auto-compresses near extreme probabilities.
 
 ### Fundamental formulas
 ```
@@ -171,7 +171,7 @@ Each HIT → ±10% correction. ≥2 traps on same match → 🔴 HIGH severity.
 
 ## KB-4: Six-Dimension Scoring Model v3.0 — Continuous
 
-> **v3.0.1 重大升级**: 从二值(0/1)改为 0–1 连续分。移除重叠维度（原 D2 和 D6 都衡量机构一致性，合并）。满分反向惩罚改为权重重校准。
+> **v3.0.1 major upgrade**: Changed from binary (0/1) to 0–1 continuous scoring. Removed overlapping dimensions (old D2 and D6 both measured institutional consensus — merged). Full-score reverse penalty replaced with weight recalibration.
 
 ### Scoring Dimensions
 
@@ -210,9 +210,9 @@ Final 6D Score = Total × 6  (scale to traditional 0-6 range for legacy compatib
 
 ### Inflation Penalty (REPLACED v3.0.1)
 
-**旧规则**（6/6→5）已被移除。该现象说明的是模型校准偏差，而非「满分不可信」。解决方式：
-- 通过历史回测重校准各维度权重
-- 如果某维度与结果负相关 → 翻转或删除该维度
+**Old rule** (6/6→5) has been removed. That phenomenon indicates model calibration bias, not "perfect score is untrustworthy." Resolution:
+- Recalibrate dimension weights via historical backtest
+- If a dimension negatively correlates with outcome → flip or delete that dimension
 - Pending 500+ match backtest
 
 ### Dimension Overlap Resolution (v3.0.1)
@@ -483,13 +483,13 @@ For each outcome (H/D/A), across all 30 bookmakers:
   direction_i: +1 if odds↓, −1 if odds↑, 0 if |change|<noise_threshold
   
   noise_threshold = max(0.02 × odds_current, 1.5 × σ_historical)
-    (自适应阈值: 至少 2% 变动, 且超过该结果的历史波动率 1.5σ)
+    (adaptive threshold: at least 2% change AND exceeds 1.5σ of historical volatility)
 
   magnitude_weight = min(|change_pct| / 0.10, 1.0)
-    (幅度加权: 变动越大权重越高, 10% 变动达到满权重)
+    (magnitude weighting: larger moves get higher weight, 10% change = full weight)
 
   time_decay = exp(−hours_since_change / 24)
-    (时间衰减: 24 小时前半衰, 越靠近开赛权重越高)
+    (time decay: half-life of 24h, changes closer to kickoff weighted more heavily)
 
   direction_i_weighted = direction_i × magnitude_weight × time_decay
 
@@ -497,11 +497,11 @@ Final SCS = SCS_favorite × 0.6 + SCS_draw × 0.2 + SCS_underdog × 0.2
   (favorite = lowest current odds among H/D/A, not fixed to home)
 ```
 
-**v3.0.1 改进**：
-- 热门方动态判定（不再固定主胜），客场热门时自动调整
-- 加入变动幅度加权（0.01 vs 0.1 的信号强度不同）
-- 加入时间衰减（临场变动权重大于早期变动）
-- 自适应噪音阈值（深盘/浅盘不同标准）
+**v3.0.1 improvements**:
+- Dynamic favorite determination (no longer fixed to home win), auto-adjusts when away is favorite
+- Added magnitude weighting (0.01 vs 0.1 change has different signal strength)
+- Added time decay (late changes weighted higher than early changes)
+- Adaptive noise threshold (different standards for deep vs shallow handicap)
 
 **Thresholds**:
 - SCS ≥ 0.70 → Strong consensus → Step 10 correction +10%
@@ -514,8 +514,8 @@ Final SCS = SCS_favorite × 0.6 + SCS_draw × 0.2 + SCS_underdog × 0.2
 DRI_raw = ouzhi.dispersion.home × 0.5 + ouzhi.dispersion.draw × 0.3 + ouzhi.dispersion.away × 0.2
 
 联赛校准: DRI_calibrated = DRI_raw / league_median_DRI × 30
-  (各联赛取 500+ 场历史比赛的中位数 DRI 作为基准，消除联赛间天然差异)
-  WC/EPL/UCL 中位数 ~12-18; 低级别联赛中位数 ~25-40
+  (league-specific: take 500+ historical matches per league median DRI as baseline, eliminates natural inter-league differences)
+  WC/EPL/UCL median ~12-18; lower-division median ~25-40
 
 阈值 (以 WC/top5 联赛为默认):
   DRI_cal < 12 → Tight consensus → confidence × 1.05
@@ -525,59 +525,59 @@ DRI_raw = ouzhi.dispersion.home × 0.5 + ouzhi.dispersion.draw × 0.3 + ouzhi.di
 
 信息驱动 vs 混乱型离散 (v3.0.1 NEW):
   如果 DRI 高 AND Pinnacle 领涨 (Lead-Lag STRONG):
-    → 信息驱动型离散（市场正在重新定价），DRI_signal 减半处理
+    → Info-driven dispersion (market repricing), DRI_signal halved
   如果 DRI 高 AND Lead-Lag = NOISE:
-    → 混乱型离散（散户无序波动），DRI_signal 全额计入
+    → Chaos-type dispersion (retail noise), DRI_signal fully applied
 ```
 
-**v3.0.1 改进**：
-- 联赛层级分位数校准（消除天然差异）
-- 区分信息驱动 vs 混乱型离散
-- 权重跟随热门方动态调整
+**v3.0.1 improvements**:
+- League-level quantile calibration (eliminates natural differences across leagues)
+- Distinguishes information-driven vs chaotic dispersion
+- Weights dynamically follow favorite side
 
 #### 10.2.1 DRI Tier-Variance Analysis (NEW v3.0.3)
 
 ```
-信息型离散（派系分歧）检测:
-  条件: Sharp层内部离散 < 10 AND Retail层内部离散 < 10
-        BUT |Sharp均值 − Retail均值| > 0.15
+Information-type dispersion (faction divergence) detection:
+  Condition: Sharp-tier internal dispersion < 10 AND Retail-tier internal dispersion < 10
+        BUT |Sharp mean − Retail mean| > 0.15
 
-  含义: Sharp层(平博/bet365/IBC)意见统一，Retail层(威廉/立博)意见统一，
-        但两层方向相反。Sharp层拿到了核心内幕，Retail层还在按旧信息定价。
+  Meaning: Sharp tier (Pinnacle/bet365/IBC) unified, Retail tier (William Hill/Ladbrokes) unified,
+        but opposite directions. Sharp tier has inside information, Retail tier still pricing on old data.
 
-  处理: DRI 惩罚减半 (×0.5)
-        额外 Sharp跟随校正: logit +0.20（跟随Sharp方向）
-        标记为「信息型分歧 — 跟随Sharp」
+  Action: DRI penalty halved (×0.5)
+        Extra Sharp-follow correction: logit +0.20 (follow Sharp direction)
+        Marked as "Info-Type Divergence — Follow Sharp"
 
-混乱型离散检测:
-  条件: 不满足信息型条件，且 DRI > 40
+Chaos-type dispersion detection:
+  Condition: Info-type conditions not met, AND DRI > 40
 
-  含义: 30家机构杂乱无章，上下交错，无层级规律。
-        机构自身也没把握，纯噪音。
+  Meaning: 30 bookmakers in disorder, no tier pattern, random cross-cutting.
+        Bookmakers themselves uncertain, pure noise.
 
-  处理: DRI 惩罚全额生效
+  Action: DRI penalty fully applied
 ```
 
 ### 10.3 Lead-Lag Chain Detection — v3.0.1 revised
 
 ```
 Parse change_time from yazhi page (format: "MM-DD HH:MM").
-时间戳质量校验: 如果 500.com 抓取延迟 >1h，降级为低置信。
+Timestamp quality check: if 500.com scrape delay >1h, downgrade to low confidence.
 
-领先机构优先级（按赛事类型）:
-  欧美赛事 (WC/Euro/EPL/UCL): Pinnacle > bet365 > 澳门
-  亚洲赛事 (亚冠/J联赛/K联赛): 沙巴/IBC > 澳门 > Pinnacle
-  世界杯: Pinnacle = 沙巴 (权重相等，世界杯全球定价)
+Lead institution priority (by event type):
+  Western events (WC/Euro/EPL/UCL): Pinnacle > bet365 > Macau
+  Asian events (AFC CL/J-League/K-League): SBO/IBC > Macau > Pinnacle
+  World Cup: Pinnacle = SBO (equal weight, global pricing)
 
 链类型:
-1. 领先机构先动 → 次级机构 2h 内跟进 → 第三层 4h 内跟进
+1. Lead moves first → secondary follows <2h → tertiary follows <4h
    → STRONG SIGNAL, logit +0.40
-   幅度加权: 如果领头机构调整 ≥5%，额外 +0.10
+   Magnitude bonus: if lead adjusts ≥5%, extra +0.10
 
-2. 领先机构动了 → 多数机构 4h 内未跟进
+2. Lead moved → majority DID NOT follow within 4h
    → WEAK SIGNAL, 忽略
 
-3. 非领先机构先动 → 领先机构长时间静态
+3. Non-lead moved first → lead remained static
    → NOISE, 忽略
 
 4. 三层同时动 (1h 窗口内)
@@ -588,15 +588,15 @@ Default: no clear chain → 0
 
 ### 10.4 Water Flow Analysis — v3.0.1 revised
 
-**v3.0.1 重大修正**：水位变动必须先控制在相同盘口档位下比较，否则盘口升/降带来的水位变化会被误判为资金流向。
+**v3.0.1 major correction**: Water level changes must first be controlled to compare only under the same handicap level, otherwise water changes caused by handicap upgrades/downgrades will be misidentified as capital flow.
 
 ```
-前提: 仅统计「盘口档位未变」的机构的 AH 水位变化。
-      盘口升/降的机构单独标记，不计入流向统计。
+Prerequisite: only count AH water changes from bookmakers whose handicap level DID NOT change.
+      Bookmakers with level changes are flagged separately, excluded from flow stats.
 
-机构去重: 16 家亚盘公司中存在同集团白标（皇冠/利记/易胜博共用赔率源）。
-          先对赔率向量做聚类（correlation > 0.95 视为同源），
-          每个聚类只取一个代表。独立数据源数量通常为 6-9 个。
+Bookmaker dedup: 16 AH companies contain same-group white labels (Crown/Legacy/EasyBet share odds source).
+          Cluster odds vectors first (correlation > 0.95 = same source),
+          take one representative per cluster. Independent sources typically 6-9.
 
 统计规则 (锁定盘口后):
   flowing_in:  home water↓ OR away water↑ = 看好主队
@@ -617,15 +617,15 @@ Flow Ratio ≥ 0.75 (强流向):
 ```
 Asian Heat vs Sharp Counter-Bet Detection:
 
-触发条件: Flow Ratio ≥ 0.70 (Asian层: 澳门/皇冠/利记/12bet)
+Trigger: Flow Ratio ≥ 0.70 (Asian tier: Macau/Crown/Legacy/12bet)
           AND (Pinnacle 反向变动 ≥0.03 OR Pinnacle 极度静态 >4h)
 
-含义: 亚洲层散户热钱同向涌入（水位狂降），
-      但 Sharp 层 Pinnacle 不仅不跟进，反而在对面吃货/阻盘。
-      经典「散户热 vs 机构冷」——Sharp 层在对赌亚洲热钱。
+Meaning: Asian tier retail money flooding in same direction (water dropping hard),
+      but Sharp tier Pinnacle not only fails to follow, it COUNTER-MOVES or absorbs.
+      Classic "retail hot vs institution cold" — Sharp tier is counter-betting Asian heat.
 
 处理: 热门方 logit −0.35（强反向）
-      标记为 🔴 反向信号，考虑博弈下盘
+      Marked as 🔴 counter signal, consider opposing side
       对应 Trap #19 修正
 ```
 
@@ -655,8 +655,8 @@ From touzhu data (必发 Betfair exchange):
 │ Layer 3: Bookmaker P&L Exposure (庄家盈亏敞口)  NEW       │
 │   pl_exposure = bookmaker_PL / total_volume × 100%         │
 │   pl_exposure < −20% on favorite:                          │
-│     → BOOKMAKER EXPOSED: 庄家在热门方严重亏损敞口          │
-│     → 可能触发赔率上调以平衡风险 → logit −0.10 (caution)   │
+│     → BOOKMAKER EXPOSED: bookmaker heavily exposed on favorite side          │
+│     → May trigger odds increase to balance risk → logit −0.10 (caution)   │
 │   pl_exposure > +50% on underdog:                          │
 │     → BOOKMAKER HEDGED: 庄家在冷门方盈利充足               │
 │     → no signal (bookmaker already protected)             │
@@ -675,39 +675,39 @@ Exchange Composite Signal:
   where volume_confidence = min(1.0, volume_ratio / 0.80)
 ```
 
-**v3.0.1 新增**：
-- VWAP（成交量加权均价）替代单纯的成交量占比，区分「聪明钱」vs「跟风盘」
-- 庄家盈亏敞口检测——庄家亏损侧需要调整赔率，影响后续价格走向
-- 赛事体量折扣——小众赛事必发成交量极低，参考价值接近零
-- 复合信号：多个维度合成而非单独使用
+**v3.0.1 additions**:
+- VWAP (volume-weighted average price) replaces pure volume ratio to distinguish "smart money" vs "retail chasing"
+- Bookmaker P&L exposure detection — loss side requires odds adjustment, affecting future price direction
+- Event size discount — minor events have extremely low Betfair volume, reference value approaches zero
+- Composite signal: multiple dimensions synthesized rather than used individually
 
 ### 10.6 Kelly Consensus (v3.0.2 — Two-Framework Approach)
 
-**核心修正**：凯利指数不存在绝对的方向判读——同样的数值在不同场景下含义完全相反。必须分场景、分阶段、交叉验证。
+**Core correction**: Kelly index has no absolute directional interpretation — the same value means completely opposite things in different contexts. Must segment by scenario, by phase, and cross-validate.
 
-#### 10.6.1 基础定义
+#### 10.6.1 Basic Definition
 
 ```
 Kelly = 赔率 × 市场去抽水真实概率
-含义: 该结果打出时机构对该赛果的赔付比例
+Meaning: the payout ratio the bookmaker owes if this outcome hits
 
-关键认知: Kelly 的绝对值无意义 → 必须相对该机构的返还率来判读
+Key insight: absolute Kelly values are meaningless → must interpret relative to each bookmaker's return rate
   Pinnacle 返还率 ~98%  → "高" = Kelly > 0.98
   竞彩返还率 ~89%      → "高" = Kelly > 0.89
   threshold = bookmaker_return_rate × 1.02
 ```
 
-#### 10.6.2 两套判读框架（不是"选哪个"，是"分场景用哪个"）
+#### 10.6.2 Two Interpretation Frameworks (not "pick one" — "use different one per scenario")
 
-| 框架 | 核心前提 | 适用场景 | 信号解读 |
+| Framework | Core Premise | Applicable Scenario | Signal Interpretation |
 |:---|:---|:---|:---|
-| **理论做市逻辑** | 庄家平衡投注、靠抽水盈利、不主动坐庄 | 90%普通联赛、非焦点战、资金平稳赛事 | 凯利越低 → 机构赔付压力越小 → 市场共识越强 → 赛果打出概率越高 |
-| **博弈坐庄逻辑** | 庄家放弃平衡投注，利用散户认知差做盘诱注 | 顶级杯赛淘汰赛、豪门德比等资金暴增焦点战 | 热门方资金大量涌入但凯利不降反升 → 庄家不惧赔付，真实看好；凯利持续走低 → 诱多陷阱 |
+| **Theoretical Market-Making Logic** | Bookmaker balances bets, profits from vig, does not actively take positions | 90% regular leagues, non-marquee matches, stable fund flow events | Lower Kelly → less payout pressure on bookmaker → stronger market consensus → higher outcome probability |
+| **Game-Theoretic Bookmaking Logic** | Bookmaker abandons bet balancing, exploits retail cognitive gaps to set traps | Top cup knockout stages, elite club derbies and other capital-surge marquee matches | Favorite side heavy capital inflow but Kelly rises instead of falling → bookmaker unafraid of payout, truly bullish; Kelly keeps falling → bait trap |
 
-#### 10.6.3 场景判定规则
+#### 10.6.3 Scenario Determination Rules
 
 ```
-Phase 1: 赛事分级
+Phase 1: Event Classification
   焦点赛事 (启用博弈逻辑):
     - 世界杯淘汰赛阶段 (R16+)
     - 欧冠淘汰赛
@@ -720,55 +720,55 @@ Phase 1: 赛事分级
     - 联赛中游无欲无求的场次
     - 友谊赛（无论成交量多少，凯利信号不适用）
 
-Phase 2: 时间阶段
-  初盘阶段 (开赛 >24h): 仅用理论逻辑（初盘定价反映基本面判断）
-  受注高峰 (开赛 <24h): 焦点赛事切换到博弈逻辑，普通赛事保持理论逻辑
+Phase 2: Time Phase
+  Opening phase (>24h to kickoff): market-making logic only (opening odds reflect fundamental assessment)
+  Peak betting (<24h to kickoff): focus matches switch to game theory logic, ordinary matches keep market-making logic
 
-Phase 3: 成交量校验
-  必发成交量 > £1M: 博弈逻辑可用
-  必发成交量 £200K–£1M: 博弈逻辑 → 信号减半
-  必发成交量 < £200K: 博弈逻辑不启用，退回到理论逻辑
+Phase 3: Volume Validation
+  Betfair volume > £1M: game theory logic enabled
+  Betfair volume £200K–£1M: game theory → signal halved
+  Betfair volume < £200K: game theory disabled, fall back to market-making logic
 ```
 
-#### 10.6.4 核心判定规则
+#### 10.6.4 Core Determination Rules
 
-**普通赛事（理论逻辑）**:
+**Regular Events (Theoretical Logic)**:
 
-| 条件 | 信号 | Logit Δ |
+| Condition | Signal | Logit Δ |
 |:---|:---|:---:|
-| 热门方凯利 < (返还率 − 0.05) AND 为三方最低 | 机构控赔，看好热门 | +0.15 |
-| 热门方凯利 > (返还率 + 0.05) | 机构未控赔，热门存疑 | −0.20 |
-| 热门方凯利介于区间内 | 中性 | 0 |
-| 三方凯利均 < (返还率 − 0.10) | 抽水过重，信号降级 | 置信 ×0.88 |
+| Favorite Kelly < (return_rate − 0.05) AND lowest among three | Institution controlling payout, bullish on favorite | +0.15 |
+| Favorite Kelly > (return_rate + 0.05) | Institution not controlling payout, favorite questionable | −0.20 |
+| Favorite Kelly within range | Neutral | 0 |
+| All three Kelly < (return_rate − 0.10) | Excessive vig, signal downgrade | Confidence ×0.88 |
 
-**焦点赛事受注高峰（博弈逻辑）**:
+**Marquee Event Peak Betting Phase (Game-Theoretic Logic)**:
 
-| 条件 | 信号 | Logit Δ |
+| Condition | Signal | Logit Δ |
 |:---|:---|:---:|
-| 热门方资金涌入 (>70% vol) + 凯利较初盘上升 | 庄家不惧赔付，真实看好 | +0.20 |
-| 热门方资金涌入 (>70% vol) + 凯利较初盘持续下降 | 诱多陷阱，热门存疑 | −0.25 |
-| 热门方凯利较初盘上升 + 3+ Sharp层机构同步走高 | 尖峰机构共识确认 | +0.10 (叠加) |
-| 成交量不足（<£200K）| 博弈逻辑不适用 | 退回到理论逻辑 |
+| Favorite heavy inflow (>70% vol) + Kelly rising vs opening | Bookmaker unafraid of payout, truly bullish | +0.20 |
+| Favorite heavy inflow (>70% vol) + Kelly continuously falling vs opening | Bait trap, favorite questionable | −0.25 |
+| Favorite Kelly rising vs opening + 3+ Sharp tier books syncing upward | Sharp consensus confirmed | +0.10 (stacked) |
+| Insufficient volume (<£200K) | Game-theoretic logic not applicable | Fallback to theoretical logic |
 
-#### 10.6.5 交叉验证规则（MANDATORY）
+#### 10.6.5 Cross-Validation Rules (MANDATORY)
 
 ```
-凯利信号不可单独生效，必须与 MBI 其他模块共振:
+Kelly signals CANNOT act alone, must resonate with other MBI modules:
 
-✅ 凯利正向 + Lead-Lag 确认 (STRONG or GENUINE) + 水位同向流入
+✅ Kelly positive + Lead-Lag confirmed (STRONG or GENUINE) + Water Flow same direction
    → 信号生效，校正幅度拉满
 
 ⚠️ 凯利正向 但 DRI > 40（高分歧）
-   → 凯利信号降级，校正幅度减半
+   → Kelly downgraded, correction halved
 
-❌ 凯利信号与 SCS 共识、Water Flow 方向背离
-   → 凯利信号无效，以水位+必发数据为准
+❌ Kelly conflicts with SCS consensus or Water Flow direction
+   → Kelly invalid; trust Water Flow + Betfair data instead
 
-❌ 凯利信号与必发 VWAP 方向背离
-   → 凯利信号无效，VWAP 为真金白银投票，优先级更高
+❌ Kelly conflicts with Betfair VWAP direction
+   → Kelly invalid; VWAP is real money voting, higher priority
 ```
 
-#### 10.6.6 在 Step 10 中的应用
+#### 10.6.6 Application in Step 10
 
 ```
 kelly_logit = applicable_framework(category, phase, volume) → signal
@@ -788,12 +788,12 @@ Apply: logit' = logit + kelly_effective
 |:--:|------|---------|:------:|--------|
 | 16 | **Tier Divergence** | Sharp tier vs Asian tier AH gap ≥0.25 ball | 🔴 systemic | Confidence ×0.85, flag match |
 | 17 | **Exchange-Volume Spike** | 必发 volume >2× previous + odds static | ⚠️ resistance | Direction confidence −5% |
-| 18 | **Kelly Context Gap** | 焦点赛受注阶段：热门方凯利不降反升 + 3+ Sharp层同步走高 + 必发成交量>70% | ✅ context signal | Direction +5%, logit +0.20 (需交叉验证: Lead-Lag/WaterFlow同向才生效) |
-| 19 | **Sharp Counter-Betting** | Flow Ratio ≥0.70 (Asian层) + Pinnacle 反向或极度静态>4h | 🔴 counter-bet | 热门方 logit −0.35, 考虑博弈下盘 |
+| 18 | **Kelly Context Gap** | Marquee match betting phase: favorite Kelly rising not falling + 3+ Sharp tier syncing upward + Betfair volume >70% | ✅ context signal | Direction +5%, logit +0.20 (requires cross-validation: Lead-Lag/WaterFlow same direction to activate) |
+| 19 | **Sharp Counter-Betting** | Flow Ratio ≥0.70 (Asian tier) + Pinnacle opposing or extremely static >4h | 🔴 counter-bet | Favorite logit −0.35, consider betting underdog |
 
 ### 10.8 Integration into Step 10 (Probability Synthesis)
 
-**v3.0.1 重大修正**：原 v3.0 在概率空间做加法校正（p ± X%）违反概率公理（有界性破坏、非贝叶斯更新）。修正为 **logit 空间校正**：
+**v3.0.1 major correction**: Original v3.0 applied additive correction in probability space (p ± X%) which violates probability axioms (boundary violation, non-Bayesian update). Corrected to **logit-space correction**:
 
 ```
 Step A: 基础概率 → logit 转换
@@ -803,7 +803,7 @@ Step A: 基础概率 → logit 转换
 
 Step B: 在 logit 空间叠加所有校正
   logit_h' = logit_h + Σ(correction_i)
-  其中 correction_i 为各校正因子的 logit 偏移量（来自 KB-6 各条）
+  where correction_i is the logit offset from each correction factor (from KB-6)
 
 Step C: sigmoid 转回概率
   P_h' = 1 / (1 + e^(−logit_h'))
@@ -815,10 +815,10 @@ Step D: 归一化
   final = [P_h'/total, P_d'/total, P_a'/total]
 ```
 
-**logit 空间的优势**：
-- 概率始终在 (0, 1) 区间，永不越界
-- 等价于贝叶斯更新中对数几率乘法，数学上正确
-- 极端概率（如 90%+）附近校正幅度自然压缩，符合直觉
+**Advantages of logit space**:
+- Probabilities always stay within (0, 1) interval, never overflow
+- Equivalent to log-odds multiplication in Bayesian updating, mathematically correct
+- Correction magnitude naturally compresses near extreme probabilities (e.g., 90%+), consistent with intuition
 
 ### MBI Composite (#12) in logit space
 
@@ -857,16 +857,16 @@ Step D: 归一化
 
 ### Factor Correlation Dampening (v3.0.1 NEW)
 
-SCS、DRI、Water Flow 本质上都衡量「市场共识强度」，高度相关。直接叠加会导致重复计数。
+SCS, DRI, and Water Flow all essentially measure "market consensus strength" and are highly correlated. Direct stacking would cause double counting.
 
 ```
 Dampening rule:
   如果 SCS_signal 和 WaterFlow_signal 同向（都正或都负）:
     叠加值 = max(SCS_signal, WaterFlow_signal) + 0.3 × min(SCS_signal, WaterFlow_signal)
-  （较大信号全额计入，较小信号打 3 折，避免 1+1=2 的线性放大）
+  (larger signal fully counted, smaller signal discounted to 30%, avoiding 1+1=2 linear amplification)
 
   如果 DRI_signal < −0.35（高离散）且 SCS_signal > 0:
-    DRI_signal 减半（信息驱动的离散不等同于混乱型离散）
+    DRI_signal halved (info-driven dispersion ≠ chaos-type dispersion)
 ```
 
 ### 10.9 Quick MBI Assessment (for report)
@@ -920,14 +920,14 @@ Before applying ANY MBI module, validate input data quality:
 
 ## KB-11: Data Calibration Layer (v3.0.3 Final)
 
-> 解决"垃圾进垃圾出"问题，确保输入模型的信号纯净、可比。
+> Solves the "garbage in, garbage out" problem, ensuring model input signals are clean and comparable.
 
 ### 11.1 Dynamic Bookmaker Deduplication
 
 ```
 血缘图谱（预设）:
   沙巴系: IBC(沙巴), 12bet, 18bet, M88
-  皇冠系: 皇冠, 利记, 易胜博, 明升
+  Crown group: 皇冠, 利记, 易胜博, 明升
   Entain系: 立博, Bwin, Coral
   Kindred系: Unibet, 32Red
   Pinnacle系: 独立
@@ -935,94 +935,94 @@ Before applying ANY MBI module, validate input data quality:
   澳门系: 独立
 
 动态血缘检测（每周）:
-  对所有机构配对计算赔率变动时间序列的皮尔逊相关系数
-  r > 0.95 + 时间戳同步 → 判定为同源 → 更新图谱
+  Compute Pearson correlation of odds movement time series for all bookmaker pairs
+  r > 0.95 + timestamp sync → identified as same source → update lineage map
 
 去重权重:
-  同源 N 家聚类为 1 个独立节点
-  节点权重 = 原层级单机构权重 × √N
+  Cluster N same-source bookmakers into 1 independent node
+  Node weight = original tier single-bookmaker weight × √N
   （√N 而非 N，避免过度稀释）
 
 脏数据熔断:
-  单家赔率变动 > 同层级均值 3σ + 无时间戳匹配 → 抓取异常，剔除
-  去重后独立数据源 < 5 → DRI 阈值上移 1 档，Water Flow 权重 ×0.5
+  Single-bookmaker change > tier mean 3σ + no timestamp match → scrape anomaly, discard
+  Post-dedup independent sources < 5 → DRI threshold raised 1 notch, Water Flow weight ×0.5
 ```
 
 ### 11.2 Cross-Bookmaker Water Normalization
 
 ```
-问题: 澳门 0.90水 vs Pinnacle 0.975水 直接对比毫无意义
-      各机构返还率不同，水位不能直接比大小
+Problem: Macau 0.90 water vs Pinnacle 0.975 water — direct comparison is meaningless
+      Each bookmaker has different return rates; water levels cannot be directly compared
 
 校准公式:
-  归一化水位 = 原始水位 × (0.95 / 该机构标准返还率)
+  Normalized water = raw water × (0.95 / bookmaker standard return rate)
   
-  例: 澳门原始 0.90, 返还率 0.92 → 归一化 = 0.90 × (0.95/0.92) = 0.929
+  Example: Macau raw 0.90, return rate 0.92 → normalized = 0.90 × (0.95/0.92) = 0.929
       Pinnacle 原始 0.975, 返还率 0.98 → 归一化 = 0.975 × (0.95/0.98) = 0.945
 
-硬约束: 未校准的原始水位严禁直接用于 Water Flow 同向性统计
-        所有跨机构水位对比必须先归一化
+Hard constraint: uncalibrated raw water MUST NOT be used directly in Water Flow direction stats
+        All cross-bookmaker water comparisons MUST be normalized first
 ```
 
 ### 11.3 True Opening Odds Anchor
 
 ```
-废弃 72h 早盘: 流动性差，多为庄家试水假动作
+Abandon 72h early odds: low liquidity, mostly bookmaker trial balloons
 
-重新定义「真实初盘」:
-  取赛前 24h-48h 之间，且满足以下条件的赔率节点:
+Redefine "true opening odds":
+  Take the odds node between 24-48h pre-match meeting these conditions:
     (a) 必发成交量首次突破 £100K  OR
     (b) 亚盘成交量首次突破 HK$100K
 
-  取两条件最先触发者对应的赔率作为真实初盘基准
-  如果 24h 内仍未触发 → 取赛前 24h 节点作为 fallback
+  Take the odds corresponding to whichever condition triggers first as true opening baseline
+  If neither triggers within 24h → use 24h pre-match node as fallback
 
-对比基准: 后续所有「初盘→即时」比较统一使用此真实初盘
+Comparison baseline: all subsequent "open→current" comparisons use this true opening uniformly
 ```
 
-### 11.4 Event Tiering (三档赛事参数隔离)
+### 11.4 Event Tiering (Three-tier event parameter isolation)
 
-| 参数 | 顶级赛事 | 次级赛事 | 野鸡赛事 |
+| Parameter | Top-Tier Events | Second-Tier Events | Low-Tier Events |
 |:---|:---|:---|:---|
-| **范围** | 五大联赛/欧冠正赛/世界杯正赛/欧洲杯正赛 | 荷甲/日职/美职/巴甲/欧冠资格赛 | 低级别/友谊赛/季前赛/资格赛早期 |
-| **机构权重** | Sharp 0.6 / Asian 0.2 / Retail 0.2 | Sharp 0.45 / Asian 0.35 / Retail 0.2 | Sharp 0.3 / Asian 0.4 / Retail 0.3 |
-| **DRI 阈值** | 12 / 35 / 65 | 18 / 45 / 75 | 25 / 55 / 80 |
-| **Kelly 博弈逻辑** | 必发 > £1M 启用 | 必发 > £500K 启用 | **全程禁用博弈逻辑** |
-| **必发信号权重** | 100% | 50% | **0%（禁用）** |
-| **特殊限制** | 无 | 无 | 禁「平局」投注; DRI>35 直接放弃 |
+| **Scope** | 五大联赛/欧冠正赛/世界杯正赛/欧洲杯正赛 | 荷甲/日职/美职/巴甲/欧冠资格赛 | Low divisions/friendlies/preseason/early qualifiers |
+| **Bookmaker Weight** | Sharp 0.6 / Asian 0.2 / Retail 0.2 | Sharp 0.45 / Asian 0.35 / Retail 0.2 | Sharp 0.3 / Asian 0.4 / Retail 0.3 |
+| **DRI Thresholds** | 12 / 35 / 65 | 18 / 45 / 75 | 25 / 55 / 80 |
+| **Kelly Game-Theoretic Logic** | Betfair > £1M enabled | Betfair > £500K enabled | **Fully disabled game-theoretic logic** |
+| **Betfair Signal Weight** | 100% | 50% | **0% (disabled)** |
+| **Special Restrictions** | None | None | No "draw" bets; DRI > 35 = abandon |
 
 ```
 动态定级:
-  野鸡赛事单场必发 > £500K → 自动升级为次级
-  顶级联赛预备队/杯赛鸡肋轮次 → 自动降级为次级
-  友谊赛永远归类为野鸡，不适用升级
+  Minnow event single-match Betfair > £500K → auto-upgrade to Secondary
+  Top-league reserve teams/cup dead rubbers → auto-downgrade to Secondary
+  Friendlies always classified as Minnow, upgrade not applicable
 ```
 
 ---
 
 ## KB-12: Advanced Signal Quantification (v3.0.3 Final)
 
-> 所有 Logit 校正必须对应具体庄家操盘手法。
+> All logit corrections must correspond to specific bookmaker manipulation techniques.
 
 ### 12.1 Lead-Lag Retracement Validation
 
 ```
-回调验证机制（防试探性跳价）:
-  基准机构调整后，4h 内回调幅度:
-    > 50% → 判定为试探性假动作 → 信号清零
+Retracement validation (anti-probing false moves):
+  After lead bookmaker adjustment, within 4h retracement:
+    > 50% → identified as probing false move → signal cleared
     < 20% + 趋势保持 → 信号确认生效
     20%-50% → 信号减半
 
-  亚洲赛事基准: 沙巴 + 澳门 (非 Pinnacle)
-  欧美赛事基准: Pinnacle (沙巴作为验证)
+  Asian event lead: SBO + Macau (NOT Pinnacle)
+  Western event lead: Pinnacle (SBO as verification)
 ```
 
 ### 12.2 AH Level Change: True vs Trap Break
 
-| 类型 | 条件 | Logit | 陷阱号 |
+| Type | Condition | Logit | Trap # |
 |:---|:---|:---:|:---:|
-| **真升/降盘** | 对应方向水位 ≤ 0.925 + Sharp 层率先变动 | ±0.18 | — |
-| **诱升/降盘** | 对应方向水位 ≥ 1.00 + 仅 Asian 层动/Sharp 不动 | **反向 ±0.22** | #20/#21 |
+| **Genuine Up/Down** | Corresponding direction water ≤ 0.925 + Sharp tier moved first | ±0.18 | — |
+| **Bait Up/Down** | Corresponding direction water ≥ 1.00 + Only Asian tier moved / Sharp static | **Opposite ±0.22** | #20/#21 |
 
 ```
 时间权重:
@@ -1030,59 +1030,59 @@ Before applying ANY MBI module, validate input data quality:
   开赛 24h 外早期信号 × 0.7
 
 深盘约束:
-  SPF < 1.35 的超深盘，升降档多为被动平衡账本
+  Ultra-deep odds SPF < 1.35, level changes mostly passive book-balancing
   → 信号权重强制 × 0.5
 ```
 
 ### 12.3 Betfair Order Book Resistance Wall
 
 ```
-阻力墙检测（真金白银硬扛）:
-  热门方卖一挂单 ≥ 买一 3倍 + 持续 30min + 价格逼近时撤单率 < 20%
+Resistance wall detection (real money standing firm):
+  Favorite ask-1 ≥ bid-1 ×3 + sustained 30min + cancellation rate < 20% as price approaches
   → 触发阻力墙 → 热门方 logit −0.25
 
 下盘阻力墙加权:
-  散户天然偏爱上盘 → 下盘出现阻力墙的庄家意图更明确
+  Retail naturally favors the favorite → underdog resistance wall = clearer bookmaker intent
   → 反向校正 × 1.3
 
 支撑墙正向信号:
-  热门方买一挂单 ≥ 卖盘 2倍 + 价格稳步下移
+  Favorite bid-1 ≥ ask ×2 + price steadily moving down
   → 真实资金突破 → logit +0.20
 
-⚠️ 注意: 仅使用买卖一档（二档三档多为做市机器人幽灵单）
-         仅当必发成交 > £100K 时启用（流动性不足 → 挂单无意义）
+⚠️ Note: use only bid/ask level 1 (levels 2-3 are mostly market-maker ghost orders)
+         Only enabled when Betfair volume > £100K (insufficient liquidity → order book meaningless)
 ```
 
 ### 12.4 Opening-Receiving Gap Analysis
 
 ```
 初受盘差:
-  真实初盘节点下，Sharp vs Asian 层盘口差距 ≥ 0.25 球
+  At true opening node, Sharp vs Asian tier handicap gap ≥ 0.25 ball
   → 标记为「高波动场次」
   → 全场信号权重 × 0.5
   → 禁入串关核心胆
 
 反市场操作加权:
-  条件: 必发买一占比 > 80% (公众极度看好热门)
-        + 盘口逆势降盘 (庄家不给面子)
+  Condition: Betfair bid-1 ratio > 80% (public extremely bullish on favorite)
+        + handicap counter-trend downgrade (bookmaker not playing along)
         + 无对应新闻解释
-  → 判定为庄家主动反市场操作
-  → 信号强度 × 1.5 (庄家主动行为比被动跟随更有信号价值)
+  → Identified as bookmaker active counter-market operation
+  → Signal strength × 1.5 (bookmaker active behavior more informative than passive following)
 ```
 
 ### 12.5 Draw Diversion Trap (Bidirectional)
 
 ```
-正向分流（庄家设置资金池）:
-  平局凯利 < min(主胜凯利, 客胜凯利) − 0.1
+Positive diversion (bookmaker setting capital pool):
+  Draw Kelly < min(home Kelly, away Kelly) − 0.1
   + 平局必发成交量占比 < 20%
-  → 庄家用低凯利平局吸引资金，真实不看好平局
+  → Bookmaker uses low Kelly draw to attract capital, genuinely does not expect draw
   → 平局概率下调，热门方 logit +0.12
 
 反向分流（散户追捧平局）:
-  平局凯利 > max(主胜凯利, 客胜凯利) + 0.1
+  Draw Kelly > max(home Kelly, away Kelly) + 0.1
   + 平局必发成交量占比 > 35%
-  → 散户狂热买平局，庄家抬高赔付不怕打出
+  → Retail crowd frantically buying draw, bookmaker raising payout unafraid of it hitting
   → 平局概率下调，胜负方 logit +0.10
 ```
 
@@ -1092,16 +1092,16 @@ Before applying ANY MBI module, validate input data quality:
 
 ### 13.1 Dynamic Slippage Model
 
-| 阶段 | 时间窗口 | 滑点 | 说明 |
+| Phase | Time Window | Slippage | Description |
 |:---|:---|:---:|:---|
-| 初盘 | >24h | 1% | 流动性充足 |
-| 受注中期 | 6-24h | 2% | 正常波动 |
-| 临场 | 1-6h | 3.5% | 扫水频繁 |
-| 封盘前 | <30min | 5% | 极度波动 |
+| Opening | >24h | 1% | Ample liquidity |
+| Mid-Betting | 6-24h | 2% | Normal fluctuation |
+| Late | 1-6h | 3.5% | Frequent water sweeps |
+| Pre-close | <30min | 5% | Extreme volatility |
 
 ```
 串关滑点叠加:
-  总滑点 = 单场滑点 × √N  (独立随机变量方差叠加)
+  Total slippage = single-match slippage × √N  (independent random variable variance stacking)
   3串1 临场总滑点 = 3.5% × √3 ≈ 6.1%
 
 凯利计算前置:
@@ -1111,92 +1111,92 @@ Before applying ANY MBI module, validate input data quality:
 
 ### 13.2 Signal Confidence Tiering (A/B/C)
 
-| 等级 | 判定标准 | 凯利系数 | 单场cap | 串关准入 |
+| Tier | Criteria | Kelly Coefficient | Single-Match Cap | Parlay Admission |
 |:---:|------|:---:|:---:|:---|
-| **A (强)** | ≥2核心模块同向共振 + 无高危陷阱 + 6D≥4 | 0.25× | 5% | 可做核心胆 |
-| **B (中)** | 1个核心正向 + 无高危陷阱 + 6D≥3 | 0.15× | 3% | 仅搭配A类 |
-| **C (弱)** | 弱模块正向 + 有次要陷阱 + 6D=3 | 0.08× | 1.5% | 禁止串关，仅轻仓单关 |
+| **A (Strong)** | ≥2 core modules same-direction resonance + no high-risk traps + 6D≥4 | 0.25× | 5% | Can be core anchor |
+| **B (Medium)** | 1 core positive + no high-risk traps + 6D≥3 | 0.15× | 3% | Only pair with A-tier |
+| **C (Weak)** | Weak module positive + has minor traps + 6D=3 | 0.08× | 1.5% | No parlay, light position singles only |
 
 ```
 核心模块 = Lead-Lag / Water Flow / Exchange VWAP
-高危陷阱 = #13,#16,#19,#20,#21 (≥1个触发即为高危)
+High-risk traps = #13,#16,#19,#20,#21 (≥1 trigger = high risk)
 ```
 
-### 13.3 Circuit Breakers (熔断机制)
+### 13.3 Circuit Breakers
 
 ```
 单日熔断:
-  当日实际亏损 ≥ 总资金 3% → 立即停止当日所有投注 → 进入复盘
+  Daily actual loss ≥ 3% of bankroll → immediately stop all betting for the day → enter review
 
 周度熔断:
-  单周累计亏损 ≥ 总资金 8% → 暂停实盘 → 强制切回影子测试
-  → 连续 1 周影子胜率 ≥ 65% → 恢复实盘（仓位减半恢复期）
+  Weekly cumulative loss ≥ 8% of bankroll → suspend live trading → force shadow testing
+  → 1 week consecutive shadow win rate ≥ 65% → resume live (half-size recovery period)
 
 模块熔断:
-  单个模块连续 7 场判断错误 → 临时禁用该模块
-  → 复盘排查原因 → 修复后才恢复
+  Single module 7 consecutive wrong calls → temporarily disable that module
+  → Investigate root cause → restore only after fix
 ```
 
 ### 13.4 Risk Day Index & Auto-Empty
 
 ```
 一级空仓（全日停手）:
-  ① 当日 ≥ 3场触发 #16 层级分歧陷阱
-  ② 当日 ≥ 4场触发 #20/#21 升降盘诱盘（庄家集体做盘日）
+  ① ≥3 matches trigger Trap #16 tier divergence on the day
+  ② ≥4 matches trigger Trap #20/#21 level-change traps (collective bookmaker manipulation day)
   ③ 当日野鸡赛事占比 ≥ 70% + DRI均值 > 50
-  ④ 连续 2 日全灭 + 亏损达单日上限 ×2（情绪冷却）
+  ④ 2 consecutive days total loss + loss reaching daily cap ×2 (emotional cooldown)
 
 二级降仓（仓位 ×0.5，仅打 2串1）:
   ① 当日必发异动场次占比 ≥ 30%
-  ② 转会窗关闭前 24h / 国家队大名单公布日
-  ③ 联赛最后 3 轮保级战 / 杯赛次回合首回合分差 ≥ 3球
+  ② 24h before transfer window closes / national team squad announcement day
+  ③ League final 3 rounds relegation battles / cup 2nd leg with 1st leg margin ≥ 3 goals
 
 串关相关性隔离:
-  同联赛 + 同开球时间 + 同派系 → 同一串关最多 1 场
-  防止系统性黑天鹅一黑黑一串
+  Same league + same kickoff time + same faction → max 1 match per parlay
+  Prevent systemic black swan from killing entire parlay chain
 ```
 
-### 13.5 Iron Rules (不可逾越的红线)
+### 13.5 Iron Rules (Uncrossable Red Lines)
 
 ```
 ❌ 临场 30 分钟禁令:
-   开赛 30min 内绝对禁止任何投注决策
-   所有决策必须在开赛 >1h 前完成
+   Absolutely forbidden: any betting decision within 30min of kickoff
+   All decisions MUST be finalized >1h before kickoff
 
 ❌ 禁止倍投:
-   连黑后加仓追损 = 爆仓核心原因
-   严格按 Kelly 系数执行，单场硬上限 5%，永无例外
+   Chasing losses after losing streaks = #1 cause of account blowup
+   Strictly follow Kelly coefficient, single-match hard cap 5%, NO exceptions ever
 
 ❌ 禁止无意义对冲:
-   竞彩中同时买入正反两面 = 双重抽水加速失血
+   Buying both sides simultaneously in 竞彩 = double vig bleeding accelerated
    看不懂 → 直接空仓
 
 ❌ 串关赔率结构底线:
    串关几何平均 ≥ 1.50
-   3场以上赔率 <1.35 的串关禁止（EV 深度负数）
-   超低赔 (<1.35) 仅单场或 M串N 容错底座
+   Parlays with 3+ legs all odds <1.35 FORBIDDEN (EV deeply negative)
+   Ultra-low odds (<1.35): single bet only or M串N fault-tolerant base
 
 ❌ 竞彩 EV 底线:
-   0.89 返还率下，单串 EV ≥ −5% 才允许入选
-   所有 EV 统一使用滑点 + 返还率调整后的赔率
+   Under 0.89 return rate, single parlay EV ≥ −5% required for inclusion
+   All EV uniformly uses slippage + return rate adjusted odds
 ```
 
 ### 13.6 Shadow Testing Acceptance Criteria
 
 ```
-实盘上线前置条件（≥1 个月影子测试）:
+Live trading prerequisites (≥1 month shadow testing):
 
-全部达标方可切真金白银:
+All met before switching to real money:
   ☐ A类信号胜率 ≥ 65%
-  ☐ 反向信号 (阻力墙/诱盘) 准确率 ≥ 70%
+  ☐ Counter signals (resistance wall/trap breaks) accuracy ≥ 70%
   ☐ 串关全灭概率 ≤ 25%
   ☐ 竞彩返还率下模拟 EV ≥ −3%
   ☐ 连续 2 周无单周回撤 > 5%
 
-信号溯源复盘模板 (每场必填):
-  比赛信息 + 赛事包等级 + 信号置信等级 (A/B/C)
-  最终 Logit 校正值 + 各模块贡献拆解
-  命中/失手原因 (模型误判/庄家新手法/脏数据)
+Signal traceability review template (mandatory per match):
+  Match info + event tier + signal confidence level (A/B/C)
+  Final logit correction + per-module contribution breakdown
+  Hit/miss root cause (model misjudgment / new bookmaker tactic / dirty data)
   对应规则优化建议
 ```
 
@@ -1204,19 +1204,18 @@ Before applying ANY MBI module, validate input data quality:
 
 ```
 ❌ 真实赛事数据 (xG/Opta):
-   庄家精算团队早已计入初盘，散户重复计算 = 信息滞后噪音
+   Bookmaker quants already priced into opening odds; retail recalculation = lagged noise
 
 ❌ NLP 新闻事件自动量化:
-   新闻是庄家喂散户的毒药，机器抓新闻 = 接盘诱空/诱多盘口
+   News is poison bookmakers feed retail; automated news scraping = eating trap baits
 
 ❌ LSTM/Transformer 赔率时序预测:
-   赔率是人工根据资金池干预结果，无内在物理规律
+   Odds are human-adjusted based on capital pool, no intrinsic physical laws
    深度学习 = 100% 严重过拟合
 
 ❌ 必发三档深度:
-   二档三档多为做市机器人幽灵单，引入 = 噪音放大器
+   Level 2-3 mostly market-maker ghost orders; inclusion = noise amplifier
 
-❌ 全赛事共用一套静态参数:
-   无视联赛信息透明度差异 = 五大联赛漏信号 + 野鸡联赛踩陷阱
+❌ Single static parameter set for all events:
+   Ignores league transparency differences = top leagues miss signals + minnow leagues hit traps
 ```
-

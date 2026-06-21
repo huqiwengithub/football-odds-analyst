@@ -1,36 +1,36 @@
 ---
 name: 500com-football-scraper
-description: "从 500.com 爬取竞彩足球全量赔率数据，默认 deep 模式（每场6页深度分析：ouzhi/yazhi/rangqiu/daxiao/shuju/touzhu），支持 --quick 快速模式，输出标准化 JSON"
+description: "Scrape full football odds data from 500.com. Default deep mode (6 analysis pages per match: ouzhi/yazhi/rangqiu/daxiao/shuju/touzhu). Supports --quick fast mode. Outputs standardized JSON."
 agent_created: true
 version: "2.0"
 ---
 
-# 500.com 竞彩足球数据爬虫 v2.0
+# 500.com Football Odds Scraper v2.0
 
-> 默认 deep 模式：每场抓取 6 个深度分析页（百家欧赔/亚盘对比/让球指数/大小指数/数据分析/投注分析），覆盖 30 家博彩公司含 Pinnacle。
-> 输出标准化 JSON，供 `football-odds-analyst` 直接消费。12h 缓存复用。
+> Default deep mode: fetches 6 deep analysis pages per match (European odds, Asian handicap comparison, RQSPF, OU, fundamentals, betting flow), covering 30 bookmakers including Pinnacle.
+> Outputs standardized JSON consumed by `football-odds-analyst`. 12-hour cache reuse.
 
-## 触发
+## Triggers
 
-- 用户提到「500.com」「竞彩」「拉取赔率」「爬数据」
-- `football-odds-analyst` 依赖调用
-- 任何需要 500.com 结构化数据的场景
+- User mentions "500.com", "scrape odds", "pull data"
+- Called as dependency by `football-odds-analyst`
+- Any scenario needing structured 500.com data
 
 ---
 
-## 两种模式
+## Two Modes
 
-### deep 模式（默认）
+### Deep Mode (default)
 
-每场抓取 6 个分析页 + 基础 trade 页 + XML，输出全量 JSON。
+6 analysis pages + basic trade page + XML per match. Outputs full JSON.
 
 ```bash
 python3 references/parser.py --date 2026-06-22 --json
 ```
 
-### quick 模式（`--quick`）
+### Quick Mode (`--quick`)
 
-仅 trade 页 + XML，输出基础赔率。用于快速预览。
+Only trade page + XML. Outputs basic odds. For quick preview.
 
 ```bash
 python3 references/parser.py --date 2026-06-22 --quick --json
@@ -38,217 +38,119 @@ python3 references/parser.py --date 2026-06-22 --quick --json
 
 ---
 
-## 执行流程（deep 模式）
+## Execution Flow (Deep Mode)
 
-### Phase 1：获取比赛列表 + shuju ID
+### Phase 1: Get match list + shuju IDs
 
 ```
 1. WebFetch https://trade.500.com/jczq/?playid=312&g=2
-   提取：比赛编号、队名、排名、时间、shuju ID（从 /fenxi/shuju-XXXXXXX.shtml 链接）
-2. 按日期过滤
-3. 得到 match_list = [{code, datetime, home_team, away_team, home_rank, away_rank, shuju_id, handicap_rqspf}]
+   Extract: match code, team names, rankings, time, shuju ID (from /fenxi/shuju-XXXXXXX.shtml links)
+2. Filter by date
+3. Build match_list = [{code, datetime, home_team, away_team, home_rank, away_rank, shuju_id, handicap_rqspf}]
 ```
 
-### Phase 2：每场抓取 6 个深度分析页
+### Phase 2: Fetch 6 deep analysis pages per match
 
-对每场比赛，WebFetch 以下 6 个 URL（{id} 替换为 shuju_id）：
+For each match, WebFetch these 6 URLs ({id} = shuju_id):
 
-| 页面 | URL 模板 | 核心数据 |
+| Page | URL Template | Key Data |
 |:---|:---|:---|
-| **ouzhi** 百家欧赔 | `https://odds.500.com/fenxi/ouzhi-{id}.shtml` | 30 家博彩公司 SPF 初盘→即时，概率，凯利指数，离散值 |
-| **yazhi** 亚盘对比 | `https://odds.500.com/fenxi/yazhi-{id}.shtml` | 16 家公司 AH 初盘→即时，水位，盘口变化时间戳 |
-| **rangqiu** 让球指数 | `https://odds.500.com/fenxi/rangqiu-{id}.shtml` | RQSPF 初盘→即时，含竞彩官方 |
-| **daxiao** 大小指数 | `https://odds.500.com/fenxi/daxiao-{id}.shtml` | OU 初盘→即时，盘口升降 |
-| **shuju** 数据分析 | `https://odds.500.com/fenxi/shuju-{id}.shtml` | FIFA排名、H2H、近期战绩、预计阵容、场均数据 |
-| **touzhu** 投注分析 | `https://odds.500.com/fenxi/touzhu-{id}.shtml` | 必发成交量、庄家盈亏、冷热指数、投注分布 |
+| **ouzhi** | `https://odds.500.com/fenxi/ouzhi-{id}.shtml` | 30 bookmakers SPF open→current, probability, Kelly index, dispersion |
+| **yazhi** | `https://odds.500.com/fenxi/yazhi-{id}.shtml` | 16 bookmakers AH open→current, water level, handicap change timestamps |
+| **rangqiu** | `https://odds.500.com/fenxi/rangqiu-{id}.shtml` | RQSPF open→current, including official odds |
+| **daxiao** | `https://odds.500.com/fenxi/daxiao-{id}.shtml` | OU open→current, line direction |
+| **shuju** | `https://odds.500.com/fenxi/shuju-{id}.shtml` | FIFA ranking, H2H, recent form, expected lineup, avg stats |
+| **touzhu** | `https://odds.500.com/fenxi/touzhu-{id}.shtml` | Betfair volume, bookmaker P&L, hot/cold index, distribution |
 
-### Phase 3：解析关键数据
+### Phase 3: Parse key data
 
-#### ouzhi 解析规则
-
-```
-Pinnacle = 第 10 行（"Pi****le平*"）
-提取: 初盘 SPF（前三位数）/ 即时 SPF（后三位数）/ 初盘概率 / 即时概率 / 凯利指数
-
-全部 30 家逐行提取格式:
-  序号 | 公司名 | 初盘胜/平/负 | 即时胜/平/负 | 初盘概率%/%/% | 即时概率%/%/% | 返还率 | 即时凯利胜/平/负
-
-平均值行（最后一行）: 提取均值 + 最高值 + 最低值 + 离散值
-```
-
-#### yazhi 解析规则
+#### ouzhi parsing
 
 ```
-Pinnacle = 第 10 行
-提取: 即时水位 / 即时盘口 / 客水位 | 变化时间 | 初盘水位 / 初盘盘口 / 客水位 | 初盘时间
+Pinnacle = row 10 ("Pi****le" — Pinnacle sportsbook)
+Extract: open SPF (first 3 numbers) / current SPF (last 3 numbers) / open probability / current probability / Kelly index
 
-盘口中文→数值映射:
+All 30 bookmakers row format:
+  index | name | open H/D/A | current H/D/A | open prob%/%/% | current prob%/%/% | return rate | current Kelly H/D/A
+
+Average row (last row): extract mean + max + min + dispersion
+```
+
+#### yazhi parsing
+
+```
+Pinnacle = row 10
+Extract: current water / current handicap / away water | change time | open water / open handicap / away water | open time
+
+Chinese handicap → numeric mapping:
   平手=0, 平手/半球=0.25, 半球=0.5, 半球/一球=0.75, 一球=1.0, 一球/球半=1.25,
   球半=1.5, 球半/两球=1.75, 两球=2.0, 两球/两球半=2.25, 两球半=2.5, 两球半/三球=2.75, 三球=3.0
-  受X球 = -X
+  受X球 = -X (home team receiving handicap)
 
-方向: "升"=盘口加深, "降"=盘口回落, "↓"=水位降, "↑"=水位升
+Direction: 升 = handicap deepens, 降 = handicap retreats, ↓ = water drops, ↑ = water rises
 ```
 
-#### shuju 解析规则
+#### shuju parsing
 
 ```
-FIFA排名: "西班牙\[世2\]" → home_rank=2
-H2H: "双方近3次交战，西班牙3胜0平0负，进9球，失2球"
-近期战绩: "近10场战绩6胜4平0负进25球失4球"
-主场/客场战绩: 同样格式
-预计阵容: 首发 + 替补 + 伤病/停赛（名单）
+FIFA ranking: "西班牙\[世2\]" → home_rank=2
+H2H: "双方近3次交战，西班牙3胜0平0负，进9球，失2球" → {matches:3, home_wins:3, draws:0, ...}
+Recent form: "近10场战绩6胜4平0负进25球失4球" → {matches:10, wins:6, draws:4, losses:0, goals_for:25, goals_against:4}
+Home/Away records: same format
+Expected lineup: starters + substitutes + injuries/suspensions (name lists)
 ```
 
-#### touzhu 解析规则
+#### touzhu parsing
 
 ```
-必发成交量: "1.13 1,176,453 -31,357" → price=1.13, volume=1176453, pl=-31357
-投注比例: "86.3% 9.7% 3.9%" → home=86.3, draw=9.7, away=3.9
-必发指数: 提取冷热指数和盈亏指数
+Betfair volume: "1.13 1,176,453 -31,357" → price=1.13, volume=1176453, pl=-31357
+Distribution: "86.3% 9.7% 3.9%" → home=86.3, draw=9.7, away=3.9
+Betfair index: extract hot/cold index and P&L index
 ```
 
-### Phase 4：合并输出
+### Phase 4: Merge and output
 
-```json
-{
-  "meta": {
-    "source": "500.com",
-    "date": "2026-06-22",
-    "fetch_time": "2026-06-21T08:00:00+08:00",
-    "match_count": 4
-  },
-  "matches": [
-    {
-      "code": "周日037",
-      "datetime": "2026-06-22 00:00",
-      "home_team": "西班牙",
-      "away_team": "沙特阿拉伯",
-      "home_rank": 2,
-      "away_rank": 61,
-      "league": "世界杯",
-      "handicap_rqspf": -2,
+Standardized JSON schema (see ouzhi/yazhi/rangqiu/daxiao/shuju/touzhu sub-schemas above). Output fields use Chinese team/league names where appropriate (data, not metadata).
 
-      "ouzhi": {
-        "pinnacle": {
-          "open": {"home": 1.11, "draw": 9.11, "away": 18.94},
-          "current": {"home": 1.09, "draw": 10.53, "away": 24.70},
-          "prob_open": {"home": 84.71, "draw": 10.32, "away": 4.96},
-          "prob_current": {"home": 87.14, "draw": 9.02, "away": 3.85},
-          "kelly": {"home": 0.94, "draw": 1.02, "away": 0.96}
-        },
-        "all_bookmakers": [
-          {"id": 1, "name": "威廉希尔", "open": [1.10, 8.50, 26.00], "current": [1.10, 9.50, 29.00], ...},
-          ...
-        ],
-        "average": {"open": [1.11, 8.58, 21.60], "current": [1.10, 9.83, 24.58], ...},
-        "dispersion": {"home": 6.04, "draw": 109.74, "away": 407.88}
-      },
-
-      "yazhi": {
-        "pinnacle": {
-          "current": {"home_water": 0.99, "handicap": 2.5, "away_water": 0.86},
-          "open": {"home_water": 0.85, "handicap": 2.25, "away_water": 0.96},
-          "change_time": "06-21 07:35",
-          "direction": "升"
-        },
-        "all_bookmakers": [...16家...],
-        "average": {"current": [0.958, -2.469, 0.873], "open": [0.852, -2.125, 0.933]}
-      },
-
-      "rangqiu": {
-        "pinnacle": {"open": [1.95, 3.92, 2.99], "current": [...]},
-        "official": {"open": [2.57, 3.43, 2.35], "current": [...]}
-      },
-
-      "daxiao": {
-        "pinnacle": {
-          "current": {"over_water": 1.00, "line": 3.25, "under_water": 0.85},
-          "open": {"over_water": 0.94, "line": 3.00, "under_water": 0.86},
-          "direction": "升"
-        }
-      },
-
-      "shuju": {
-        "fifa_rank": {"home": 2, "away": 61},
-        "h2h": {"matches": 3, "home_wins": 3, "draws": 0, "away_wins": 0, "home_goals": 9, "away_goals": 2},
-        "recent_form": {
-          "home": {"matches": 10, "wins": 6, "draws": 4, "losses": 0, "goals_for": 25, "goals_against": 4},
-          "away": {"matches": 10, "wins": 2, "draws": 3, "losses": 5, "goals_for": 10, "goals_against": 13}
-        },
-        "home_away_form": {
-          "home_home": {"matches": 10, "wins": 5, "draws": 5, "losses": 0, ...},
-          "away_away": {"matches": 10, "wins": 4, "draws": 2, "losses": 4, ...}
-        },
-        "lineup": {
-          "home": {"starters": ["加维","拉波尔特",...], "subs": [...], "injuries": [], "suspensions": []},
-          "away": {...}
-        }
-      },
-
-      "touzhu": {
-        "betfair": {
-          "home": {"price": 1.13, "volume": 1176453, "pl": -31357},
-          "draw": {"price": 12.06, "volume": 7946, "pl": 482683},
-          "away": {"price": 30.05, "volume": 3636, "pl": -311045}
-        },
-        "distribution": {"home": 86.3, "draw": 9.7, "away": 3.9},
-        "index": {"hot_cold": {"home": -4, "draw": -47, "away": -5}, "pl_index": {"home": -3, "draw": 37, "away": -24}}
-      },
-
-      "basic": {
-        "spf_lc": {"home": 1.77, "draw": 4.05, "away": 3.15},
-        "spf_avg": {"home": 1.10, "draw": 9.83, "away": 24.58},
-        "ah_bet365": {"home_water": 1.0, "handicap": 2.5, "away_water": 0.85},
-        "ou_bet365": {"over_water": 1.0, "line": 3.25, "under_water": 0.85},
-        "jqs": {"0": 26.0, "1": 7.75, "2": 4.50, "3": 3.60, "4": 4.20, "5": 6.30, "6": 9.70, "7": 11.50},
-        "bqc": {"胜胜": 1.26, "胜平": 35.0, ...},
-        "bf": {"1:0": 8.0, "2:0": 5.50, ...}
-      }
-    }
-  ]
-}
-```
-
-### Phase 5：缓存
+### Phase 5: Cache
 
 ```
-缓存位置: .cache/500com/{date}_deep.json
-过期时间: 12 小时
---no-cache: 强制拉取新数据，覆盖缓存
+Cache location: .cache/500com/{date}_deep.json
+Expiration: 12 hours
+--no-cache: force fresh fetch, overwrite cache
 ```
 
 ---
 
-## 注意事项
+## Notes
 
-1. **编码**: trade.500.com 返回 GB2312，需转为 UTF-8。depth 分析页为 UTF-8，无需转换。
-2. **shuju ID 获取**: 从 trade 页的 `<a href="/fenxi/shuju-XXXXXXX.shtml">` 链接提取。
-3. **Pinnacle 行定位**: ouzhi 页第 10 行（"Pi****le平*"），yazhi 页同样第 10 行。
-4. **未开售**: RQSPF 显示"未开售"时该字段置 null。
-5. **网络**: 每场 6 页 × N 场比赛 = 页面多，建议 2-3 页并发拉取。
+1. **Encoding**: trade.500.com returns GB2312, must convert to UTF-8. Deep analysis pages are UTF-8, no conversion needed.
+2. **shuju ID extraction**: From trade page links like `<a href="/fenxi/shuju-XXXXXXX.shtml">`.
+3. **Pinnacle row**: Row 10 in ouzhi page ("Pi****le"), same position in yazhi page.
+4. **Not-yet-open**: RQSPF showing "未开售" → set field to null.
+5. **Network**: 6 pages × N matches = many pages. Fetch 2-3 pages concurrently.
 
 ---
 
-## quick 模式
+## Quick Mode
 
-仅拉取 trade 页 + XML，输出基础 JSON（不包含 ouzhi/yazhi/rangqiu/daxiao/shuju/touzhu 深度数据）。
+Only fetches trade page + XML. Outputs basic JSON (no ouzhi/yazhi/rangqiu/daxiao/shuju/touzhu deep data).
 
 ```bash
 python3 references/parser.py --date 2026-06-22 --quick --json
 ```
 
-输出结构同 v1.0，包含 basic 段（SPF/RQSPF/AH/OU/JQS/BF/BQC），不含 deep 段。
+Output structure same as v1.0: contains `basic` section (SPF/RQSPF/AH/OU/JQS/BF/BQC), no deep sections.
 
 ---
 
-## 命令行参考
+## CLI Reference
 
-| 参数 | 说明 | 默认 |
+| Flag | Description | Default |
 |:---|:---|:---|
-| `--date YYYY-MM-DD` | 按日期过滤 | 全部 |
-| `--quick` | 快速模式（仅基础） | deep 模式 |
-| `--json` | JSON 输出 | 文本输出 |
-| `--no-cache` | 跳过缓存强制刷新 | 使用缓存 |
-| `--match 队名` | 查找特定球队 | 全部 |
-| `--cache-dir DIR` | 缓存目录 | .cache/500com/ |
+| `--date YYYY-MM-DD` | Filter by date | All |
+| `--quick` | Fast mode (basic only) | Deep mode |
+| `--json` | JSON output | Text output |
+| `--no-cache` | Skip cache, force refresh | Use cache |
+| `--match NAME` | Filter by team name | All |
+| `--cache-dir DIR` | Cache directory | .cache/500com/ |
