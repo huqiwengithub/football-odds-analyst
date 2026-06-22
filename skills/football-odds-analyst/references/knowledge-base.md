@@ -2,7 +2,9 @@
 
 > **Load trigger**: Read this file when SKILL.md instructs you to reference a specific section ($KB-N). Contains all detailed rules, formulas, trap definitions, scoring criteria, and methodology.
 >
-> **Reading strategy**: Start with KB-16 (OCI客观指标) + KB-18 (仓位决策) — v3.5.0核心. Then KB-6 + KB-7 for Step 10. KB-2 + KB-4 for traps/scoring. KB-10 for MBI.
+> **Reading strategy**: Start with KB-16 (OCI客观指标) + KB-18 (仓位决策 — 见betting-sop.md) — v3.5.0核心. Then KB-6 + KB-7 for Step 10. KB-2 + KB-4 for traps/scoring. KB-10 for MBI.
+>
+> **赛前对照检查**: 分析完成后对照 `postmortem.md` 检查是否有匹配的观察项触发。在报告中以"历史观察提示"标注（不纳入模型校正），赛后更新样本量。
 
 ---
 
@@ -1075,22 +1077,9 @@ Positive diversion (bookmaker setting capital pool):
   所有 EV 统一使用 adjusted_odds
 ```
 
-### 13.2 Signal Confidence Tiering (A/B/C)
+### 13.2 Signal Confidence Tiering → 见 betting-sop.md
 
-| Tier | Criteria | Kelly Coefficient | Single-Match Cap | Parlay Admission |
-|:---:|------|:---:|:---:|:---|
-| **A (Strong)** | ≥2 core modules same-direction resonance + no high-risk traps + 6D≥4 | 0.25× | 5% | Can be core anchor |
-| **B (Medium)** | 1 core positive + no high-risk traps + 6D≥3 | 0.15× | 3% | Only pair with A-tier |
-| **C (Weak)** | Weak module positive + has minor traps + 6D=3 | 0.08× | 1.5% | No parlay, light position singles only |
-
-```
-核心模块 = Lead-Lag / Water Flow / Exchange VWAP
-High-risk traps = #13,#16,#19,#20,#21 (≥1 trigger = high risk)
-```
-
-### 13.3 — 13.6 风控执行 → 见 betting-sop.md
-
-> 熔断/空仓/铁律/M串N仓位分配/影子回测等投注执行规则已统一移入 `references/betting-sop.md`。
+> 信号分级、Kelly系数、单场上限、串关准入规则已移入 `references/betting-sop.md`。
 > 本模块仅保留分析层面的风险控制。
 
 ### 13.7 Permanently Excluded Feature Blacklist
@@ -1116,6 +1105,7 @@ High-risk traps = #13,#16,#19,#20,#21 (≥1 trigger = high risk)
 ### 13.8 竞彩市场转换层
 
 > 分析层(Pinnacle, ~98%)与执行层(竞彩, ~71%)存在市场错配。所有概率分析须在竞彩EV框架下评估。
+> EV阈值分级、串关策略 → 见 betting-sop.md
 
 #### 13.8a 竞彩 EV 转换公式
 
@@ -1125,20 +1115,7 @@ High-risk traps = #13,#16,#19,#20,#21 (≥1 trigger = high risk)
 竞彩隐含概率: Q_h = (1/C_h) / (1/C_h + 1/C_d + 1/C_a) × R
 ```
 
-#### 13.8b EV 阈值分级
-
-```
-EV > +0.05:       正期望，正常投
-−0.05 ≤ EV ≤ +0.05: 边界，仅限小仓（≤1% 本金）
-EV < −0.05:       负期望，标注 ⚠️ 警告，仓位 × 0.50
-EV < −0.15:       严重负期望，🔴 禁止入选串关核心
-
-示例（deVigProb=55% 主胜, 竞彩赔率 1.60, R=0.71）:
-  EV = 0.55 × 1.60 × 0.71 − 1 = −0.375
-  → 🔴 严重负期望 — MBI 可能仍说"方向看好"，但竞彩无正EV
-```
-
-#### 13.8c 竞彩特有的"赔率冻住"风险
+#### 13.8b 竞彩特有的"赔率冻住"风险
 
 ```
 竞彩赔率开售后不随国际市场变动。
@@ -1150,7 +1127,7 @@ EV < −0.15:       严重负期望，🔴 禁止入选串关核心
   → 相应方向竞彩 EV 可靠性降级
 ```
 
-#### 13.8d 单关 vs 串关返奖率差
+#### 13.8c 单关 vs 串关返奖率差
 
 ```
 竞彩返奖率:
@@ -1466,58 +1443,11 @@ DRM-3: 近期平局惯性
 - DRM-4/5/6/8: 样本不足，暂保留但不激活
 ```
 
-## KB-18: 三档仓位引擎 — 由信而赌 
+## KB-18: 仓位分配 + 串关资格 → 见 betting-sop.md
 
 > **v3.5.0 更新**: 新增第四档(冷门翻转)，仓位逻辑改为由OCI(客观指标)加权分驱动。
-
-### 18.1 四档定义
-
-```
-仓位由OCI加权综合信心分决定:
-
-  信心分 >= 65% -> 🔥 核心仓位 (全仓, 入串关核心)
-    条件: 5个OCI中>=3个正向, 无偏离信号
-    来源: FVS=2+DRM=0模式(80%命中)
-
-  信心分 50-65% -> ✅ 标准仓位 (半仓, 入容错腿)
-    条件: 多数OCI正向但有1个中性
-    来源: FVS=0+DRM=0模式(52%)
-
-  信心分 < 50% 且 偏离信号<2 -> 🚫 跳过
-    条件: OCI多数负向或中性, 无偏离
-    来源: FVS=1或DRM>=2模式(<50%)
-
-  信心分 < 50% 且 偏离信号>=2 -> 🔄 冷门翻转
-    条件: OCI指向负面, 且偏离检测触发
-    动作: 反转系统方向, 押冷门/平局
-    来源: FVS=0+DRM=4(40%平率) + FVS=1(58%冷门)
-```
-
-### 18.2 偏离检测条件
-
-```
-满足>=2条即触发冷门翻转:
-
-  [ ] Pinnacle升水 > 3% (热门赔率在上升)
-  [ ] 成交量与赔率方向背离 (量增但赔率不降)
-  [ ] 30家均值方向与Pinnacle方向不一致
-  [ ] deVig(平) > 28% (平局概率高)
-  [ ] OU线下调 > 0.25 (进球预期降低)
-
-翻转后动作:
-  平局偏向(>=3个偏离指向平局) -> 押平局
-  逆转偏向(<3个偏离但多数指向逆转) -> 押反方向
-  仓位: 标准仓位x0.50 (因为冷门命中率约40-58%)
-```
-
-### 18.3 串关资格
-
-```
-  核心仓位: 可入串关核心
-  标准仓位: 仅入容错腿
-  跳过: 不入任何串关
-  冷门翻转: 仅单关 (翻转信号不够强, 不能串)
-```
+> 仓位分配、串关资格规则已移入 `references/betting-sop.md`。
+> 本模块仅保留偏离检测条件（与KB-19合并）。
 
 ## KB-19: 客观偏离检测 + 冷门翻转触发 
 
@@ -1564,72 +1494,7 @@ DRM-3: 近期平局惯性
     deVig(平) > 28% + OU下调 -> 押平局
     量价背离 + 升水 -> 押反方向
     市场分歧 + 升水 -> 押反方向
-```## KB-20: 跨赛事回测验证框架 
+```## KB-20: 跨赛事回测验证 → 见 postmortem.md
 
-> 每次技能修正后的强制性验证流程。
-> 数据源: `.cache/tournament_data/wc2018_backtest.json` / `euro2024_backtest.json` / `wc2022_backtest_data.json`
-
-### 20.1 三关验证流程
-
-```
-任何规则修改、参数调整、阈值变更后，必须过三关:
-
-
-
-## KB-20: 跨赛事回测验证框架 + 模式库查表 
-
-> **v3.5.0 更新**: 新增OCI模式库查表流程。
-
-### 20.1 OCI模式库查表流程
-
-```
-每次执行OCI分析时:
-  1. 提取5个OCI指标的当前变化方向+幅度
-  2. 在历史数据库中查找相同变化模式的场次
-  3. 取这些场次的平均命中率作为该指标权重
-  4. 最少要求3场匹配, 不足3场则降权50%
-  5. 每新增50场数据自动更新权重表
-```
-
-### 20.2 三关验证
-
-```
-第一关: 改善（Improvement）
-  - 所有三个赛事回测命中率均不下降（允许持平）
-  - 综合命中率提升 ≥1%
-  - 核心仓位（FVS=2+DRM=0）命中率不下降
-
-第二关: 一致性（Consistency）
-  - 三个赛事改善方向一致（允许幅度不同，不允许方向相悖）
-  - 若某一赛事退步 → 该赛事的校准因子须独立调整
-  - 若两赛事退步 → 回滚改动
-
-第三关: 统计显著性（Statistical Significance）
-  - 改善不是由 ≤3 场极端比赛驱动（5-折交叉验证）
-  - 核心仓位样本量 ≥20 场
-  - 否决精确率 ≥40%
-```
-
-### 20.2 回测执行脚本
-
-```bash
-# 跨赛事回测
-cd ~/Desktop/足彩
-python3 cross_tournament_backtest.py
-
-# 查看报告
-open 跨赛事FVSDRM回测报告.html
-```
-
-### 20.3 版本升级检查清单
-
-```
-每次升级v3.x.x时:
-□ 三个赛事数据完整（WC2022/WC2018/Euro2024）
-□ cross_tournament_backtest.py 已更新为新规则
-□ 三关验证全部通过
-□ 回测报告已生成
-□ KB-9（复盘）已更新
-□ 如改善 >5% → 考虑推送git
-```
+> 回测验证框架、OCI模式库查表流程、升级检查清单已移入 `references/postmortem.md`。
 

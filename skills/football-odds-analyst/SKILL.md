@@ -16,9 +16,9 @@ dependencies:
 # Football Odds Analyst v3.5.0 — 文件分责体系
 
 > **文件分工**：
-> - `references/knowledge-base.md`（KB-0~KB-20）→ **盘口分析**：赔率解读、陷阱检测、MBI、OCI客观指标、DRM平局因子、仓位决策、偏离检测
-> - `references/betting-sop.md` → **投注执行**：五步SOP、M串N动态仓位分配、熔断空仓铁律
-> - `references/postmortem.md` → **复盘回测**：历史观察项、回测发现、影子验证流程
+> - `references/knowledge-base.md`（KB-0~KB-19）→ **盘口分析**：赔率解读、陷阱检测、MBI、OCI客观指标、DRM平局因子、偏离检测
+> - `references/betting-sop.md` → **投注执行**：五步SOP、M串N动态仓位分配、熔断空仓铁律、信号分级、EV执行、仓位规则
+> - `references/postmortem.md` → **复盘回测**：历史观察项、回测发现、影子验证流程、KB-20三关验证、版本升级清单
 
 ---
 
@@ -167,9 +167,9 @@ dependencies:
   - DRM-1: deVig(平)>28%->仓位x0.80 | DRM-2: OU线变化 | DRM-3: 近期平局惯性
 - 输出：5xOCI权重 + DRM调整值 -> 综合信心分
 
-### Step 10.6 — 四档仓位 + 偏离检测 (KB-18 + KB-19)
-- 综合决策: OCI信心分匹配仓位档位，偏离信号决定是否冷门翻转
-- **必须先读 KB-18 + KB-19**
+### Step 10.6 — 仓位 + 偏离检测 (见 betting-sop.md + KB-19)
+- 综合决策: OCI信心分匹配仓位档位（规则见betting-sop.md），偏离信号决定是否冷门翻转（KB-19）
+- **必须先读 betting-sop.md（仓位规则） + KB-19（偏离检测）**
 - 四档仓位（由综合信心分驱动）:
   - 🔥 **核心**（≥65%）: 全仓入串关 | ✅ **标准**（50-65%）: 半仓入容错腿
   - 🚫 **跳过**（<50%+偏离<2）: 不投 | 🔄 **冷门翻转**（<50%+偏离≥2）: 押冷门单关
@@ -349,11 +349,14 @@ assets/report-template.html 作为基础模板，注入以下模块：
 
 | KB | 内容 | 文件 | 对应步骤 |
 |:--:|------|:---:|:--:|
-| 0-8 | 盘口分析基础（队名/数学/陷阱/6D/基本面/logit/进球倾向/方法） | knowledge-base.md | 1-10 |
-| **9** | **复盘/回测 → 见 postmortem.md** | **postmortem.md** | **赛后** |
-| 10-15 | MBI/数据校准/高级信号/风控/庄家读心/外源信号 | knowledge-base.md | Pre-1~11 |
-| **16-20** | **OCI/DRM/仓位/偏离检测/回测验证** | **knowledge-base.md** | **10.5~赛后** |
-| **SOP** | **量化投注 SOP + 风控细则** | **betting-sop.md** | **Step 11** |
+| 0-8 | 盘口分析基础（队名/数学/陷阱/6D/基本面/logit/进球倾向/方法） | `knowledge-base.md` | 1-10 |
+| **9** | **复盘/回测 → 见 postmortem.md** | **`postmortem.md`** | **赛后** |
+| 10-15 | MBI/数据校准/高级信号/风控/庄家读心/外源信号 | `knowledge-base.md` | Pre-1~11 |
+| **16-17** | **OCI/DRM 平局因子** | **`knowledge-base.md`** | **10.5** |
+| **18** | **仓位分配 → 见 betting-sop.md** | **`betting-sop.md`** | **Step 11** |
+| **19** | **偏离检测** | **`knowledge-base.md`** | **10.6** |
+| **20** | **回测验证 → 见 postmortem.md** | **`postmortem.md`** | **赛后** |
+| **SOP** | **量化投注 SOP + 风控细则 + 信号分级 + EV执行 + 仓位规则** | **`betting-sop.md`** | **Step 11** |
 
 ---
 
