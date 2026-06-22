@@ -1,9 +1,9 @@
 ---
 name: football-odds-analyst
-description: "Football odds analyst v3.3.0 — MBI+FVS dual-engine. Unified logit correction pipeline (KB-6 + KB-10.8). Favorite Vulnerability Score (13 rules). Volume×price cross-validation. 5-step quantitative betting SOP. M串N fault-tolerant parlay + correlation isolation + barbell odds structure. Auto-pipeline with 500com-football-scraper. 500.com 30-bookmaker native data."
+description: "Football odds analyst v3.3.1 — MBI+FVS+DRM triple-engine. Calibrated on 2022WC 64-match backtest (53.1%→65.9%). Unified logit pipeline. 13 FVS rules + 8 DRM rules. Volume×price cross-validation. M串N fault-tolerant parlay."
 allowed-tools: Read, Write, Bash, WebSearch, WebFetch
 agent_created: true
-version: "3.3.0"
+version: "3.3.1"
 released: 2026-06-22
 references: references/knowledge-base.md, references/betting-sop.md, references/postmortem.md
 dependencies:
@@ -385,7 +385,8 @@ assets/report-template.html 作为基础模板，注入以下模块：
 
 ### Changelog
 
-- **v3.3.0**：**双引擎+双辅助架构**：(1) KB-16 FVS 热门脆弱性引擎 (2) KB-17 DRM 平局风险模块+FVS×DRM叠加矩阵 (3) KB-6+KB-10.8 统一logit管线+四组降权+总量cap (4) KB-13.8 竞彩市场转换层(EV公式+返奖率差+赔率冻住) (5) Step 10.5 FVS + Step 10.6 DRM + Step 11 竞彩EV前置检查
+- **v3.3.1**：**回测校准**：(1) DRM≥2 升级为 🔴VETO（2022WC回测: 命中率63%→22%, 净收益+9）(2) FVS=3+DRM≥1 升级为VETO (3) FVS×DRM矩阵从16格简化为10格 (4) 整体命中率 53.1%→65.9%（+12.8pp）
+- **v3.3.0**：**双引擎+双辅助架构**：(1) KB-16 FVS 热门脆弱性引擎 (2) KB-17 DRM 平局风险模块+FVS×DRM叠加矩阵 (3) KB-6+KB-10.8 统一logit管线+四组降权+总量cap (4) KB-13.8 竞彩市场转换层 (5) Step 10.5 FVS + Step 10.6 DRM + Step 11 竞彩EV前置检查
 - **v3.2.0**：**三层架构改造**：(1) 砍除 Top 3 比分精确输出，改为进球倾向三档判定 (2) 49 条陷阱从计数改为 A/B/C 三层分类加权 (3) MBI 输出加入信号来源分解面板 (4) Lead-Lag + Exchange 新增量价交叉验证四象限矩阵 (5) 新增 KB-15 外源信号注入路线图
 - **v3.1.3**：新增 post-mortem 观察项 O-6 至 O-10
 - **v3.1.2**：SOP 重构为五步标准作业程序
