@@ -38,9 +38,112 @@
 
 ---
 
+## O-6: 零陷阱信号陷阱（"最干净=最危险"悖论）
+- **来源**: 2026-06-22 乌拉圭 vs 佛得角 — 评分4.2/6, 0陷阱触发, 报告称"本场最干净" — 实际 2-2 冷平
+- **现象**: 当 6D 评分在 4.0-4.5 区间且 0 陷阱触发时，模型的信心可能被虚高。0 陷阱 ≠ 高确定性，仅说明市场对这场没有发出明确的方向性信号（没有信号本身也意味着市场定价更有效率，不应被解读为"更安全"）
+- **当前处理**: 无。现有逻辑中 0 陷阱→判断为"干净"→正向加成
+- **待验证**: 6D 4.0-4.5 + 0 陷阱的比赛，命中率是否显著低于有 1-2 条低风险陷阱的比赛
+- **建议修正方向**: 若验证成立，低 6D+0 陷阱的信号应降级半档（如 A→B）
+- **样本量**: 1
+
+## O-7: 同日多场 1.20-1.50 中赔率爆冷连锁
+- **来源**: 2026-06-22 比利时(竞彩1.26)和乌拉圭(1.28)同日打出平局
+- **现象**: 同一天内两场 1.20-1.50 赔率的"安全"选择同时打平。现有三不选规则隔离了同联赛/同时�/同战意，但未覆盖"同赔率段同日"的相关性。同日多项中赔选项可能存在系统性爆冷因子（裁判尺度/场地/强队心理疲劳等）
+- **当前处理**: 三不选无此条目。SPF 组合中若 ≥2 场赔率在 1.20-1.50 区间且为同一竞彩日，应增加一个条件概率校正（至少一场不中的概率 ≥ 朴素乘积 × 1.2）
+- **待验证**: 是否有足够样本支持该校正系数
+- **样本量**: 1（2 场同一天）
+
+## O-8: #15 AH偏深陷阱的实证升级 — 偏差≥0.50 时的全冷风险
+- **来源**: 2026-06-22 比利时 vs 伊朗 — AH 1.25 vs 理论 0.75, 偏差+0.50 — 实际 0-0
+- **对照**: 此前 O-1（厄瓜多尔 vs 库拉索, 85% 主胜→0-0）也涉及深盘爆冷
+- **现象**: 当 AH 偏差 ≥0.50 球时，不仅存在"赢球输盘"风险，还存在"赢不了球"的实质性的冷门风险。Trap #15 的原始描述仅警告"让球偏深→赢球输盘"，未覆盖冷门
+- **建议修正方向**: 若累计 ≥3 案例，将 Trap #15 升级为双重警告：偏差 ≥0.50 → 冷门预警（非仅穿盘预警）
+- **当前样本量**: 2
+
+## O-9: 全低赔日(全≤1.50)的串关结构脆弱性
+- **来源**: 2026-06-22 全部4场竞彩 SPF ≤1.42，任何组合(2串1/3串1/3串4)均全黑
+- **现象**: 当某竞彩日所有可用场次 SPF 均 ≤1.50 时，构建串关在结构上极度脆弱——任何一场平局即杀死全部串关。全低赔日的"所有强队同时赢球"概率低于朴素乘积（存在系统性的同日相关性）
+- **待验证**: 竞彩日中全部场次 SPF ≤1.50 的情况下，全部强队同时赢球的历史概率 vs 朴素乘积
+- **建议决策规则**: 全低赔日(≤1.50)串关应强制降级为 2串1 巅峰对决，或直接跳过该日
+- **样本量**: 1
+
+## O-10: 客胜压缩 ≥12% 信号的可靠性（埃及案例验证）
+- **来源**: 2026-06-22 埃及 vs 新西兰 — Pinnacle 客胜初盘 1.88→1.61(-14.4%)，实际 3-1 逆转胜（半场 0-1 落后 → 下半场 3球）
+- **现象**: 客胜压缩 14.4%（接近极端压缩阈值 15%），信号准确。即使半场落后，模型的方向判断仍然正确
+- **当前处理**: KB-5 压缩强度分级已覆盖（强压缩 10-15% = 显著信号），本案例验证了该分级的有效性
+- **待验证**: 无需新增规则。可作为 KB-5 压缩分级的正例保留
+- **样本量**: 1（对现有分级而言是验证性证据，非新发现）
+
+---
+
 ## 使用方式
 
 在赛前分析完成后，对照此文件检查是否有匹配的观察项触发。如有匹配：
 1. 在报告中以「历史观察提示」的形式标注（不纳入模型校正）
 2. 赛后更新对应观察项的样本量
 3. 任一观察项累计 ≥2 个独立验证后，方可升级为 KB 正式规则
+
+
+---
+
+## KB-9 历史复盘汇总（从 knowledge-base.md 移入）
+
+### Quality Metrics
+
+```
+Category A: Fully resolved and calibrated
+Category B: Identified but pending multi-event validation
+Category C: Temporarily excluded with documented bypass conditions
+```
+
+### Recent Observations
+
+```
+| Date | Match | Miss | Lesson |
+|:---:|:---|:---|:---|
+| 6/19 | SUI 4-1 BIH | Called narrow | One match ≠ ability; 3+ match form needed |
+| 6/19 | CAN 6-0 QAT | Predicted 2-0 | Host nation xG → 14.0c |
+| 6/19 | MEX 1-0 KOR | Predicted KOR | WC history > continental ranking |
+| 6/16 | All 4 draws | Called outcomes | Draw prob >30% = uncertainty; full skip rule |
+| 6/13-14 | Debut upsets | Fav overconfidence | First-point hunger + heat discount (Rules #27-28) |
+```
+
+### 2022WC KO Backtest: 16 matches, SPF direction 94%, parlay +62% (intl) / +37% (JCL)
+### Key: 70% of betting days correctly skipped — not hit rate, but selectivity
+
+---
+
+## KB-9b: 2022WC回测观察
+
+> 完整回测报告见 `跨赛事FVSDRM回测报告.html`
+
+### 核心发现
+1. 开盘(56.2%)比收盘(53.1%)更准 — 市场移动改善0场、恶化2场
+2. DRI高≠风险高 — 高DRI来自压倒性热门，反而更准(62% vs 50%)
+3. Pinnacle=市场平均 — 64场完全一致，无套利空间
+
+---
+
+## 影子回测与验证流程（从 KB-13.6 移入）
+
+### Data Sources
+```
+Prediction side: analyst report → {date}_predictions.json
+  Fields: match_code, predicted_W/L, confidence_tier, each module signal contribution
+
+Result side: 500.com wanchang → {date}_results.json
+  URL: https://live.500.com/wanchang.php
+```
+
+### Backtesting Workflow
+```
+1. Auto-save predictions after each analysis
+2. Fetch 500.com wanchang after matches complete
+3. Compute: W/L accuracy / tier accuracy / counter signal accuracy / P(全灭) / Simulated EV
+4. Calibrate: negative correlation dimensions / DRI thresholds / Kelly coefficient
+```
+
+### Minimum Sample Size
+```
+Before parameter change: ≥100 matches/league | Before live: ≥300 total | Before removing module: ≥50 with module fired
+```
