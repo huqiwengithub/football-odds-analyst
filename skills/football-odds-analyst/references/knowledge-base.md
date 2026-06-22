@@ -282,15 +282,9 @@ D5: requires yazhi water data → if missing, D5 = 0.5
 
 > 废除概率空间加法，全部迁移到 logit 空间。与 MBI 在同一管线中串行叠加，避免双轨冲突。
 
-### 6.1 换算基准
-
-中位锚定法（base 50%，logit=0）:
+### 6.1 换算基准 (概率→logit)
 ```
-概率 +10%  →  logit +0.40
-概率  +8%  →  logit +0.32
-概率  +7%  →  logit +0.28
-概率  +5%  →  logit +0.20
-概率  +3%  →  logit +0.12
++10%→+0.40 | +8%→+0.32 | +7%→+0.28 | +5%→+0.20 | +3%→+0.12
 ```
 
 ### 6.2 12 项校正换算为 logit 偏移
@@ -433,46 +427,18 @@ Probability -> AH line approximation:
 OU 2.5 -> xG ~2.5  |  OU 2.0 -> xG ~2.0  |  OU 3.0 -> xG ~3.0
 OU 2.25 -> xG ~2.25 |  OU 2.75 -> xG ~2.75
 ```
-## KB-9: Post-Mortem (Historical)
+## KB-9: 复盘/回测 → 见 postmortem.md
 
-### 28-Match Cycle (6/12–6/19)
-- W/L accuracy: 18/28 raw → ~22/28 corrected (79.2%)
-- Exact score: 3/24 (12.5%); Within 1 goal: 14/24 (58.3%)
-- Mixed parlay: 6/6 tickets, +107.8% ROI; 11/28 matches (39%) correctly skipped
-
-### Root Causes of Score Bias (±1 goal systematic error)
-1. xG too conservative in extreme mismatches → 14.0b Stomp fix
-2. Host nation xG explosion overlooked → 14.0c Host fix
-3. Multi-factor nonlinear compounding → cross-trigger cap
-
-### Key Individual Learnings
-| Date | Match | Error | Lesson |
-|------|-------|-------|--------|
-| 6/19 | CZE 1-1 RSA | Called CZE win | Narrative compression → Step 1.5, Trap #7 |
-| 6/19 | SUI 4-1 BIH | Called narrow | One match ≠ ability; 3+ match form needed |
-| 6/19 | CAN 6-0 QAT | Predicted 2-0 | Host nation xG → 14.0c |
-| 6/19 | MEX 1-0 KOR | Predicted KOR | WC history > continental ranking |
-| 6/16 | All 4 draws | Called outcomes | Draw prob >30% = uncertainty; full skip rule |
-| 6/13-14 | Debut upsets | Fav overconfidence | First-point hunger + heat discount (Rules #27-28) |
-
-### 2022WC KO Backtest: 16 matches, SPF direction 94%, parlay +62% (intl) / +37% (JCL)
-### Key: 70% of betting days correctly skipped — not hit rate, but selectivity
+> 所有历史复盘、回测观察、赛后总结已统一移入 `references/postmortem.md`。
+> 包括: 28场复盘数据、各场次错误分析、2022WC回测核心发现等。
 
 ---
 
-## KB-9b: 2022WC回测观察 (Historical - Summary Only)
-
-> 完整回测报告见项目根目录 `跨赛事FVSDRM回测报告.html`
-
-### 核心发现
-1. 开盘(56.2%)比收盘(53.1%)更准 — 市场移动改善0场、恶化2场
-2. DRI高≠风险高 — 高DRI来自压倒性热门，反而更准(62% vs 50%)
-3. Pinnacle=市场平均 — 64场完全一致，无套利空间
 ## KB-10: MBI — Multi-Bookmaker Intelligence Framework
 
 > **Rationale**: Pinnacle is the gold standard but not infallible. 30-bookmaker data from 500.com enables consensus-weighted analysis that captures signals Pinnacle alone misses.
 
-### 10.0 Bookmaker Tier Classification
+### 博彩公司分级
 
 | Tier | Weight | Members | Characteristics |
 |:---|:---:|:---|:---|
@@ -480,29 +446,13 @@ OU 2.25 -> xG ~2.25 |  OU 2.75 -> xG ~2.75
 | **Asian** | 0.25 | 澳门, 皇冠, 利记, 易胜博, 12bet, 18bet | Regional capital flow, water-level sensitive, macro-policy influenced |
 | **Retail** | 0.20 | 威廉希尔, 立博, Interwetten, 必发(exchange), 伟德, Bwin | Public sentiment, recreational volume, exchange reveals real money |
 
-### 10.1 Sharp Consensus Score (SCS)
-
-> **⚠️**: Sharp 机构调价不一定是"判断赛果"。Pinnacle 的商业模式是抽水驱动的做市商——调价可能仅是响应单边持仓压力（仓位驱动），而非信息驱动。SCS 信号必须配合 **10.3b 量价交叉验证** 使用，否则会系统性高估 Sharp 调价的信息含量。
+### SCS — Sharp Consensus Score (需10.3b量价交叉验证)
 
 ```
-For each outcome (H/D/A), across all 30 bookmakers:
-  SCS_outcome = Σ(tier_weight_i × direction_i) / Σ(tier_weight_i)
-
-  direction_i: +1 if odds↓, −1 if odds↑, 0 if |change|<noise_threshold
-  
-  noise_threshold = max(0.02 × odds_current, 1.5 × σ_historical)
-    (adaptive threshold: at least 2% change AND exceeds 1.5σ of historical volatility)
-
-  magnitude_weight = min(|change_pct| / 0.10, 1.0)
-    (magnitude weighting: larger moves get higher weight, 10% change = full weight)
-
-  time_decay = exp(−hours_since_change / 24)
-    (time decay: half-life of 24h, changes closer to kickoff weighted more heavily)
-
-  direction_i_weighted = direction_i × magnitude_weight × time_decay
-
-Final SCS = SCS_favorite × 0.6 + SCS_draw × 0.2 + SCS_underdog × 0.2
-  (favorite = lowest current odds among H/D/A, not fixed to home)
+SCS = Σ(tier_w_i × dir_i) / Σ(tier_w_i)
+  dir_i: +1↓/−1↑/0|<噪声阈值 | 噪声 = max(0.02×odds, 1.5×σ历史)
+  幅度权重 = min(|变化%/10%|, 1.0) | 时间衰减 = exp(−小时/24)
+  权重化方向 = dir × 幅度权重 × 时间衰减
 ```
 
 交叉验证要求:
@@ -519,7 +469,7 @@ SCS 信号生效需通过 10.3b 量价交叉验证:
 - SCS 0.40–0.70 → Moderate → no adjustment
 - SCS < 0.40 → Weak consensus → Step 10 penalty −5%
 
-### 10.2 Dispersion Risk Index (DRI)
+### DRI — Dispersion Risk Index
 
 ```
 DRI_raw = ouzhi.dispersion.home × 0.5 + ouzhi.dispersion.draw × 0.3 + ouzhi.dispersion.away × 0.2
@@ -543,7 +493,7 @@ DRI_raw = ouzhi.dispersion.home × 0.5 + ouzhi.dispersion.draw × 0.3 + ouzhi.di
 
 
 
-#### 10.2.1 DRI Tier-Variance Analysis
+#### DRI Tier-Variance Analysis
 
 ```
 Information-type dispersion (faction divergence) detection:
@@ -655,7 +605,7 @@ Flow Ratio ≥ 0.75 (强流向):
 0.50–0.75 → 中度，logit ±0.10
 < 0.50 → 分散，无信号
 
-#### 10.4.1 Sharp Counter-Betting Asian Heat
+#### Sharp Counter-Betting Asian Heat
 
 ```
 Asian Heat vs Sharp Counter-Bet Detection:
@@ -672,8 +622,7 @@ Meaning: Asian tier retail money flooding in same direction (water dropping hard
       对应 Trap #19 修正
 ```
 
-### 10.5 Exchange-Traditional Divergence
-
+### Exchange-Traditional Divergence
 ```
 From touzhu data (必发 Betfair exchange):
 
@@ -825,9 +774,9 @@ Apply: logit' = logit + kelly_effective
 | 18 | **Kelly Context Gap** | Marquee match betting phase: favorite Kelly rising not falling + 3+ Sharp tier syncing upward + Betfair volume >70% | ✅ context signal | Direction +5%, logit +0.20 (requires cross-validation: Lead-Lag/WaterFlow same direction to activate) |
 | 19 | **Sharp Counter-Betting** | Flow Ratio ≥0.70 (Asian tier) + Pinnacle opposing or extremely static >4h | 🔴 counter-bet | Favorite logit −0.35, consider betting underdog |
 
-### 10.8 Integration into Step 10
+### MBI logit-space集成
 
-All in logit-space:
+
 
 ```
 Step A: 基础概率 → logit 转换
@@ -851,9 +800,9 @@ Step D: 归一化
 
 Probabilities bounded (0,1), Bayesian-equivalent, magnitude auto-compresses near extremes.
 
-### MBI Composite — logit space
+### MBI Composite — logit空间
 
-> 四组相关降权 + 总量 cap，与 KB-6 统一 logit 管线串联执行。
+> 四组降权 + cap + 与KB-6串联:
 
 ```
 #12 MBI Composite 作为 logit 偏移量:
@@ -897,9 +846,9 @@ Probabilities bounded (0,1), Bayesian-equivalent, magnitude auto-compresses near
     资金离场(被动抬价+量增) → −0.15
 ```
 
-### Factor Correlation Dampening
+### 四组降权
 
-四组降权，覆盖所有 15 项校正（KB-6 9项 + MBI 6项）:
+覆盖KB-6 9项 + MBI 6项:
 
 ```
 四组降权规则:
@@ -928,7 +877,7 @@ Probabilities bounded (0,1), Bayesian-equivalent, magnitude auto-compresses near
   KB-6 组(组3+组4) 与 MBI 组(组1+组2) 不额外降权（信息源不同）
 ```
 
-### MBI Composite Final
+### MBI Final
 
 ```
 mbi_logit = signal_组1 + signal_组2
@@ -953,7 +902,7 @@ Apply:
   80% 是足球预测的理性上限，从此杜绝 90%+ 虚假高置信度
 ```
 
-### 10.9 Quick MBI Assessment
+### 报告中的MBI面板
 
 Each match report MUST include an MBI panel:
 
@@ -969,7 +918,7 @@ Each match report MUST include an MBI panel:
 └───────────────────────────────────────────────┘
 ```
 
-### 10.10 Data Quality Validation
+### 数据质量验证
 
 ```
 Before applying ANY MBI module, validate input data quality:
@@ -1009,57 +958,26 @@ Before applying ANY MBI module, validate input data quality:
 ### 11.1 Dynamic Bookmaker Deduplication
 
 ```
-血缘图谱（预设）:
-  沙巴系: IBC(沙巴), 12bet, 18bet, M88
-  Crown group: 皇冠, 利记, 易胜博, 明升
-  Entain系: 立博, Bwin, Coral
-  Kindred系: Unibet, 32Red
-  Pinnacle系: 独立
-  bet365系: 独立
-  澳门系: 独立
-
-动态血缘检测: Pearson r>0.95+时间戳同步→同一来源→更新血缘图
-
-去重权重:
-  Cluster N same-source bookmakers into 1 independent node
-  Node weight = original tier single-bookmaker weight × √N
-  （√N 而非 N，避免过度稀释）
-
-脏数据熔断:
-  Single-bookmaker change > tier mean 3σ + no timestamp match → scrape anomaly, discard
-  Post-dedup independent sources < 5 → DRI threshold raised 1 notch, Water Flow weight ×0.5
+血缘: 沙巴系(IBC/12bet/18bet/M88) | Crown(皇冠/利记/易胜博/明升) | Entain(立博/Bwin/Coral)
+系内去重: N家→1个独立节点, 权重=原权重×√N
+动态: Pearson r>0.95+时间戳→更新血缘图
+脏数据: 单家>均值3σ+无时间戳→丢弃 | 去重后<5家→DRI升1档, WF×0.5
 ```
 
 ### 11.2 Cross-Bookmaker Water Normalization
 
 ```
-Problem: Macau 0.90 water vs Pinnacle 0.975 water — direct comparison is meaningless
-      Each bookmaker has different return rates; water levels cannot be directly compared
-
-校准公式:
-  Normalized water = raw water × (0.95 / bookmaker standard return rate)
-  
-  Example: Macau raw 0.90, return rate 0.92 → normalized = 0.90 × (0.95/0.92) = 0.929
-      Pinnacle 原始 0.975, 返还率 0.98 → 归一化 = 0.975 × (0.95/0.98) = 0.945
-
-Hard constraint: uncalibrated raw water MUST NOT be used directly in Water Flow direction stats
-        All cross-bookmaker water comparisons MUST be normalized first
+归一化 = 原始水位 × (0.95/该机构标准返还率)
+Macau 0.90/0.92→0.929 | Pinnacle 0.975/0.98→0.945
+禁止直接使用未校准原始水位
 ```
 
 ### 11.3 True Opening Odds Anchor
 
 ```
-Abandon 72h early odds: low liquidity, mostly bookmaker trial balloons
-
-Redefine "true opening odds":
-  Take the odds node between 24-48h pre-match meeting these conditions:
-    (a) 必发成交量首次突破 £100K  OR
-    (b) 亚盘成交量首次突破 HK$100K
-
-  Take the odds corresponding to whichever condition triggers first as true opening baseline
-  If neither triggers within 24h → use 24h pre-match node as fallback
-
-Comparison baseline: all subsequent "open→current" comparisons use this true opening uniformly
+弃用72h初盘(低流动性/试盘)
+真实初盘=24-48h中首达条件之赔率: (a)必发量>£100K 或 (b)亚盘量>HK$100K
+24h内均未达→以24h节点为基准
 ```
 
 ### 11.4 Event Tiering
@@ -1086,70 +1004,36 @@ Comparison baseline: all subsequent "open→current" comparisons use this true o
 
 > 所有 logit 校正须对应庄家操盘手法。
 
-### 12.1 Lead-Lag Retracement Validation
+### 12.1 回调验证
 
 ```
-Retracement validation (anti-probing false moves):
-  After lead bookmaker adjustment, within 4h retracement:
-    > 50% → identified as probing false move → signal cleared
-    < 20% + 趋势保持 → 信号确认生效
-    20%-50% → 信号减半
-
-  Asian event lead: SBO + Macau (NOT Pinnacle)
-  Western event lead: Pinnacle (SBO as verification)
+4h内回调>50%→假测试→清除信号 | <20%+趋势保持→确认
+20-50%→减半 | 亚洲赛事SBO+澳门(非Pinnacle) | 西向Pinnacle(SBO验证)
 ```
 
-### 12.2 AH Level Change: True vs Trap Break
+### 12.2 AH真假突破
 
-| Type | Condition | Logit | Trap # |
-|:---|:---|:---:|:---:|
-| **Genuine Up/Down** | Corresponding direction water ≤ 0.925 + Sharp tier moved first | ±0.18 | — |
-| **Bait Up/Down** | Corresponding direction water ≥ 1.00 + Only Asian tier moved / Sharp static | **Opposite ±0.22** | #20/#21 |
+| 类型 | 条件 | 效果 |
+|:---|:---|:---:|
+| 真突破 | 对应方向水位≤0.925+Sharp先动 | ±0.18 |
+| 假突破(Trap) | 水位≥1.00+仅Asian动/Sharp不动 | **反向±0.22** |
 
-```
-时间权重:
-  临场 1h 内信号 × 1.3
-  开赛 24h 外早期信号 × 0.7
+临场1h内×1.3 | 24h外×0.7 | SPF<1.35×0.5(被动平衡)
 
-深盘约束:
-  Ultra-deep odds SPF < 1.35, level changes mostly passive book-balancing
-  → 信号权重强制 × 0.5
-```
 
-### 12.3 Betfair Order Book Resistance Wall
+### 12.3 必发订单簿阻力墙
 
 ```
-Resistance wall detection (real money standing firm):
-  Favorite ask-1 ≥ bid-1 ×3 + sustained 30min + cancellation rate < 20% as price approaches
-  → 触发阻力墙 → 热门方 logit −0.25
-
-下盘阻力墙加权:
-  Retail naturally favors the favorite → underdog resistance wall = clearer bookmaker intent
-  → 反向校正 × 1.3
-
-支撑墙正向信号:
-  Favorite bid-1 ≥ ask ×2 + price steadily moving down
-  → 真实资金突破 → logit +0.20
-
-⚠️ Note: use only bid/ask level 1 (levels 2-3 are mostly market-maker ghost orders)
-         Only enabled when Betfair volume > £100K (insufficient liquidity → order book meaningless)
+热门ask-1≥bid-1×3+持续30min+取消率<20%→阻力墙→logit -0.25
+下盘阻力墙(零售逆势)→×1.3 | 支撑墙(热门bid≥ask×2+稳降)→+0.20
+仅用level1(2-3层是庄家虚单) | 仅Betfair量>£100K时启用
 ```
 
-### 12.4 Opening-Receiving Gap Analysis
+### 12.4 初受盘差分析
 
 ```
-初受盘差:
-  At true opening node, Sharp vs Asian tier handicap gap ≥ 0.25 ball
-  → 标记为「高波动场次」
-  → 全场信号权重 × 0.5
-  → 禁入串关核心胆
-
-反市场操作加权:
-  Condition: Betfair bid-1 ratio > 80% (public extremely bullish on favorite)
-        + handicap counter-trend downgrade (bookmaker not playing along)
-        + 无对应新闻解释
-  → Identified as bookmaker active counter-market operation
-  → Signal strength × 1.5 (bookmaker active behavior more informative than passive following)
+Sharp vs Asian差≥0.25球→高波动→信号×0.5→禁入串关核心
+反市场操作: 必发>80%看好+盘口反向下调+无新闻→庄家主动操作→×1.5
 ```
 
 ### 12.5 Draw Diversion Trap (Bidirectional)
@@ -1208,18 +1092,6 @@ High-risk traps = #13,#16,#19,#20,#21 (≥1 trigger = high risk)
 
 > 熔断/空仓/铁律/M串N仓位分配/影子回测等投注执行规则已统一移入 `references/betting-sop.md`。
 > 本模块仅保留分析层面的风险控制。
-
-### 13.7 Permanently Excluded Feature Blacklist#### Wanchang Fetch Mode (Scraper)
-
-```bash
-# Fetch completed match results for a date
-python3 references/parser.py --wanchang --date 2026-06-20 --json
-
-# Output: .cache/500com/{date}_wanchang.json
-# Schema: [{date, time, league, home_team, away_team, home_rank, away_rank, ft_score, ht_score}]
-```
-  对应规则优化建议
-```
 
 ### 13.7 Permanently Excluded Feature Blacklist
 
@@ -1303,15 +1175,13 @@ EV < −0.15:       严重负期望，🔴 禁止入选串关核心
 
 ### 14.1 Module 1: Pulsation (拉锯战指数)
 
-**核心逻辑**：赔率变化的"犹豫程度"比"变化幅度"更能反映庄家真实意图。
-
 #### 14.1.2 核心指标
 
 | 指标 | 计算 | 含义 |
 |:---|:---|:---|
-| 振荡频率 F | 方向改变次数 / (有效采样数 − 1) | 高频 ≥ 0.4 = 犹豫 |
-| 净位移 D | \|首末差值\| / 首值 × 100% | 低幅 < 1.5% = 微弱 |
-| TWQ | F / (D + 0.001) | TWQ > 50 = 严重拉锯 |
+| 频率F | 方向改变/采样-1 | ≥0.4=犹豫 |
+| 位移D | \|首末差\|/首值 | <1.5%=微弱 |
+| TWQ | F/(D+0.001) | >50=严重拉锯 |
 
 #### 14.1.3 二维决策矩阵
 
@@ -1341,8 +1211,6 @@ IF matrix = "宽幅洗盘" → PULSATION_CAUTION (需 PVD/CD 交叉验证)
 
 #### 14.2.1 PVD — Price-Volume Divergence (价量背离)
 
-**Score 映射（只输出 [-1,+1]，不直接改信度）：**
-
 | 状态 | 条件 | Score |
 |:---|:---|:---:|
 | 真实推动 | 赔率降(升) + 必发量暴增(>2x) | +1.0 |
@@ -1352,10 +1220,6 @@ IF matrix = "宽幅洗盘" → PULSATION_CAUTION (需 PVD/CD 交叉验证)
 | 无可比性 | 必发缺失或量极低 | 0.0 |
 
 #### 14.2.2 CD — Channel Divergence (渠道背离)
-
-**基准锚点（铁律）：所有修正只作用于 Sharp 层指向的方向。**
-
-**Score 映射：**
 
 | 状态 | 条件 | Score |
 |:---|:---|:---:|
@@ -1430,83 +1294,37 @@ Step 0.5 — 市场健康检查 (KB-14)，在 Step 1 之前执行。
 
 ---
 
-## KB-15: External Signal Injection Roadmap
+## KB-15: External Signal Injection (Roadmap)
 
-> **核心理念**: 赔率不是信息源，是庄家的风险管理工具。真正的 edge 在赔率之外。
-> 本模块为长期演进路线图，标注实施优先级和代价。
+> 未实现模块的优先级和量化规则。注: 赔率不是信息源，是庄家的风控工具。真正的 edge 在赔率之外。
 
-### 15.1 伤停/首发信息自动抓取 (优先级: ⭐⭐⭐)
-
-**逻辑**: 赛前 1-2h 首发公布 → 提取关键位置变化 → 对比赔率变动时间戳。
-
+### 15.1 首发伤停 (⭐⭐⭐)
 ```
-执行流程:
-  1. 赛前 2h: 抓取 500.com 伤停页面或竞彩官网首发
-  2. 提取: 主力前锋缺阵? 核心中场轮休? 防线核心停赛?
-  3. 时间戳对比:
-     赔率在首发公布前已调整 → 信息提前泄露，市场已定价 → 无 edge
-     赔率在首发公布后仍未调整 → 市场未反应 → 真正的 edge
-  
-  4. 量化:
-     关键缺阵 (前锋/中场/门将) → 对应方 logit −0.15
-     双核缺阵 → logit −0.30
-     防线重组 (≥2人换位) → 对方 logit +0.10
+赛前2h抓取→提取关键位置变化→对比赔率变动时间戳:
+  赔率提前调整→市场已定价→无edge
+  赔率未调整→市场未反应→真正edge
+量化: 关键缺阵→logit -0.15 | 双核缺阵→-0.30 | 防线重组→对方+0.10
 ```
 
-**数据源**: 500.com shuju 页面已有伤停信息（部分联赛）。竞彩官网赛前1h 公布首发。
-**实现代价**: 低。在 Step 1.5 反叙事筛查中嵌入首发抓取逻辑。
-
-### 15.2 赛程密度体能模型 (优先级: ⭐⭐)
-
-**逻辑**: 7 天 3 赛的球队体能衰减高度可预测，但赔率定价滞后。
-
+### 15.2 赛程体能 (⭐⭐)
 ```
-体能扣分表:
-  7 天 2 赛 (正常): ×1.00
-  7 天 3 赛 (密集): ×0.92 (总进球倾向降低)
-  7 天 4 赛 (极端): ×0.85
-  
-  双线作战 (联赛+杯赛): 自动降 1 档
-  跨洲旅行 (>3h 时差): 自动降 1 档
-  
-  轮换概率:
-    密集赛程 + 对手为弱旅 → 轮换概率高 → 深盘穿盘概率降低
-    密集赛程 + 对手为强敌 → 轮换概率低 → 体能衰减影响防守端
+7天3赛→x0.92 | 7天4赛→x0.85 | 双线→降1档 | 跨洲3h+→降1档
+密集+弱旅→轮换高→穿盘降 | 密集+强敌→防守端受影响
 ```
 
-**数据源**: 比赛日程公开数据，无需外部 API。
-**实现代价**: 中。需要在 Step 2 基本面分析中嵌入赛程体能模块。
-
-### 15.3 天气/场地信息 (优先级: ⭐)
-
-**逻辑**: 对特定联赛（北欧、英冠冬季、J 联赛雨季），天气对进球数的预测力高于赔率。
-
+### 15.3 天气场地 (⭐)
 ```
-天气影响矩阵:
-  暴雨/大雪 → 总进球倾向 −1 档（偏小球）
-  高温 >32°C → 总进球倾向 −1 档（体能消耗加速）
-  大风 >8 级 → 技术型球队受影响 > 力量型球队
-  人工草皮 → 客队不适应 → 主场优势 +5%
-  场地积水 → 长传冲吊队受益，控球队受损
+暴雨/大雪→偏小球 | >32°C→偏小球 | 大风→技术型受影响
+人工草皮→客队-5% | 积水→长传队受益
 ```
 
-**数据源**: OpenWeatherMap API 或比赛地天气网页抓取。
-**实现代价**: 中高（需要稳定 API 或定时抓取）。
-
-### 15.4 实施优先级总结
-
-| 信号源 | 预期信息增益 | 实现代价 | 状态 |
+### 优先级
+| 信号 | 增益 | 代价 | 状态 |
 |:---|:---:|:---:|:---|
-| 首发伤停 | **高** — 信息驱动，庄家常滞后 | 低 | 📋 待实现 |
-| 赛程体能 | 中 — 可预测但庄家也在看 | 中 | 📋 待实现 |
-| 天气场地 | 中低 — 特定联赛有效 | 中高 | 📋 待实现 |
-| NLP 新闻 | ⛔ 黑名单 — 新闻是庄家鱼饵 (KB-13.7) | — | 永久排除 |
-
-### 15.5 与外源信号联动
-
-所有外源信号统一在 Step 1.5 (反叙事筛查) 和 Step 2 (基本面分析) 中注入。
-输出时在「信号来源分解」面板的第四行「赔率之外还需要知道的」中显性标注。
-空白 = 边界明确 → 提醒用户该判断完全基于赔率。
+| 首发 | 高 | 低 | 📋 |
+| 体能 | 中 | 中 | 📋 |
+| 天气 | 中低 | 中高 | 📋 |
+| NLP | ⛔永久排除 | — | 🚫 |
 
 ---
 
