@@ -1,8 +1,8 @@
-# Knowledge Base Reference — Football Odds Analyst v3.2.0
+# Knowledge Base Reference — Football Odds Analyst v3.5.0: OCI客观指标体系
 
 > **Load trigger**: Read this file when SKILL.md instructs you to reference a specific section ($KB-N). Contains all detailed rules, formulas, trap definitions, scoring criteria, and methodology.
 >
-> **Reading strategy**: Start with KB-2 (traps, now A/B/C classified) + KB-4 (6D) — used every match. Then KB-6 + KB-7 for Step 10 (goal tendency, not score prediction). KB-10 for MBI + volume×price cross-validation.
+> **Reading strategy**: Start with KB-16 (OCI客观指标) + KB-18 (仓位决策) — v3.5.0核心. Then KB-6 + KB-7 for Step 10. KB-2 + KB-4 for traps/scoring. KB-10 for MBI.
 
 ---
 
@@ -37,7 +37,7 @@ Austria=奥地利, Ukraine=乌克兰, Turkey=土耳其, Greece=希腊, Scotland=
 
 ### De-vig Methods
 
-**v3.0.1**: Upgraded to Shin de-vigging algorithm. Simple proportional method systematically overestimates favorite probabilities (favorite-longshot bias widens as odds gap grows).
+Use Shin de-vigging algorithm. Simple proportional method systematically overestimates favorite probabilities (favorite-longshot bias widens as odds gap grows).
 
 ```
 Shin's method:
@@ -283,7 +283,7 @@ D5: requires yazhi water data → if missing, D5 = 0.5
 
 ---
 
-## KB-6: Unified Logit Correction Pipeline (v3.3.0)
+## KB-6: Unified Logit Correction Pipeline
 
 > **v3.3.0 重大重构**: 废除概率空间加法（`base + Σ(corrections)`），全部迁移到 logit 空间。与 KB-10.8 MBI 在同一个 logit 管线中串行叠加，避免双轨冲突和边界溢出。
 
@@ -362,7 +362,7 @@ base 55% (logit=0.20) + cap 1.20 = logit 1.40 → sigmoid → ≈80% 主胜
 
 ---
 
-## KB-7: Goal Tendency Determination
+## KB-7: Goal Tendency
 
 > **v3.2.0 重大改动**: 砍除 Poisson Top 3 比分精确输出。原因：Poisson 独立性假设在足球中不成立（进球概率随比分状态变化、上下半场 λ 不同、红牌/伤病扰动）。精确比分预测是虚假精度，庄家全场比分盘(Correct Score)的抽水远高于 SPF 盘，印证连庄家都无法精确定价。改为输出进球倾向三档判定。
 
@@ -484,7 +484,7 @@ OU pathways:
 
 ---
 
-## KB-9: Post-Mortem Summary
+## KB-9: Post-Mortem (Historical)
 
 ### 28-Match Cycle (6/12–6/19)
 - W/L accuracy: 18/28 raw → ~22/28 corrected (79.2%)
@@ -511,7 +511,7 @@ OU pathways:
 
 ---
 
-## KB-9b: 2022 世界杯 64 场全量回测 — 观察项 (非规则)
+## KB-9b: 2022WC回测观察 (Historical)
 
 > **数据源**: Pinnacle 收盘赔率 × 30家博彩公司 × 64场
 > **基准准确率**: Pinnacle 34/64 = 53.1% | 开盘价 36/64 = 56.2% | 30家平均 = 53.1% (无额外信息)
@@ -640,7 +640,7 @@ P≥70% 的比赛 10 场 80% 准确。唯一不可解释的冷门: 阿根廷 1-2
 
 ---
 
-## KB-10: MBI — Multi-Bookmaker Intelligence Framework (v3.0)
+## KB-10: MBI — Multi-Bookmaker Intelligence Framework
 
 > **Rationale**: Pinnacle is the gold standard but not infallible. 30-bookmaker data from 500.com enables consensus-weighted analysis that captures signals Pinnacle alone misses.
 
@@ -1189,7 +1189,7 @@ Before applying ANY MBI module, validate input data quality:
 
 ---
 
-## KB-11: Data Calibration Layer (v3.0.3 Final)
+## KB-11: Data Calibration
 
 > Solves the "garbage in, garbage out" problem, ensuring model input signals are clean and comparable.
 
@@ -1271,7 +1271,7 @@ Comparison baseline: all subsequent "open→current" comparisons use this true o
 
 ---
 
-## KB-12: Advanced Signal Quantification (v3.0.3 Final)
+## KB-12: Advanced Signal Quantification
 
 > All logit corrections must correspond to specific bookmaker manipulation techniques.
 
@@ -1359,7 +1359,7 @@ Positive diversion (bookmaker setting capital pool):
 
 ---
 
-## KB-13: System Risk Controls & Iron Rules (v3.1.1)
+## KB-13: System Risk Controls
 
 ### 13.1 Dynamic Slippage Model
 
@@ -1796,7 +1796,7 @@ EV < −0.15:       严重负期望，🔴 禁止入选串关核心
 
 ---
 
-## KB-14: Bookmaker Intelligence — Market Pressure & Pulsation Analysis
+## KB-14: Bookmaker Intelligence — Market Pressure
 
 > v3.1.2 | 扩展 MBI 框架的"庄家读心"层。不改变方向判定，只调节置信度。
 > 从博弈对抗痕迹和跨市场错位中提取信号，而非仅依赖赔率数值。
@@ -1942,7 +1942,7 @@ MPC > 0.3 场次中修正后命中率提升 ≥ 3% → 模块有效
 
 ---
 
-## KB-15: External Signal Injection Roadmap (v3.2.0)
+## KB-15: External Signal Injection Roadmap
 
 > **核心理念**: 赔率不是信息源，是庄家的风险管理工具。真正的 edge 在赔率之外。
 > 本模块为长期演进路线图，标注实施优先级和代价。
