@@ -1,8 +1,8 @@
-# Knowledge Base Reference — Football Odds Analyst v2.9
+# Knowledge Base Reference — Football Odds Analyst v3.2.0
 
 > **Load trigger**: Read this file when SKILL.md instructs you to reference a specific section ($KB-N). Contains all detailed rules, formulas, trap definitions, scoring criteria, and methodology.
 >
-> **Reading strategy**: Start with KB-2 (traps) + KB-4 (6D) — used every match. Then KB-6 + KB-7 for Step 10. KB-8 + KB-9 are supplementary.
+> **Reading strategy**: Start with KB-2 (traps, now A/B/C classified) + KB-4 (6D) — used every match. Then KB-6 + KB-7 for Step 10 (goal tendency, not score prediction). KB-10 for MBI + volume×price cross-validation.
 
 ---
 
@@ -112,59 +112,81 @@ Formula: theoretical_ah = (deVigProb_home − 0.50) × 4
 
 ## KB-2: Fifteen Euro-Asian Divergence Traps
 
-| # | Pattern | Trigger | Risk |
-|:--:|---------|---------|------|
-| 1 | Deep odds, shallow handicap | Gap ≥0.25 ball, theoretical AH deeper than actual | Draw/away upset |
-| 2 | Shallow odds, deep handicap | Gap ≥0.25 ball, actual deeper than theoretical + SBOBet water >1.00 | Straight outcome |
-| 3 | Draw odds dropping + deep handicap | Draw odds ↓ ≥8% from open + AH ≥0.25 deeper than theoretical | Hidden draw |
-| 4 | Late odds drop + handicap retreat | Home odds ↓ ≥5% in last 6h + AH retreats ≥0.25 (opposite direction) | Fake news |
-| 5 | Favorite deep handicap + water >1.05 | AH ≥0.75 ball + SBOBet water ≥1.05 at close | Favorite struggles |
-| 6 | Underdog drops for no reason | Underdog odds ↓ ≥10% + ZERO fundamental support (WebSearch verified) | Minimal reference value |
-| 7 | Narrative-driven moderate compression | Compression 5–15% + draw true prob >25% + driver is "known news" | Overvalued favorite |
-| 8 | Same-direction compression + AH static | Home odds ↓ ≥5% + AH unchanged | Market lean |
-| 9 | Opposite-direction odds vs AH | 1X2 moves one way, AH opposite | Strong trap |
-| 10 | SBOBet diverges from Pinnacle | SBOBet AH deviates ≥0.25 from Pinnacle | Asian sharp disagrees |
-| 11 | bet365 limit crash | bet365 limit drops >30% in 2h, odds unchanged | Risk aversion |
-| 12 | Opening line extreme | Opening AH ≥1.5 balls | Market overconfidence |
-| 13 | Illegal betting site manipulation 🚩 | Unregulated bookmaker >0.15 from Pinnacle + limit drops >50% + market suspended (≥2 signs) | RED FLAG — skip |
-| 14 | Three-bookmaker consensus break | All 3 diverge ≥0.25 on same market | Systemic uncertainty |
-| 15 | Referee-driven odds shift | Referee >0.35 penalties/game or >5.0 cards/game + physical team | Adjust OU ±0.25 |
+> **v3.2.0 重分类**: 每条陷阱标注 A/B/C 三层分类。C=信息型(真实警告) / B=诱导型(可能强化原方向) / A=仓位型(噪音/忽略)。计数阈值(≥2→🔴)已废弃，以分类加权判定为准。
 
-Each HIT → ±10% correction. ≥2 traps on same match → 🔴 HIGH severity.
+| # | Pattern | Category | Trigger | Risk |
+|:--:|---------|:--------:|---------|------|
+| 1 | Deep odds, shallow handicap | **C** | Gap ≥0.25 ball, theoretical AH deeper than actual | Draw/away upset |
+| 2 | Shallow odds, deep handicap | **C** | Gap ≥0.25 ball, actual deeper than theoretical + SBOBet water >1.00 | Straight outcome |
+| 3 | Draw odds dropping + deep handicap | **C** | Draw odds ↓ ≥8% from open + AH ≥0.25 deeper than theoretical | Hidden draw |
+| 4 | Late odds drop + handicap retreat | **B** | Home odds ↓ ≥5% in last 6h + AH retreats ≥0.25 (opposite direction) | Fake news / 庄家反向诱导 |
+| 5 | Favorite deep handicap + water >1.05 | **A** | AH ≥0.75 ball + SBOBet water ≥1.05 at close | 仓位压力, passive |
+| 6 | Underdog drops for no reason | **C** | Underdog odds ↓ ≥10% + ZERO fundamental support (WebSearch verified) | Minimal reference value |
+| 7 | Narrative-driven moderate compression | **B** | Compression 5–15% + draw true prob >25% + driver is "known news" | 庄家借叙事钓鱼 |
+| 8 | Same-direction compression + AH static | **A** | Home odds ↓ ≥5% + AH unchanged | 仓位型，被动调价 |
+| 9 | Opposite-direction odds vs AH | **C** | 1X2 moves one way, AH opposite | Strong trap |
+| 10 | SBOBet diverges from Pinnacle | **C** | SBOBet AH deviates ≥0.25 from Pinnacle | Asian sharp disagrees |
+| 11 | bet365 limit crash | **A** | bet365 limit drops >30% in 2h, odds unchanged | Risk aversion (仓位管理) |
+| 12 | Opening line extreme | **B** | Opening AH ≥1.5 balls | 庄家刻意制造"危险"假象 |
+| 13 | Illegal betting site manipulation 🚩 | **C** | Unregulated bookmaker >0.15 from Pinnacle + limit drops >50% + market suspended (≥2 signs) | RED FLAG — skip |
+| 14 | Three-bookmaker consensus break | **C** | All 3 diverge ≥0.25 on same market | Systemic uncertainty |
+| 15 | Referee-driven odds shift | **C** | Referee >0.35 penalties/game or >5.0 cards/game + physical team | Adjust OU ±0.25 |
+
+### 分类加权规则
+
+```
+C 类陷阱（信息型 — 赔率方向与基本面不一致）:
+  每条触发 → logit ±0.25（方向与陷阱指示相反）
+  多条 C 类共振 → 信度 × 0.70，标记为 🔴 高严重度
+
+B 类陷阱（诱导型 — 庄家刻意制造"危险信号"）:
+  每条触发 → 不降信度，但标记为 ⚠️ 疑似诱导
+  需成交量交叉验证: 无量配合 → 确认为诱导 → logit +0.15（强化原方向）
+                   有量配合 → 转为 C 类处理
+  多条 B 类共振且无量 → logit +0.25（庄家在反向操作）
+
+A 类陷阱（仓位型 — 被动调价，与基本面无关）:
+  每条触发 → 不产生 logit 修正
+  仅作为上下文标注: "此变动为仓位驱动，非信息信号"
+```
+
+Each HIT → Category-based correction (see above). ~~≥2 traps on same match → 🔴 HIGH severity~~ (deprecated).
 
 ---
 
 ## KB-3: Twenty-Eight Universal Trap Rules
 
+> **v3.2.0**: 每条标注 A/B/C 分类。C=信息型 / B=诱导型 / A=仓位型。分类加权规则同 KB-2。
+
 ```
- 1: Odds drop ≥8% without fundamentals → trap
- 2: Deep open (AH ≥1.0) + never retreat in 24h → true signal
- 3: Opening shallow (gap ≥0.25) + paper strength clear → upset warning
- 4: Same-direction multi-bookmaker → weight ×1.5
- 5: Pinnacle leads movement (>5 min ahead of others) → real signal
- 6: Random single-bookmaker deviation ≥0.10 → ignore
- 7: Late odds + AH both reverse in last 2h → trap
- 8: Odds ↓ ≥5% + AH retreats ≥0.25 → trap
- 9: bet365 moves opposite Pinnacle → retail-sharp conflict
-10: Odds static (σ<0.03) + water volatile (σ>0.08) → indecision
-11: Narrative compression 5–15% → market overreacting (see KB-2 Trap #7)
-12: Suspension paradox → suspended teams play MORE defensive
-13: Illegal betting site — match 2+ red flags → SKIP (see KB-2 Trap #13)
-14: Referee influence → adjust expectations (see KB-2 Trap #15)
-15: No fundamental event → movement is noise
-16: 1X2 odds drop → verify AH direction match
-17: Three-bookmaker consensus strong (≤0.15 ball) → high confidence
-18: deVigProb(home) >75% → unusual; check narrative
-19: deVigProb(draw) >30% → market uncertain; expect draw risk
-20: deVigProb(away) >40% → strong away signal; verify AH
-21: Extreme compression >15% → overreaction
-22: 1X2 spread across 3 bookmakers >0.30 → uncertainty penalty
-23: AH spread across 3 bookmakers >0.50 → high divergence
-24: Both teams WC debut → draw prob floor 28%
-25: Same-direction water rise >0.15 on all 3 → genuine flow
-26: Favorite odds <1.25 → lay risk; max confidence 80%
-27: Defensive fortress (qualifying GA<0.5 or 5+ clean sheets) → +3% direction, +15% under
-28: Heat discount (>35°C or humidity >80%) → fade favorite; underdog +5% prob
+[C]  1: Odds drop ≥8% without fundamentals → trap
+[A]  2: Deep open (AH ≥1.0) + never retreat in 24h → true signal (仓位型，市场坚定)
+[C]  3: Opening shallow (gap ≥0.25) + paper strength clear → upset warning
+[A]  4: Same-direction multi-bookmaker → weight ×1.5 (仓位共振≠信息共振)
+[A]  5: Pinnacle leads movement (>5 min ahead of others) → real signal (需量确认是否为仓位驱动)
+[A]  6: Random single-bookmaker deviation ≥0.10 → ignore
+[B]  7: Late odds + AH both reverse in last 2h → trap (庄家反向操作)
+[B]  8: Odds ↓ ≥5% + AH retreats ≥0.25 → trap (诱导型)
+[C]  9: bet365 moves opposite Pinnacle → retail-sharp conflict
+[A] 10: Odds static (σ<0.03) + water volatile (σ>0.08) → indecision (仓位拉锯)
+[B] 11: Narrative compression 5–15% → market overreacting (诱导型，借叙事)
+[C] 12: Suspension paradox → suspended teams play MORE defensive
+[C] 13: Illegal betting site — match 2+ red flags → SKIP (see KB-2 Trap #13)
+[C] 14: Referee influence → adjust expectations (see KB-2 Trap #15)
+[A] 15: No fundamental event → movement is noise
+[C] 16: 1X2 odds drop → verify AH direction match
+[C] 17: Three-bookmaker consensus strong (≤0.15 ball) → high confidence
+[C] 18: deVigProb(home) >75% → unusual; check narrative
+[C] 19: deVigProb(draw) >30% → market uncertain; expect draw risk
+[C] 20: deVigProb(away) >40% → strong away signal; verify AH
+[B] 21: Extreme compression >15% → overreaction (庄家造势)
+[C] 22: 1X2 spread across 3 bookmakers >0.30 → uncertainty penalty
+[C] 23: AH spread across 3 bookmakers >0.50 → high divergence
+[C] 24: Both teams WC debut → draw prob floor 28%
+[A] 25: Same-direction water rise >0.15 on all 3 → genuine flow (仓位型)
+[C] 26: Favorite odds <1.25 → lay risk; max confidence 80%
+[C] 27: Defensive fortress (qualifying GA<0.5 or 5+ clean sheets) → +3% direction, +15% under
+[C] 28: Heat discount (>35°C or humidity >80%) → fade favorite; underdog +5% prob
 ```
 
 ---
@@ -261,121 +283,148 @@ D5: requires yazhi water data → if missing, D5 = 0.5
 
 ---
 
-## KB-6: Weighted Probability Synthesis Model
+## KB-6: Unified Logit Correction Pipeline (v3.3.0)
 
-**Base**: De-vigged home/draw/away from Pinnacle (Step 3).
+> **v3.3.0 重大重构**: 废除概率空间加法（`base + Σ(corrections)`），全部迁移到 logit 空间。与 KB-10.8 MBI 在同一个 logit 管线中串行叠加，避免双轨冲突和边界溢出。
 
-**Apply corrections in order, then NORMALIZE:**
+### 6.1 换算基准
 
-| # | Correction | Magnitude | Condition |
-|:--:|------------|:---------:|-----------|
-| 1 | Euro-Asian trap hit | ±10% | Any of 15 traps triggered |
-| 2 | Opening odds law hit | ±8% | Any of 4 laws triggered |
-| 3 | Late movement authenticity | ±7% | Pass/fail check |
-| 4 | Compression intensity | +7/+7/+3.5/0% | Extreme/Strong/Moderate/Weak |
-| 5 | Fundamental alignment | ±5% | Weighted fundamental match |
-| 6 | Back-to-Wall effect | draw +5~8%, away +5% | Seeker triggered |
-| 7 | Narrative discount | favorite −5% | Odds driven by "known news" |
-| 8 | 6D score | ±3% | ≥4→+3%; ≤2→−3% |
-| 9 | SBOBet divergence | ±3% | Asian sharp vs Pinnacle gap |
-| 10 | Market liquidity | confidence × (0.85–1.00) | KB-8 indicators |
-| 11 | External factors | xG × (1 ± penalty × 0.03) | KB-8 weather/travel/rest |
-
-**Normalize** (MANDATORY):
+中位锚定法（base 50%，logit=0）:
 ```
-raw = base + Σ(corrections)
-total = raw_home + raw_draw + raw_away
-predicted = raw / total × 100%
+概率 +10%  →  logit +0.40
+概率  +8%  →  logit +0.32
+概率  +7%  →  logit +0.28
+概率  +5%  →  logit +0.20
+概率  +3%  →  logit +0.12
+```
+
+### 6.2 12 项校正换算为 logit 偏移
+
+| # | Correction | Logit Δ | Condition |
+|:--:|------------|:-------:|-----------|
+| 1 | 欧亚陷阱 | ±0.40 | A/B/C 分类加权确定方向（C类→±0.40，B类→±0.20需量确认，A类→0） |
+| 2 | 开盘定律 | ±0.32 | Any of 4 laws triggered |
+| 3 | 临场真实性 | ±0.28 | Pass/fail check |
+| 4 | 压缩强度 | +0.28 / +0.14 | Extreme/Strong → +0.28; Moderate → +0.14; Weak → 0 |
+| 5 | 基本面一致 | ±0.20 | Weighted fundamental match |
+| 6 | 背水一战 | 平 +0.20~0.32, 客 +0.20 | Seeker triggered |
+| 7 | 叙事折扣 | 热门 −0.20 | Odds driven by "known news" |
+| 8 | 6D 评分 | ±0.12 | ≥4→+0.12; ≤2→−0.12 |
+| 9 | SBO 分歧 | ±0.12 | Asian sharp vs Pinnacle gap |
+| 10 | 市场流动性 | conf × (0.85–1.00) | **后置乘数**（sigmoid 后应用，不进 logit 管线） |
+| 11 | 外部因素 | xG × (1 ± penalty × 0.03) | **剥离至 KB-7**（进球倾向用，不进概率管线） |
+
+### 6.3 组内降权规则（KB-6 内部）
+
+**组3 — 盘口异常检测**（校正 #1 + #2 + #3，三者测同一现象）:
+```
+只取 max(|Δ|)，其余两项各 ×0.30
+  corrected_组3 = max(|Δ₁|,|Δ₂|,|Δ₃|) × sign + 0.30 × next_largest + 0.30 × smallest
+```
+**组4 — 基本面/叙事**（校正 #5 + #6 + #7，信息源不同）:
+```
+线性叠加，不降权（信息源各自独立）
+```
+
+### 6.4 统一管线执行顺序（8 步）
+
+```
+① Shin de-vig → P_base（概率）
+     ↓
+② logit_base = ln(P_base / (1 − P_base))
+     ↓
+③ KB-6 校正（9项 logit偏移，含组3/组4降权）
+   logit_ctx = logit_base + dampened_Σ(KB6_correction_i)
+     ↓
+④ KB-10.8 MBI 校正（6项 logit偏移，见 KB-10.8 降权规则）
+   logit_final = logit_ctx + dampened_Σ(MBI_signal_i)
+     ↓
+⑤ 总量 cap:
+   |KB6_correction_total| ≤ 0.80 logit (≈概率 ±20%)
+   |MBI_total| ≤ 0.80 logit
+   合计 |correction_total| ≤ 1.20 logit
+   超出 → 按比例等比压缩到上限
+     ↓
+⑥ sigmoid: P = 1 / (1 + e^(−logit_final))
+     ↓
+⑦ 归一化: P_final = P / Σ(P)
+     ↓
+⑧ 后置乘数: conf' = conf × liquidity_factor (校正 #10)
+             P_final 不变，仅压缩置信度
+```
+
+### 6.5 logit cap 数学含义
+
+```
+base 55% (logit=0.20) + cap 1.20 = logit 1.40 → sigmoid → ≈80% 主胜
+  → 足球中 80% 已接近理性上限，杜绝 90%+ 虚假高置信度
 ```
 
 ---
 
-## KB-7: Score Prediction Refinements (14.0–14.11)
+## KB-7: Goal Tendency Determination
 
-### Base xG Flow
+> **v3.2.0 重大改动**: 砍除 Poisson Top 3 比分精确输出。原因：Poisson 独立性假设在足球中不成立（进球概率随比分状态变化、上下半场 λ 不同、红牌/伤病扰动）。精确比分预测是虚假精度，庄家全场比分盘(Correct Score)的抽水远高于 SPF 盘，印证连庄家都无法精确定价。改为输出进球倾向三档判定。
+
+### Base xG Flow (保留用于方向判定)
 ```
 1. home_xG = (OU_line / 2) + (AH_line × 0.5)
    away_xG = (OU_line / 2) − (AH_line × 0.5)
-2. Apply 14.4 correction (team form, WebSearch required)
-3. Apply external factors (14.10)
+2. Apply team form correction (WebSearch if available)
+3. Apply external factors (KB-8 14.10 weather/travel/rest)
 4. Adjust by probability: home_xG ×= (pred_home/50%), away_xG ×= (pred_away/50%)
-5. Poisson: P(home:n,away:m) = Poisson(n, home_xG) × Poisson(m, away_xG)
-6. Rank → top 3 scores
 ```
 
-### 14.0a Away xG Strong-D Discount
-- Away def tier "elite" (GA<0.8/game): away_xG ×0.85, home_xG ×0.92
-- Away def tier "ultra-elite" (GA<0.5/game): away_xG ×0.75, home_xG ×0.92
+### Goal Tendency Classification
 
-### 14.0b Stomp xG (Extreme Favorite)
-- If pred_home ≥70% AND AH ≥1.5: home_xG += 1.5×(pred_home−70%)/30% (max +1.5), away_xG −= 0.3 (floor 0.15)
+```
+Step 1: 计算全场预期总进球
+  total_xG = home_xG + away_xG
 
-### 14.0c Host Historic xG
-- World Cup host nation → home_xG += 1.0
+Step 2: 应用校正因子（以下从原 14.x 简化保留）
+  14.0a 客场防守折扣: away def tier "elite" → total_xG ×0.92
+  14.0b 深盘压制: pred_home ≥70% AND AH ≥1.5 → total_xG += 0.5 (stomp potential)
+  14.2 OU Price Calibration: adjusted_OU = OU_line + (OU_home_water − 1.90) × 0.5
+  14.4 xG Factor: team form adjustment (WebSearch, skip if unavailable)
+  14.5 Phase Coefficient: Group R1 ×1.00 / R2 ×0.95 / R3 ×0.90 / KO R16 ×0.88 / QF ×0.85 / SF ×0.82 / Final ×0.80
+  14.6 Zero-Inflation: both teams ≤2 GF/game → total_xG ×0.90
+  14.10 External: weather ≤ −1.0 → total_xG ×0.85; rest deficit → ×0.92
 
-### 14.0d Knockout Draw Baseline
-- KO matches: draw probability floor = 28%
+Step 3: 最终校正
+  final_xG = total_xG × Π(correction_factors)
+  weighted_OU = max(OU_line, final_xG) × 0.4 + min(OU_line, final_xG) × 0.6 (anchor to market OU)
 
-### 14.0e Ultra-Low Odds Fragility
-- If any outcome odds <1.25: max confidence = 80%; score range +1 goal each side
+Step 4: 判定
+  偏大球: weighted_OU ≥ 2.75 or (weighted_OU ≥ 2.5 and draw exclusion 4/4 true)
+  偏小球: weighted_OU ≤ 2.0 or (weighted_OU ≤ 2.25 and both teams defensive fortress)
+  中性: 2.0 < weighted_OU < 2.75
 
-### 14.1 AH Water Calibration
-- home_xG ×= (1 / home_ah_water), away_xG ×= (1 / away_ah_water)
+Step 5: 置信度
+  高: market OU + team trends + external factors all aligned
+  中: 2 of 3 aligned
+  低: ≤1 aligned or data missing
+```
 
-### 14.2 OU Price Calibration
-- adjusted_OU = OU_line + (OU_home_water − 1.90) × 0.5; recalibrate if ≠
+### Draw Exclusion (保留用于大小球判定)
+```
+All 4 true → over boost:
+  1. Both no 0-0 in last 3  2. Combined GF >2.5
+  3. OU 2.5 over water ≤1.85  4. No defensive fortress (KB-3 rule #27)
+```
 
-### 14.3 CS Market Calibration
-- weighted_OU = Σ(score_total × CS_implied_prob); if |weighted_OU − OU_line| >0.25 → override
+### ⛔ 已移除
 
-### 14.4 xG Factor Correction (team form)
-- Requires WebSearch for each team's last 6-match avg GF/GA
-- home_xG_adjusted = home_xG × (GF_home/avg) × (GA_away/avg); same for away
-- If WebSearch unavailable → skip with note "market-only xG"
-
-### 14.5 Phase Conservative Coefficient
-- Group R1: ×1.00 / R2: ×0.95 / R3: ×0.90
-- KO R16: ×0.88 / QF: ×0.85 / SF: ×0.82 / Final: ×0.80
-
-### 14.6 Poisson Zero-Inflation
-- If both teams ≤2 GF/game: P(0-0) +=0.05, P(0-1) +=0.02, then re-normalize
-
-### 14.7 Multi-Period Fusion
-- Late-1h present: H_late×0.60 + H_mid×0.25 + H_open×0.15
-- Mid only: H_mid×1.0
-
-### 14.8 Dispersion Confidence Penalty
-- AH_std = std(3 AH lines), OU_std = std(3 OU lines)
-- penalty = max(0, 1 − 0.3×(AH_std+OU_std))
-- Top1 prob ×= penalty; if AH_std≥0.25 or OU_std≥0.25 → 🔴 flag
-
-### 14.9 Market Liquidity
-
-| Indicator | Healthy | Warning | Danger |
-|-----------|:---:|:---:|:---:|
-| Water σ (1h) | <0.03 | 0.03–0.06 | >0.06 |
-| Spread tightness | <1.06 | 1.06–1.10 | >1.10 |
-| Change frequency (6h) | >20 | 10–20 | <10 |
-| SBOBet-Pinnacle AH gap | <0.25 | 0.25–0.50 | >0.50 |
-| bet365 limit direction | ↑ | flat | ↓ |
-
-- liquidity_score = avg(indicators mapped to 0–1)
-- confidence ×= (0.85 + 0.15 × liquidity_score)
-
-### 14.10 External Factor Quantification
-
-| Factor | 0 (neutral) | −0.5 | −1.0 |
-|--------|:---:|:---:|:---:|
-| Weather | Clear, 10–25°C | Rain, 5–10 or 25–32°C | Snow/storm, <5 or >32°C |
-| Travel | <500km | 500–2000km | >2000km or +3h tz |
-| Rest | ≥5 days | 3–4 days | ≤2 days |
-| Altitude | <500m | 500–1500m | >1500m |
-
-- external_penalty = Σ(scores for both teams)
-- xG ×= (1 + penalty × 0.03)
-
-### 14.11 Draw Inertia
-- Either team ≥2 consecutive draws in last 3 → draw prob floor = max(current, 30%)
+以下原 KB-7 内容因虚假精度已移除，不再参与任何计算：
+- ~~Poisson 比分概率分布~~ (独立性假设不成立)
+- ~~Top 3 比分及百分比~~ (误导用户产生确定性幻觉)
+- ~~14.0c Host Historic xG~~ (缺乏跨赛事验证)
+- ~~14.1 AH Water Calibration~~ (与 OU 判定无直接关系)
+- ~~14.3 CS Market Calibration~~ (用 CS 盘校正，等于用庄家校正自己)
+- ~~14.7 Multi-Period Fusion~~ (与进球倾向判定无直接关系)
+- ~~14.8 Dispersion Confidence Penalty~~ (输出级别已不适用)
+- ~~14.11 Draw Inertia~~ (与进球倾向无关)
+- ~~14.0d Knockout Draw Baseline~~ (与进球倾向无关)
+- ~~14.0e Ultra-Low Odds Fragility~~ (与进球倾向无关)
 
 ---
 
@@ -603,7 +652,9 @@ P≥70% 的比赛 10 场 80% 准确。唯一不可解释的冷门: 阿根廷 1-2
 | **Asian** | 0.25 | 澳门, 皇冠, 利记, 易胜博, 12bet, 18bet | Regional capital flow, water-level sensitive, macro-policy influenced |
 | **Retail** | 0.20 | 威廉希尔, 立博, Interwetten, 必发(exchange), 伟德, Bwin | Public sentiment, recreational volume, exchange reveals real money |
 
-### 10.1 Sharp Consensus Score (SCS) — v3.0.1 revised
+### 10.1 Sharp Consensus Score (SCS) — v3.2.0 revised
+
+> **⚠️ v3.2.0 重要警告**: Sharp 机构调价不一定是"判断赛果"。Pinnacle 的商业模式是抽水驱动的做市商——调价可能仅是响应单边持仓压力（仓位驱动），而非信息驱动。SCS 信号必须配合 **10.3b 量价交叉验证** 使用，否则会系统性高估 Sharp 调价的信息含量。
 
 ```
 For each outcome (H/D/A), across all 30 bookmakers:
@@ -626,14 +677,17 @@ Final SCS = SCS_favorite × 0.6 + SCS_draw × 0.2 + SCS_underdog × 0.2
   (favorite = lowest current odds among H/D/A, not fixed to home)
 ```
 
-**v3.0.1 improvements**:
-- Dynamic favorite determination (no longer fixed to home win), auto-adjusts when away is favorite
-- Added magnitude weighting (0.01 vs 0.1 change has different signal strength)
-- Added time decay (late changes weighted higher than early changes)
-- Adaptive noise threshold (different standards for deep vs shallow handicap)
+**v3.2.0 新增交叉验证要求**:
+```
+SCS 信号生效需通过 10.3b 量价交叉验证:
+  SCS ≥ 0.70 + 成交量确认方向 → 全效，logit +0.40
+  SCS ≥ 0.70 + 成交量不配合 → 降效，logit +0.15（可能仓位驱动）
+  SCS < 0.40 + 成交量放大 → 分歧有效，logit −0.20
+  SCS < 0.40 + 成交量萎缩 → 低流动性噪声，忽略
+```
 
-**Thresholds**:
-- SCS ≥ 0.70 → Strong consensus → Step 10 correction +10%
+**Thresholds** (均需量价验证):
+- SCS ≥ 0.70 → Strong consensus → 经量价验证后 ±logit
 - SCS 0.40–0.70 → Moderate → no adjustment
 - SCS < 0.40 → Weak consensus → Step 10 penalty −5%
 
@@ -687,7 +741,7 @@ Chaos-type dispersion detection:
   Action: DRI penalty fully applied
 ```
 
-### 10.3 Lead-Lag Chain Detection — v3.0.1 revised
+### 10.3 Lead-Lag Chain Detection — v3.2.0 revised
 
 ```
 Parse change_time from yazhi page (format: "MM-DD HH:MM").
@@ -713,6 +767,41 @@ Lead institution priority (by event type):
    → GENUINE EVENT, logit +0.20
 
 Default: no clear chain → 0
+```
+
+#### 10.3b Volume×Price Cross-Validation (v3.2.0 NEW)
+
+> **核心逻辑**: Pinnacle 调价 ≠ 判断赛果。区分仓位驱动调价 vs 信息驱动调价 vs 庄家诱导。
+
+```
+四象限判定矩阵（结合 touzhu 页必发成交量数据）:
+
+  ┌─────────────────┬───────────────────┬──────────────────┐
+  │ 赔率方向         │ 成交量↑(配合)      │ 成交量→(不配合)    │
+  ├─────────────────┼───────────────────┼──────────────────┤
+  │ 赔率↓(看好)     │ 被动调价(仓位驱动)  │ 主动降价(信息驱动) │
+  │                 │ = 噪音, 忽略       │ = 真信号, ×1.3    │
+  │                 │ Lead-Lag 降级      │ Lead-Lag 升级    │
+  ├─────────────────┼───────────────────┼──────────────────┤
+  │ 赔率↑(看淡)     │ 被动抬价(资金离场)  │ 主动抬价(诱导)     │
+  │                 │ = 撤退信号,        │ = 反向信号,       │
+  │                 │   logit −0.15      │   logit +0.20    │
+  │                 │                   │   (跟庄家反向)    │
+  └─────────────────┴───────────────────┴──────────────────┘
+
+判定阈值:
+  成交量↑: 必发该方成交量 > 前 4h 均量 × 2
+  成交量→: 必发该方成交量 < 前 4h 均量 × 1.2
+
+与 Lead-Lag 集成:
+  检测到 Lead 变动 → 立即查必发对应方向成交量
+  主动降价 + STRONG chain → logit +0.40 × 1.3 = +0.52 (最强信号)
+  被动调价 + STRONG chain → logit +0.40 × 0.5 = +0.20 (降级)
+  主动抬价(诱导) + GENUINE EVENT → logit −0.20 (庄家反向操作)
+
+与陷阱 B 类联动:
+  B 类陷阱触发 + 赔率变动方向无量配合 → 确认为诱导 → 强化原方向
+  B 类陷阱触发 + 赔率变动方向有量配合 → 转为 C 类处理 → 降信度
 ```
 
 ### 10.4 Water Flow Analysis — v3.0.1 revised
@@ -949,53 +1038,106 @@ Step D: 归一化
 - Equivalent to log-odds multiplication in Bayesian updating, mathematically correct
 - Correction magnitude naturally compresses near extreme probabilities (e.g., 90%+), consistent with intuition
 
-### MBI Composite (#12) in logit space
+### MBI Composite (#12) in logit space (v3.3.0)
+
+> **v3.3.0 重大升级**: 引入四组相关降权 + 总量 cap，与 KB-6 统一 logit 管线串联执行。
 
 ```
 #12 MBI Composite 作为 logit 偏移量:
-  mbi_logit = SCS_signal + DRI_signal + LeadLag_signal + Kelly_signal + WaterFlow_signal
+  mbi_raw = SCS_raw + DRI_raw + LeadLag_raw + Kelly_raw + WaterFlow_raw + VolXPrice_raw
 
-  SCS_signal:
-    SCS ≥ 0.70 → +0.40  (strong consensus)
+  各模块原始信号 (raw signal):
+  SCS_raw (v3.2.0: 需量价交叉验证):
+    SCS ≥ 0.70 + 量价确认 → +0.40
+    SCS ≥ 0.70 + 量价不配合 → +0.15
     SCS 0.40–0.70 → 0
-    SCS < 0.40 → −0.20  (weak consensus)
+    SCS < 0.40 → −0.20
 
-  DRI_signal:
-    DRI < 15 → +0.20   (tight)
+  DRI_raw:
+    DRI < 15 → +0.20
     DRI 15–40 → 0
-    DRI 40–70 → −0.35  (high dispersion)
-    DRI > 70 → −0.70   (extreme, plus confidence × 0.70 override)
+    DRI 40–70 → −0.35
+    DRI > 70 → −0.70
 
-  LeadLag_signal:
-    STRONG chain → +0.40
+  LeadLag_raw (v3.2.0: 带量价校正):
+    STRONG chain + 主动降价 → +0.52
+    STRONG chain + 被动调价 → +0.20
+    STRONG chain (无量数据) → +0.40
+    GENUINE EVENT + 主动抬价(诱导) → −0.20
     GENUINE EVENT → +0.20
     NOISE/WEAK → 0
 
-  Kelly_signal (CORRECTED):
-    fav Kelly < 0.92 + lowest → +0.20  (institution control)
-    fav Kelly > 1.00 → −0.35  (no control, potential trap)
+  Kelly_raw:
+    fav Kelly < 0.92 + lowest → +0.20
+    fav Kelly > 1.00 → −0.35
     neutral → 0
 
-  WaterFlow_signal:
+  WaterFlow_raw:
     Flow ≥ 0.70 + Pinnacle leads → +0.30
-    Flow ≥ 0.70 + Pinnacle static → −0.20 (suspicious)
+    Flow ≥ 0.70 + Pinnacle static → −0.20
     Flow < 0.50 → 0
 
-  Apply: logit_h' = logit_h + mbi_logit
+  VolXPrice_raw (v3.2.0):
+    主动降价(信息驱动) → +0.17
+    主动抬价(诱导) → −0.20
+    被动调价(仓位驱动) → 0
+    资金离场(被动抬价+量增) → −0.15
 ```
 
-### Factor Correlation Dampening (v3.0.1 NEW)
+### Factor Correlation Dampening (v3.3.0 EXPANDED)
 
-SCS, DRI, and Water Flow all essentially measure "market consensus strength" and are highly correlated. Direct stacking would cause double counting.
+**v3.3.0 重大升级**: 原 v3.0.1 仅降权 SCS↔WaterFlow (太温和，只覆盖 ≤2 模块)。v3.3.0 扩展到四组，覆盖所有 15 项校正（KB-6 9项 + MBI 6项）。
 
 ```
-Dampening rule:
-  如果 SCS_signal 和 WaterFlow_signal 同向（都正或都负）:
-    叠加值 = max(SCS_signal, WaterFlow_signal) + 0.3 × min(SCS_signal, WaterFlow_signal)
-  (larger signal fully counted, smaller signal discounted to 30%, avoiding 1+1=2 linear amplification)
+四组降权规则:
 
-  如果 DRI_signal < −0.35（高离散）且 SCS_signal > 0:
-    DRI_signal halved (info-driven dispersion ≠ chaos-type dispersion)
+组1 — 资金热度/共识 (MBI): SCS + LeadLag + WaterFlow
+  三者测同一现象("市场往哪走")，方向几乎总同向。
+  处理: 只取 max，其余两项各 ×0.25
+  signal_组1 = max(SCS, LeadLag, WaterFlow) + 0.25 × mid + 0.25 × min
+  (原: +0.40+0.52+0.30=1.22 → 新: 0.52+0.10+0.075=0.695 logit)
+
+组2 — 市场不确定性 (MBI): DRI + SBO分歧(校正9) + 6D评分(校正8)
+  三者测市场噪音/分歧/不确定性。
+  处理: 只取最负的一项（风险厌恶原则），其余忽略
+  signal_组2 = min(0, DRI_raw, 校正9_raw, 校正8_raw)
+  (保留最悲观信号，不叠加)
+
+组3 — 盘口异常检测 (KB-6): 校正1(欧亚陷阱) + 校正2(开盘定律) + 校正3(临场真实性)
+  处理: 只取 max(|Δ|)，其余两项各 ×0.30 (同 KB-6.3)
+  signal_组3 = max(|Δ₁|,|Δ₂|,|Δ₃|) × sign + 0.30 × next + 0.30 × last
+
+组4 — 基本面/叙事 (KB-6): 校正5(基本面) + 校正6(背水一战) + 校正7(叙事)
+  信息源各自独立 → 线性叠加，不降权
+  signal_组4 = 校正5 + 校正6 + 校正7
+
+跨组规则:
+  KB-6 组(组3+组4) 与 MBI 组(组1+组2) 不额外降权（信息源不同）
+```
+
+### MBI Composite Final (v3.3.0)
+
+```
+mbi_logit = signal_组1 + signal_组2
+
+Apply:
+  logit_final = logit_ctx + min(mbi_logit, 0.80)
+  (MBI 总量 cap 0.80 logit，≈概率 ±20%)
+```
+
+### Total Correction Cap
+
+```
+|KB6_correction_total| ≤ 0.80 logit  (组3+组4+其他独立项)
+|MBI_total| ≤ 0.80 logit  (组1+组2+独立项)
+合计 |correction_total| ≤ 1.20 logit
+
+含义（以 base 55%，logit=0.20 为起点）:
+  +0 校正   → sigmoid(0.20) = 55%
+  +0.60     → sigmoid(0.80) = 69%
+  +1.00     → sigmoid(1.20) = 77%
+  +1.20 CAP → sigmoid(1.40) = 80%  ← 硬上限
+  80% 是足球预测的理性上限，从此杜绝 90%+ 虚假高置信度
 ```
 
 ### 10.9 Quick MBI Assessment (for report)
@@ -1600,6 +1742,58 @@ python3 references/parser.py --wanchang --date 2026-06-20 --json
    Ignores league transparency differences = top leagues miss signals + minnow leagues hit traps
 ```
 
+### 13.8 竞彩市场转换层 (v3.3.0 NEW)
+
+> **v3.3.0 新增**: 分析层（Pinnacle/Betfair, 返奖率 ~98%）与执行层（竞彩, 串关返奖率 ~71%）存在市场错配。所有概率分析必须在竞彩 EV 框架下重新评估。
+
+#### 13.8a 竞彩 EV 转换公式
+
+```
+竞彩 EV = deVigProb × 竞彩赔率 × 串关返奖率(0.71) − 1
+
+竞彩隐含概率: Q_h = (1/C_h) / (1/C_h + 1/C_d + 1/C_a) × R
+```
+
+#### 13.8b EV 阈值分级
+
+```
+EV > +0.05:       正期望，正常投
+−0.05 ≤ EV ≤ +0.05: 边界，仅限小仓（≤1% 本金）
+EV < −0.05:       负期望，标注 ⚠️ 警告，仓位 × 0.50
+EV < −0.15:       严重负期望，🔴 禁止入选串关核心
+
+示例（deVigProb=55% 主胜, 竞彩赔率 1.60, R=0.71）:
+  EV = 0.55 × 1.60 × 0.71 − 1 = −0.375
+  → 🔴 严重负期望 — MBI 可能仍说"方向看好"，但竞彩无正EV
+```
+
+#### 13.8c 竞彩特有的"赔率冻住"风险
+
+```
+竞彩赔率开售后不随国际市场变动。
+
+规则:
+  国际市场赛前 1h 发生显著变盘（>5% 方向移动）
+  且竞彩赔率未更新
+  → 报告强制声明: "⚠️ 价格失效 — 国际赔率已变，竞彩赔率可能不反映当前市场"
+  → 相应方向竞彩 EV 可靠性降级
+```
+
+#### 13.8d 单关 vs 串关返奖率差
+
+```
+竞彩返奖率:
+  单关: ~86%
+  串关 (2串1): ~71%
+  串关 (3串1): ~71%² ≈ 50%
+
+策略含义:
+  竞彩 EV = deVigProb × C_odds × R − 1
+  → 单关 EV 阈值: EV ≥ 0 即正期望
+  → 串关 EV 阈值: 需 ≥ +0.05 才能覆盖返奖率差
+  → Step 11 串关构建前: 逐条腿计算竞彩 EV，任何 EV<−0.05 不得入选
+```
+
 ---
 
 ## KB-14: Bookmaker Intelligence — Market Pressure & Pulsation Analysis
@@ -1745,3 +1939,256 @@ MPC > 0.3 场次中修正后命中率提升 ≥ 3% → 模块有效
 | F 高频 | ≥ 0.4 | 振荡经验线 |
 | D 低幅 | < 1.5% | 位移经验线 |
 | ω₁/ω₂ | 0.6/0.4 | PVD/CD 权重 |
+
+---
+
+## KB-15: External Signal Injection Roadmap (v3.2.0)
+
+> **核心理念**: 赔率不是信息源，是庄家的风险管理工具。真正的 edge 在赔率之外。
+> 本模块为长期演进路线图，标注实施优先级和代价。
+
+### 15.1 伤停/首发信息自动抓取 (优先级: ⭐⭐⭐)
+
+**逻辑**: 赛前 1-2h 首发公布 → 提取关键位置变化 → 对比赔率变动时间戳。
+
+```
+执行流程:
+  1. 赛前 2h: 抓取 500.com 伤停页面或竞彩官网首发
+  2. 提取: 主力前锋缺阵? 核心中场轮休? 防线核心停赛?
+  3. 时间戳对比:
+     赔率在首发公布前已调整 → 信息提前泄露，市场已定价 → 无 edge
+     赔率在首发公布后仍未调整 → 市场未反应 → 真正的 edge
+  
+  4. 量化:
+     关键缺阵 (前锋/中场/门将) → 对应方 logit −0.15
+     双核缺阵 → logit −0.30
+     防线重组 (≥2人换位) → 对方 logit +0.10
+```
+
+**数据源**: 500.com shuju 页面已有伤停信息（部分联赛）。竞彩官网赛前1h 公布首发。
+**实现代价**: 低。在 Step 1.5 反叙事筛查中嵌入首发抓取逻辑。
+
+### 15.2 赛程密度体能模型 (优先级: ⭐⭐)
+
+**逻辑**: 7 天 3 赛的球队体能衰减高度可预测，但赔率定价滞后。
+
+```
+体能扣分表:
+  7 天 2 赛 (正常): ×1.00
+  7 天 3 赛 (密集): ×0.92 (总进球倾向降低)
+  7 天 4 赛 (极端): ×0.85
+  
+  双线作战 (联赛+杯赛): 自动降 1 档
+  跨洲旅行 (>3h 时差): 自动降 1 档
+  
+  轮换概率:
+    密集赛程 + 对手为弱旅 → 轮换概率高 → 深盘穿盘概率降低
+    密集赛程 + 对手为强敌 → 轮换概率低 → 体能衰减影响防守端
+```
+
+**数据源**: 比赛日程公开数据，无需外部 API。
+**实现代价**: 中。需要在 Step 2 基本面分析中嵌入赛程体能模块。
+
+### 15.3 天气/场地信息 (优先级: ⭐)
+
+**逻辑**: 对特定联赛（北欧、英冠冬季、J 联赛雨季），天气对进球数的预测力高于赔率。
+
+```
+天气影响矩阵:
+  暴雨/大雪 → 总进球倾向 −1 档（偏小球）
+  高温 >32°C → 总进球倾向 −1 档（体能消耗加速）
+  大风 >8 级 → 技术型球队受影响 > 力量型球队
+  人工草皮 → 客队不适应 → 主场优势 +5%
+  场地积水 → 长传冲吊队受益，控球队受损
+```
+
+**数据源**: OpenWeatherMap API 或比赛地天气网页抓取。
+**实现代价**: 中高（需要稳定 API 或定时抓取）。
+
+### 15.4 实施优先级总结
+
+| 信号源 | 预期信息增益 | 实现代价 | 状态 |
+|:---|:---:|:---:|:---|
+| 首发伤停 | **高** — 信息驱动，庄家常滞后 | 低 | 📋 待实现 |
+| 赛程体能 | 中 — 可预测但庄家也在看 | 中 | 📋 待实现 |
+| 天气场地 | 中低 — 特定联赛有效 | 中高 | 📋 待实现 |
+| NLP 新闻 | ⛔ 黑名单 — 新闻是庄家鱼饵 (KB-13.7) | — | 永久排除 |
+
+### 15.5 与外源信号联动
+
+所有外源信号统一在 Step 1.5 (反叙事筛查) 和 Step 2 (基本面分析) 中注入。
+输出时在「信号来源分解」面板的第四行「赔率之外还需要知道的」中显性标注。
+空白 = 边界明确 → 提醒用户该判断完全基于赔率。
+
+---
+
+## KB-16: FVS — Favorite Vulnerability Score (v3.3.0)
+
+> **v3.3.0 新增**: 热门脆弱性引擎。MBI 负责"热门有多热"，FVS 负责"热门什么时候会翻车"。
+> 所有规则来自 postmortem O-1 至 O-9 的复盘血泪 + 架构师补充的实战盲区（魔鬼赛程/临场诱盘/核心伤停/德比）。
+
+### 16.1 设计原则
+
+```
+FVS 不改方向（MBI 的方向判定不受 FVS 影响）
+FVS 改仓位和置信度（作为 Kelly 惩罚乘数）
+FVS 改串关资格（FVS≥2 → 禁止入串关核心腿）
+
+三级响应:
+  0-1 分: 正常，不调整
+  2-3 分: ⚠️ 衰减   conf × 0.85, 仓位 × 0.70
+  4-5 分: 🔴 严重   conf × 0.70, 禁入串关核心，仅可容错腿或单关 ≤1%
+  6 分+:  🚫 熔断   方向保留（估值用），投注操作停止
+```
+
+### 16.2 13 条 FVS 规则
+
+| # | 规则 | 触发条件 | 分值 | 类型 | 来源 |
+|:--:|------|---------|:---:|:---:|:---|
+| FVS-0 | 绿灯/安全阀 | fav<1.30 + 必发>80% + 赔率续降 + WaterFlow净流入 | −2 | 单场 | 架构师 |
+| FVS-1 | 超低赔警告 | odds <1.25 → +1, <1.18 → +2 | +1/+2 | 单场 | O-1 |
+| FVS-2 | 全低赔日 | 当日所有场次 SPF ≤1.50 | +2 | **系统性** | O-9 |
+| FVS-3 | 同日中赔扎堆 | ≥2场 odds 在 1.20-1.50 区间 | +1 | 系统性/单场 | O-7 |
+| FVS-4 | 零陷阱悖论 | 6D 4.0-4.5 + 0陷阱 | +1 | 单场 | O-6 |
+| FVS-5 | 换帅≤7天 | 赔率巨变 + 模型做正面校正 | +1 | 单场 | O-4 |
+| FVS-6 | 深盘偏差 | AH 理论偏差 ≥0.50 | +1 | 单场 | O-8 |
+| FVS-7 | 平局概率升高 | deVig(平)>25% + fav<1.80 | +1 | 单场 | — |
+| FVS-8 | 大胜弱旅后 | 首轮净胜≥4 + 次轮 | +1 | 单场 | O-2 |
+| FVS-9a | 全票+无量 | MBI 5/5一致 + VolXPrice无支撑 | +1 | 单场 | — |
+| FVS-9b | 单边过热+抗跌 | 必发某方>80% + 赔率不降/反升 | **+3** | 单场 | 架构师 |
+| FVS-10 | 魔鬼赛程 | 7天3赛/无欲无求 vs 保级队 | +1/+2 | 单场 | 架构师 |
+| FVS-11 | 临场诱盘 | 让球偏浅 + 临场退盘升水 | +2 | 单场 | 架构师 |
+| FVS-12 | 核心伤停 | 绝对核心缺阵 + 模型未降权 | +1 | 单场 | 架构师 |
+| FVS-13 | 德比/极端环境 | 德比战 or 极端天气 | +1 | 单场 | 架构师 |
+
+### 16.3 FVS-9b 独立通道（特殊处理）
+
+```
+FVS-9b(单边过热+抗跌)是最高权重信号(+3), 必须独立处理:
+
+触发时自动激活:
+  1. floor = 4（≥严重级别）
+  2. MBI 若仍给出热门方向强信号 → 强制降级为"博冷候选"方向
+  3. 输出标注: "⚠️ 必发过热抗跌: 热门方向与真实资金背离，考虑反向"
+```
+
+### 16.4 FVS-0 绿灯抵消规则
+
+```
+FVS-0 触发条件（全部满足）:
+  ① 热门赔率 <1.30
+  ② 必发该方成交量 >80%
+  ③ 赔率持续下降（机构主动降低赔付）
+  ④ WaterFlow 呈现净流入 + VolXPrice 确认为信息驱动（主动降价+量增）
+
+效果:
+  抵消最高 2 分 FVS 扣分 → single_fvs_score = max(0, single_fvs_score − 2)
+  注意: 赔率下降必须配合成交量放大才生效
+        (无量降价 = 可能庄家主动调价引导，不是真实防范 → 不触发 FVS-0)
+```
+
+### 16.5 系统性 vs 单场分离
+
+```
+系统性 FVS 触发时全局生效:
+  FVS-2 (全低赔日): 当日所有场次仓位 × 0.50
+  FVS-3 (中赔扎堆): 所有 1.20-1.50 场次额外降权
+
+单场 FVS: 仅影响该场
+
+叠加规则 (Max-Penalty 原则):
+  系统性 × 单场 → 取最严格，不连乘
+  final_mult = Min(system_mult, single_mult) − 0.10
+  (避免仓位缩水到毫无意义的粉尘级别)
+```
+
+### 16.6 串关木桶效应
+
+```
+FVS 串关资格规则:
+  single_fvs_score ≥ 2 → parlay_eligible = False
+  仅可单关 或 系统容错腿(3串4/4串11中的非核心位置)
+
+全局串关限制:
+  任何 2串1 及以上组合中，不允许包含单场 FVS ≥2 的比赛
+  串关的本质是放大优势，不是"带病上阵"
+```
+
+### 16.7 集成到统一管线
+
+```
+FVS 在 Sigmoid 后、仓位计算前执行（见 KB-6.4 步骤⑦）:
+
+  ⑥ sigmoid → P_final (MBI 方向概率)
+  ⑥.5 FVS 计算 (不改 P_final)
+  ⑦ 仓位: Kelly_fraction × FVS_penalty_mult
+  ⑧ 流动性后置乘数 (不累加 FVS)
+```
+
+---
+
+## KB-17: DRM — Draw Risk Module (v3.3.0)
+
+> **v3.3.0 新增**: 平局风险模块。与 MBI/FVS 并行，独立打分。不改方向，压缩所有方向性投注（主胜和客胜）的置信度。
+> 平局占足球赛果 25-28%，但当前系统仅靠 KB-3 #19 和 #24 两条规则检测。
+
+### 17.1 与 FVS 的区别
+
+```
+FVS: "热门会不会输？" → 压缩热门方向仓位（仅影响一方）
+DRM: "会不会平局？" → 压缩所有方向性投注信心（主胜和客胜都受影响）
+叠加: 高 FVS + 高 DRM → 该场只适合"双方进球"或"大小球"玩法，不适合 SPF
+```
+
+### 17.2 8 条 DRM 规则
+
+| # | 规则 | 触发条件 | 分值 |
+|:--:|------|---------|:---:|
+| DRM-1 | 赔率结构平局 | deVig(平) >28% → +2 / >25% → +1 / 赔率均衡(max/min<1.5) → +1 | 1-3 |
+| DRM-2 | 低大小球线 | OU <2.0 → +2 / 2.0-2.25 → +1 | 1-2 |
+| DRM-3 | 双方防守属性 | 双方均"防守堡垒"(KB-3 #27) → +2 / 单方 → +1 | 1-2 |
+| DRM-4 | 近期平局惯性 | 任一方近5场≥2平 → +1 / 双方上轮均平 → +2 | 1-2 |
+| DRM-5 | 联赛平局率 | 联赛历史平率 >28% → +1 / >30% → +2 | 1-2 |
+| DRM-6 | 中游对中游 | 排名差≤3 + 双方无欲无求 → +1 | 0-1 |
+| DRM-7 | 淘汰赛阶段 | KO制淘汰赛 → +2 / 杯赛决赛 → +1 | 1-2 |
+| DRM-8 | 首秀球队 | 双方世界杯首秀（FVS-2不触发时）→ +1 | 0-1 |
+
+### 17.3 二级响应（与 FVS 有所区别）
+
+```
+DRM 总分    响应                                对 MBI 方向的影响
+─────────────────────────────────────────────────────
+0-1 分    低平局风险，不调整                       方向置信度不变
+2-3 分    ⚠️ 中风险，deVig(平) floor=25%         方向置信度 ×0.90
+4-5 分    🔶 高风险，deVig(平) floor=28%         方向置信度 ×0.80
+6 分+     🚩 极高，deVig(平) floor=30%           方向置信度 ×0.70
+                                                 输出标注"建议关注平局"
+```
+
+### 17.4 FVS × DRM 叠加矩阵
+
+```
+              DRM 0-1          DRM 2-3          DRM 4-5          DRM 6+
+FVS 0-1   正常              ⚠️ 警惕平局        🔶 大概率平局      🚩 平局首选
+FVS 2-3   ⚠️ 热门不稳        ⚠️⚠️ 双重警告      🔶 倾向于避开       🚩 放弃SPF
+FVS 4-5   🔴 热门高危        🔴 高危+平局        🚫 仅可大小球      🚫 跳过此场
+FVS 6+    🚫 热门熔断        🚫 热门熔断        🚫 跳过此场        🚫 跳过此场
+
+输出标注:
+  正常: "SPF 可行"
+  ⚠️/⚠️⚠️: "建议降低仓位，关注平局可能"
+  🔶/🔴: "慎选 SPF，优先考虑大小球/双方进球"
+  🚫: "建议跳过此场 SPF 投注"
+```
+
+### 17.5 集成到统一管线
+
+```
+DRM 与 FVS 平行执行，均在 sigmoid 后、仓位计算前:
+
+  ⑥ sigmoid → P_final
+  ⑥.5 FVS 计算 + DRM 计算（并行）
+  ⑥.6 叠加判定（FVS × DRM 矩阵）
+  ⑦ 仓位: Kelly × Min(FVS_mult, DRM_mult) − 0.05 (叠加微调)
+  ⑧ 流动性后置乘数
+```

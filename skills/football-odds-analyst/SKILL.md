@@ -1,10 +1,10 @@
 ---
 name: football-odds-analyst
-description: "Football odds analyst v3.1.2 — MBI multi-bookmaker intelligence. 5-step quantitative betting SOP: signal screening → position splitting → EV-weighted sizing → account-state tuning → rolling execution. M串N fault-tolerant parlay + correlation isolation + barbell odds structure. Auto-pipeline with 500com-football-scraper. 500.com 30-bookmaker native data."
+description: "Football odds analyst v3.3.0 — MBI+FVS dual-engine. Unified logit correction pipeline (KB-6 + KB-10.8). Favorite Vulnerability Score (13 rules). Volume×price cross-validation. 5-step quantitative betting SOP. M串N fault-tolerant parlay + correlation isolation + barbell odds structure. Auto-pipeline with 500com-football-scraper. 500.com 30-bookmaker native data."
 allowed-tools: Read, Write, Bash, WebSearch, WebFetch
 agent_created: true
-version: "3.1.2"
-released: 2026-06-21
+version: "3.3.0"
+released: 2026-06-22
 references: references/knowledge-base.md, references/betting-sop.md, references/postmortem.md
 dependencies:
   - name: 500com-football-scraper
@@ -13,9 +13,9 @@ dependencies:
     description: "500.com deep data scraper — provides per-match 6-page deep analysis JSON"
 ---
 
-# Football Odds Analyst v3.1.2
+# Football Odds Analyst v3.3.0
 
-> **执行引擎**。分析规则在 `references/knowledge-base.md`（KB-0 至 PM）。
+> **执行引擎**。分析规则在 `references/knowledge-base.md`（KB-0 至 KB-16）。
 
 ---
 
@@ -94,7 +94,9 @@ dependencies:
 ### Step 3a — MBI 多机构共识
 - **必须先读 KB-10**
 - 执行 SCS → DRI → Lead-Lag → WaterFlow → Exchange → Kelly
-- 输出 MBI 面板（每模块判定 + 方向信号）
+- **v3.2.0 新增**: Lead-Lag + Exchange 必须做**赔率×成交量交叉验证**（KB-10.3b 四象限矩阵）
+  - 区分仓位驱动调价 vs 信息驱动调价 vs 庄家诱导
+- 输出 MBI 面板（每模块判定 + 方向信号 + 量价交叉验证结论）
 
 ### Step 3b — 概率数学
 - **必须先读 KB-1**
@@ -123,21 +125,52 @@ dependencies:
 
 ### Step 8 — 陷阱全扫描
 - **必须先读 KB-2 + KB-3 + KB-10**
-- 49 条陷阱规则并行检测
-- 输出：触发清单 + 判定（≥2→🔴 / ≥3→systemic）
+- 49 条陷阱规则并行检测，按 **A/B/C 三层分类加权**（非简单计数）：
+  - **C 类（信息型）**：赔率方向 vs 基本面不一致 → 真实警告，直接降信度
+  - **B 类（诱导型）**：盘面刻意制造"危险信号" → 可能强化原方向（需成交量交叉验证）
+  - **A 类（仓位型）**：机构被动调价，与基本面无关 → 降权/忽略
+- 输出：触发清单 + 分类 + 综合判定（计数阈值已废弃，以分类加权为准）
 
 ### Step 9 — 方向总结
 - 综合以上 → 每场方向判定
 - 红 = 主胜 / 琥珀 = 平 / 绿 = 客胜，结论置顶
-- 输出：`[场次] 方向：[胜/平/负]，把握：[高/中/低]`
+- **必须输出信号来源分解面板**：
+  ```
+  ┌─ 信号来源分解 ─────────────────────────┐
+  │ 赔率本身告诉你的: [Shin de-vig 隐含概率] │
+  │ 赔率变动告诉你的: [MBI 方向 + 是否仓位驱动] │
+  │ 成交量告诉你的: [量价交叉验证结论]        │
+  │ 赔率之外还需要知道的: [空白/待补充]       │
+  └──────────────────────────────────────────┘
+  ```
+- 输出：`[场次] 方向：[胜/平/负]，把握：[高/中/低]` + 信号来源分解
 
-### Step 10 — 概率精算
+### Step 10 — 进球倾向判定
 - **必须先读 KB-6 + KB-7**
-- Logit 12 项校正 → 归一化 → Poisson → Top 3 比分
-- 输出：每场概率分布 + 前 3 比分及概率
+- ⚠️ **v3.2.0**: 砍除 Top 3 比分精确输出
+- Logit 12 项校正 + MBI 6 模块 logit 叠加（**v3.3.0**: KB-6 和 KB-10.8 在统一 logit 管线中串行执行，含四组相关降权 + 总量 cap 1.20 logit）
+- 归一化 → 仅输出进球倾向：偏大球 / 偏小球 / 中性（置信度：高/中/低）
+- 不输出具体比分预测及百分比
+
+### Step 10.5 — FVS 热门脆弱性引擎 (KB-16)
+- **v3.3.0 新增**: MBI 负责"热门有多热"，FVS 负责"热门什么时候会翻车"
+- **必须先读 KB-16**
+- 13 条 FVS 规则并行检测（FVS-0 至 FVS-13），含系统性/单场分离
+- 三级响应：0-1分正常 / 2-3分⚠️衰减 / 4-5分🔴严重 / 6分+🚫熔断
+- FVS 不改 MBI 方向，改置信度、仓位和串关资格
+- 输出：FVS 总分 + 触发规则清单 + 串关资格（parlay_eligible）
+
+### Step 10.6 — DRM 平局风险模块 (KB-17)
+- **v3.3.0 新增**: FVS 问"热门会不会输"，DRM 问"会不会平局"
+- **必须先读 KB-17**
+- 8 条 DRM 规则并行检测（DRM-1 至 DRM-8）
+- 二级响应：0-1分低风险 / 2-3分⚠️中风险 / 4-5分🔶高风险 / 6分+🚩极高
+- DRM 压缩所有方向性投注（主胜和客胜）的信心
+- 输出：DRM 总分 + FVS×DRM 叠加矩阵判定 + 建议玩法（SPF / 大小球 / 双方进球）
 
 ### Step 11 — 组合构建
 - **⚠️ 必须先读 `references/betting-sop.md` 完整五步 SOP，不可仅凭下方速览执行**
+- **v3.3.0 前置检查**: 逐条腿计算竞彩 EV（KB-13.8），EV<−0.05 → 不得入选串关
 - 五步 SOP：信号筛选 → 物理拆分 → EV 非对称注码 → 账户微调 → 滚动风控+独立复盘
 - 输出：过关方案 + 仓位分配 + 回报矩阵
 
@@ -160,10 +193,12 @@ dependencies:
 □ Step 5  开盘定位已输出
 □ Step 6  水位方向+突破真伪已输出
 □ Step 7  6D 每场得分已输出
-□ Step 8  49 条陷阱全扫描+判定已输出
-□ Step 9  每场方向判定已输出
-□ Step 10 概率分布+前 3 比分已输出
-□ Step 11 betting-sop.md 已读 → 过关方案已输出
+□ Step 8  49 条陷阱全扫描+分类加权判定（A/B/C）已输出
+□ Step 9  每场方向判定+信号来源分解已输出
+□ Step 10 进球倾向（偏大/偏小/中性）已输出（不输出具体比分）
+□ Step 10.5 FVS 热门脆弱性引擎已执行 → 输出 FVS 总分 + 串关资格
+□ Step 10.6 DRM 平局风险已执行 → 输出 DRM 总分 + FVS×DRM 叠加判定
+□ Step 11 betting-sop.md 已读 + 竞彩 EV 前置检查 → 过关方案已输出
 ```
 
 ---
@@ -226,9 +261,9 @@ SOP 速览（每步详情见 betting-sop.md）:
 ### 12.2 HTML 报告结构
 ```
 assets/report-template.html 作为基础模板，注入以下模块：
-  1. 今日总览（方向 + 风险等级 + 推荐串关）
-  2. 每场分析（MBI 面板人话 + 基本面 + 比分概率 + 陷阱）
-  3. 竞彩建议（M串N 方案 + 仓位分配 + 回报矩阵）
+  1. 今日总览（方向 + 风险等级 + FVS 系统风险 + 推荐串关）
+  2. 每场分析（MBI 面板人话 + 信号来源分解 + FVS 热门脆弱性 + 基本面 + 进球倾向 + 陷阱）
+  3. 竞彩建议（M串N 方案 + 仓位分配 + FVS 调整后的回报矩阵）
   4. 风险提示（熔断状态 + 风险日级别）
   5. 报告元信息（时间/版本/数据截止）
   6. 免责声明（教育用途 / 不构成投注建议）
@@ -239,6 +274,7 @@ assets/report-template.html 作为基础模板，注入以下模块：
 □ 报告中无任何英文术语或内部缩写
 □ 所有赔率均为竞彩真实赔率（非 Pinnacle/bet365）
 □ 所有金额为 ¥2 倍数
+□ FVS 触发清单已在每场报告中标注（含总分数和是否具备串关资格）
 □ 已加入免责声明
 ```
 
@@ -272,12 +308,14 @@ assets/report-template.html 作为基础模板，注入以下模块：
 ## 每场比赛
 ### 编号 | 队名 vs 队名 | 时间
 > 胜负方向: 主胜/平/客胜(把握:高/中/低)
-> 推荐比分: X:X(Y%) / X:X(Z%)
+> 进球倾向: 偏大球/偏小球/中性(置信度:高/中/低)
 > 让球方向: 穿盘/不穿盘 | 大小球: 大/小
 
 基本面: [2-3 句，不用术语]
 机构怎么看: [MBI 面板人话翻译]
-风险提示: [触发陷阱人话解释]
+信号来源分解: [赔率本身/赔率变动/成交量/外部信息]
+热门脆弱性: FVS X分 [⚠️衰减/🔴严重/🚫熔断] — 触发: [规则清单]
+风险提示: [触发陷阱人话解释，标注 A/B/C 分类]
 综合评分: X/6
 
 ## 竞彩建议
@@ -296,26 +334,29 @@ assets/report-template.html 作为基础模板，注入以下模块：
 
 ---
 
-## KB Index（14 模块）
+## KB Index（17 模块）
 
 | KB | 内容 | 对应步骤 |
 |:--:|------|:--:|
 | 0 | 队名校验协议 | 1 |
 | 1 | Shin de-vig + logit 校正 + 欧亚转换 | 3b |
-| 2 | 15 条欧亚陷阱 | 4, 8 |
-| 3 | 28 条通用陷阱规则 | 8 |
+| 2 | 15 条欧亚陷阱（含 A/B/C 分类） | 4, 8 |
+| 3 | 28 条通用陷阱规则（含 A/B/C 分类） | 8 |
 | 4 | 6D 连续评分 | 7 |
 | 5 | 基本面权重 + 压缩等级 + 背水一战 | 2, 5 |
-| 6 | 概率合成（12 校正） | 10 |
-| 7 | 比分精炼（14.0–14.11） | 10 |
+| 6 | 统一 logit 校正管线（12项→logit偏移+组内降权+总量cap） | 10 |
+| 7 | 进球倾向判定 | 10 |
 | 8 | 方法补充（Kelly, AH, OU） | 辅助 |
 | 9 | 复盘（28 场周期） | 回顾 |
-| 10 | MBI 框架：SCS, DRI, Lead-Lag, WaterFlow, Exchange, Kelly, 陷阱#16-21 | 3a, 4, 8 |
+| 10 | MBI 框架：SCS, DRI, Lead-Lag, WaterFlow, Exchange, Kelly, 四组降权+总量cap | 3a, 10 |
 | 11 | 数据校准：机构去重, 水位归一化, 真实初盘, 三档赛事参数 | Pre-1 |
 | 12 | 高级信号：回调验证, AH 真假突破, 阻力墙, 初受盘差, 平局分流 | 4, 6 |
-| 13 | 风控+铁律：动态滑点, 置信分级, 熔断, M串N 规则, 三不选, 杠铃底线, 影子测试, 黑名单 | 11+Always |
+| 13 | 风控+铁律：熔断, 滑点, 竞彩市场转换(EV公式+返奖率差+赔率冻住) | 11+Always |
 | **14** | **庄家读心: Pulsation + Cross-Market Divergence (MPC), 三级响应 Veto/Breaker** | **0.5+11** |
-| PM | 回测观察：5 项单日衍生假设, 独立验证升级机制 | 赛后复盘 |
+| **15** | **外源信号注入路线图: 首发/体能/天气, 赔率之外的 edge** | **1.5+2** |
+| **16** | **FVS 热门脆弱性引擎: 13条规则, 三级响应, 系统性/单场分离** | **10.5** |
+| **17** | **DRM 平局风险模块: 8条规则, 二级响应, FVS×DRM叠加矩阵** | **10.6** |
+| PM | 回测观察 | 赛后复盘 |
 | **SOP** | **量化投注 SOP: 五步标准作业程序** | **Step 11** |
 
 ---
@@ -344,8 +385,10 @@ assets/report-template.html 作为基础模板，注入以下模块：
 
 ### Changelog
 
-- **v3.1.3**：新增 post-mortem 观察项 O-6 至 O-10（来源: 2026-06-22 周日037-040 复盘），覆盖"0陷阱虚假安全感""全低赔日串关脆弱性""同日中赔爆冷连锁""#15 AH偏差全冷风险""客胜压缩信号验证"
-- **v3.1.2**：SOP 重构为五步标准作业程序，新增物理拆分 + 滚动风控 + 独立复盘；投注逻辑独立为 references/betting-sop.md
-- **v3.1.1**：仓位分配从静态 70/30 升级为四步动态决策引擎（盈亏反推/EV 倾斜/风险平价/账户调节）
-- **v3.1.0**：投注逻辑全面重构：5 票金字塔级联 → M串N 容错 + 非对称注码 + 相关性隔离 + 杠铃结构
+- **v3.3.0**：**双引擎+双辅助架构**：(1) KB-16 FVS 热门脆弱性引擎 (2) KB-17 DRM 平局风险模块+FVS×DRM叠加矩阵 (3) KB-6+KB-10.8 统一logit管线+四组降权+总量cap (4) KB-13.8 竞彩市场转换层(EV公式+返奖率差+赔率冻住) (5) Step 10.5 FVS + Step 10.6 DRM + Step 11 竞彩EV前置检查
+- **v3.2.0**：**三层架构改造**：(1) 砍除 Top 3 比分精确输出，改为进球倾向三档判定 (2) 49 条陷阱从计数改为 A/B/C 三层分类加权 (3) MBI 输出加入信号来源分解面板 (4) Lead-Lag + Exchange 新增量价交叉验证四象限矩阵 (5) 新增 KB-15 外源信号注入路线图
+- **v3.1.3**：新增 post-mortem 观察项 O-6 至 O-10
+- **v3.1.2**：SOP 重构为五步标准作业程序
+- **v3.1.1**：仓位分配升级为四步动态决策引擎
+- **v3.1.0**：5 票金字塔级联 → M串N 容错 + 非对称注码
 - 旧版逻辑归档：`旧版投注逻辑_v3.0.5_金字塔级联与枚举最优票集.md`
