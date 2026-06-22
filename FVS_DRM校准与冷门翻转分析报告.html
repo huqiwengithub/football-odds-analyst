@@ -1,0 +1,394 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FVS/DRM 校准与冷门翻转分析报告</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+body { font-family: -apple-system, 'PingFang SC', 'Microsoft YaHei', sans-serif;
+       background: #f5f6fa; color: #2d3436; line-height:1.6; padding:20px; }
+.container { max-width:1000px; margin:0 auto; }
+.header { background: linear-gradient(135deg,#6c5ce7,#0984e3); color:white;
+           padding:30px; border-radius:12px; margin-bottom:20px; }
+.header h1 { font-size:24px; font-weight:700; }
+.header p { opacity:0.9; margin-top:6px; font-size:14px; }
+.card { background:white; border-radius:12px; padding:20px; margin-bottom:16px;
+        box-shadow:0 2px 8px rgba(0,0,0,0.06); }
+.card h2 { font-size:18px; margin-bottom:12px; padding-bottom:8px;
+           border-bottom:2px solid #dfe6e9; }
+.card h3 { font-size:15px; margin:12px 0 8px; color:#636e72; }
+table { width:100%; border-collapse:collapse; margin:8px 0; }
+th, td { padding:8px 12px; text-align:center; border-bottom:1px solid #dfe6e9; font-size:13px; }
+th { background:#f8f9fa; font-weight:600; color:#636e72; }
+tr:hover { background:#f0f4ff; }
+.chart-container { height:260px; margin:16px 0; }
+.finding { background:#fff3e0; border-left:4px solid #ff9800; padding:12px 16px; margin:10px 0; border-radius:4px; }
+.finding h3 { color:#e65100; margin-bottom:6px; }
+.finding p { font-size:13px; color:#555; }
+.tag { display:inline-block; padding:2px 8px; border-radius:4px; font-size:11px; font-weight:600; }
+.tag-fire { background:#55efc4; color:#006644; }
+.tag-ok { background:#dfe6e9; color:#2d3436; }
+.tag-warn { background:#ffeaa7; color:#d68910; }
+.tag-bad { background:#fab1a0; color:#c0392b; }
+.tag-flip { background:#74b9ff; color:#0984e3; }
+.matrix-cell { padding:6px; border-radius:4px; text-align:center; font-size:12px; font-weight:500; }
+.matrix-cell.fire { background:#55efc4; color:#006644; }
+.matrix-cell.ok { background:#dfe6e9; color:#2d3436; }
+.matrix-cell.warn { background:#ffeaa7; color:#d68910; }
+.matrix-cell.bad { background:#fab1a0; color:#c0392b; }
+.matrix-cell.flip { background:#74b9ff; color:#0984e3; }
+.matrix-cell.nodata { background:#f5f6fa; color:#bbb; }
+.bar-container { display:flex; align-items:center; margin:4px 0; }
+.bar-label { width:80px; font-size:12px; font-family:monospace; text-align:right; padding-right:10px; }
+.bar { height:22px; border-radius:4px; min-width:20px; display:flex; align-items:center; padding:0 8px; }
+.bar-text { font-size:11px; font-family:monospace; font-weight:500; white-space:nowrap; }
+.footer { text-align:center; font-size:12px; color:#636e72; margin-top:20px; padding:16px; }
+</style>
+</head>
+<body>
+<div class="container">
+<div class="header">
+  <h1>FVS/DRM 校准与冷门翻转分析报告</h1>
+  <p>基于 179 场跨赛事回测（2022世界杯 64 场 + 2018世界杯 64 场 + 2024欧洲杯 51 场）</p>
+</div>
+
+<!-- Section 1: Problem -->
+<div class="card">
+  <h2>问题定义</h2>
+  <div class="finding">
+    <h3>核心发现: FVS/DRM 分值不单调</h3>
+    <p>当前系统的根本问题: FVS 和 DRM 的<strong>绝对分值没有与命中率对齐</strong>。FVS=2 命中率 73% 反而比 FVS=4 的 57% 更高；DRM=0 命中率 62% 比 DRM=2 的 53% 更高。分数越高不代表风险越高——这是计分体系的设计缺陷。</p>
+  </div>
+  <div class="finding">
+    <h3>核心问题: 否决区能否按冷门押?</h3>
+    <p>当前否决区全部"跳过"——浪费了信号价值。回测发现部分信号组合下冷门方向有明确的规律性（如 FVS=0+DRM=4 时 77% 平局），可以改押冷门而非跳过。</p>
+  </div>
+</div>
+
+<!-- Section 2: FVS non-monotonic -->
+<div class="card">
+  <h2>一、FVS 分值非单调诊断</h2>
+
+  <div class="chart-container">
+    <canvas id="fvsChart"></canvas>
+  </div>
+
+  <table>
+    <tr><th>原始FVS</th><th>场次</th><th>正确</th><th>错误</th><th>命中率</th><th>vs 基线</th><th>有效FVS</th><th>校准等级</th></tr>
+    <tr><td>0</td><td>103</td><td>53</td><td>50</td><td>51.5%</td><td>-3.3%</td><td>5</td><td><span class="tag tag-warn">跳过</span></td></tr>
+    <tr><td>1</td><td>26</td><td>11</td><td>15</td><td>42.3%</td><td>-12.4%</td><td>6</td><td><span class="tag tag-flip">反买</span></td></tr>
+    <tr><td>2</td><td>26</td><td>19</td><td>7</td><td>73.1%</td><td>+18.3%</td><td>3</td><td><span class="tag tag-fire">核心</span></td></tr>
+    <tr><td>3</td><td>13</td><td>7</td><td>6</td><td>53.8%</td><td>-0.9%</td><td>5</td><td><span class="tag tag-ok">谨慎</span></td></tr>
+    <tr><td>4</td><td>7</td><td>4</td><td>3</td><td>57.1%</td><td>+2.4%</td><td>4</td><td><span class="tag tag-ok">巨星可投</span></td></tr>
+    <tr><td>5</td><td>4</td><td>4</td><td>0</td><td>100%</td><td>+45.3%</td><td>0</td><td><span class="tag tag-fire">核心</span></td></tr>
+  </table>
+
+  <h3>FVS 不单调的根因分析</h3>
+  <p><strong>FVS=2 (73%) 是最强信号</strong>：2分通常在"正常热门+轻微异常"时触发——FVS-1(+1) + FVS-3(+1) 或 FVS-7(+1) + FVS-2/3(+1)。这种组合意味着市场有<strong>真正的结构性异常</strong>，但幅度可控。热门仍然大概率赢，但赔率有便宜可占。</p>
+  <p><strong>FVS=3-4 (54-57%) 反而下降</strong>：高分通常来自<strong>极端热门（超低赔）</strong>——超级强队如 法国/巴西/阿根廷 自动触发 FVS-1(超低赔警告), FVS-2(全低赔日), FVS-7(平局升高)。这些规则被高频触发不是因为有真正的风险，而是因为热门太强导致赔率太低规则自动激活。<strong>巨星本身胜率高</strong>，所以高分 FVS 反而是"巨星局"信号。</p>
+  <p><strong>FVS=1 (42%) 是反向指标</strong>：只有 FVS-1 单独触发，没有其他规则确认。这种"孤零零的微弱警告"反而意味着市场对这个热门的信心不足但又不明确——最佳反应是<strong>反着买</strong>。</p>
+</div>
+
+<!-- Section 3: DRM non-monotonic -->
+<div class="card">
+  <h2>二、DRM 分值非单调诊断</h2>
+
+  <div class="chart-container">
+    <canvas id="drmChart"></canvas>
+  </div>
+
+  <table>
+    <tr><th>原始DRM</th><th>场次</th><th>正确</th><th>错误</th><th>命中率</th><th>vs 基线</th><th>平局率</th><th>校准等级</th></tr>
+    <tr><td>0</td><td>63</td><td>39</td><td>24</td><td>61.9%</td><td>+7.2%</td><td>—</td><td><span class="tag tag-fire">最佳</span></td></tr>
+    <tr><td>1</td><td>30</td><td>15</td><td>15</td><td>50.0%</td><td>-4.7%</td><td>—</td><td><span class="tag tag-warn">减仓</span></td></tr>
+    <tr><td>2</td><td>55</td><td>29</td><td>26</td><td>52.7%</td><td>-2.0%</td><td>25%</td><td><span class="tag tag-warn">减仓+注意平局</span></td></tr>
+    <tr><td>3</td><td>7</td><td>4</td><td>3</td><td>57.1%</td><td>+2.4%</td><td>14%</td><td><span class="tag tag-ok">样本不足</span></td></tr>
+    <tr><td>4</td><td>24</td><td>11</td><td>13</td><td>45.8%</td><td>-8.9%</td><td>42%</td><td><span class="tag tag-bad">虚高+高平局</span></td></tr>
+  </table>
+
+  <h3>DRM 不单调的根因分析</h3>
+  <p><strong>DRM=0 (62%) 是最好的信号</strong>：完全无平局风险时，命中率远超基线。这是系统最该下注的区域。</p>
+  <p><strong>DRM=4 (46%) 是最差信号但虚高成分大</strong>：DRM=4 几乎全部来自 KO 淘汰赛（DRM-7 自动 +2，加上 DRM-1 平局结构 +2 = 4 分）。但 KO 淘汰赛热门胜率通常不低——DRM=4 的低命中率不是因为平局，而是因为系统被 DRM-7 强迫"否决"了本该正确的热门预测。DRM=4 的 24 场中有 10 场平局（42%平局率），暗示<strong>DRM=4 的真实含义是"高平局可能性"</strong>，而不是"热门会输"。</p>
+  <p><strong>DRM=1-2 处于中间（50-53%）</strong>：轻微平局风险，但信号不够强，无法区分平局和逆转。</p>
+</div>
+
+<!-- Section 4: Calibration solution -->
+<div class="card">
+  <h2>三、校准方案：经验映射表</h2>
+
+  <p>核心思想：<strong>废除原始 FVS/DRM 绝对分值，改用"该分值在历史上对应的命中率"作为决策依据。</strong>从绝对分数思维转为经验概率思维。</p>
+
+  <h3>FVS 校准映射</h3>
+  <table>
+    <tr><th>原始 FVS</th><th>历史命中率</th><th>风险 = 1-命中率</th><th>有效 FVS</th><th>实际含义</th><th>仓位建议</th></tr>
+    <tr><td>0</td><td>51.5%</td><td>48.5%</td><td>5</td><td>无信号，but 基线水平</td><td><span class="tag tag-ok">标准仓位</span></td></tr>
+    <tr><td>1</td><td>42.3%</td><td>57.7%</td><td><strong>6</strong></td><td><strong>弱警告=隐式冷门信号</strong></td><td><span class="tag tag-flip">反方向</span></td></tr>
+    <tr><td>2</td><td>73.1%</td><td>26.9%</td><td><strong>3</strong></td><td><strong>真实边缘信号，置信度最高</strong></td><td><span class="tag tag-fire">核心押热门</span></td></tr>
+    <tr><td>3</td><td>53.8%</td><td>46.2%</td><td>5</td><td>信号噪音，回到基线</td><td><span class="tag tag-ok">谨慎/跳过</span></td></tr>
+    <tr><td>4</td><td>57.1%</td><td>42.9%</td><td>4</td><td>巨星局，热门过强触发规则</td><td><span class="tag tag-fire">巨星可投</span></td></tr>
+    <tr><td>5</td><td>100%</td><td>0%</td><td><strong>0</strong></td><td>极巨星局，风险极低</td><td><span class="tag tag-fire">核心押热门</span></td></tr>
+  </table>
+
+  <h3>DRM 校准映射</h3>
+  <table>
+    <tr><th>原始 DRM</th><th>历史命中率</th><th>风险 = 1-命中率</th><th>实际含义</th><th>平局倾向</th><th>仓位建议</th></tr>
+    <tr><td>0</td><td>61.9%</td><td>38.1%</td><td>无平局风险</td><td>低</td><td><span class="tag tag-fire">核心押热门</span></td></tr>
+    <tr><td>1</td><td>50.0%</td><td>50.0%</td><td>轻微示警</td><td>中</td><td><span class="tag tag-warn">减仓</span></td></tr>
+    <tr><td>2</td><td>52.7%</td><td>47.3%</td><td>中等示警</td><td>25%</td><td><span class="tag tag-warn">减仓+注意平局</span></td></tr>
+    <tr><td>3</td><td>57.1%</td><td>42.9%</td><td>样本不足</td><td>14%</td><td><span class="tag tag-ok">谨慎</span></td></tr>
+    <tr><td>4</td><td>45.8%</td><td>54.2%</td><td>虚高（KO+DRM-7）</td><td><strong>42%</strong></td><td><span class="tag tag-bad">押平局</span></td></tr>
+  </table>
+</div>
+
+<!-- Section 5: Cold flip analysis -->
+<div class="card">
+  <h2>四、冷门翻转可行性分析</h2>
+
+  <p>分析全部 179 场中错误预测的 81 场，其中 54 场有明确信号（FVS>=2 或 DRM>=2）</p>
+
+  <div class="chart-container">
+    <canvas id="flipChart"></canvas>
+  </div>
+
+  <h3>有信号的错误预测实际结果（54场）</h3>
+  <table>
+    <tr><th>信号组合</th><th>场次</th><th>平局</th><th>逆转</th><th>冷门总率</th><th>冷门方向可预测?</th></tr>
+    <tr><td>FVS=0 + DRM=2</td><td>17</td><td>7 (41%)</td><td>10 (59%)</td><td>100%</td><td>⚠️ 平局/逆转各半</td></tr>
+    <tr><td>FVS=0 + DRM=4</td><td>13</td><td>10 (77%)</td><td>3 (23%)</td><td>100%</td><td><strong>✅ 77% 平局</strong></td></tr>
+    <tr><td>FVS=1 + DRM>=2</td><td>6</td><td>4 (67%)</td><td>2 (33%)</td><td>100%</td><td>⚠️ 主要平局</td></tr>
+    <tr><td>FVS=2 + DRM=0</td><td>4</td><td>2 (50%)</td><td>2 (50%)</td><td>100%</td><td>⚠️ 各半</td></tr>
+    <tr><td>FVS=2 + DRM=2</td><td>3</td><td>3 (100%)</td><td>0 (0%)</td><td>100%</td><td>✅ 但仅 3 场</td></tr>
+    <tr><td>FVS=3 + DRM=0</td><td>5</td><td>3 (60%)</td><td>2 (40%)</td><td>100%</td><td>⚠️ 主要平局</td></tr>
+    <tr><td>FVS=4 + DRM=0</td><td>2</td><td>0 (0%)</td><td>2 (100%)</td><td>100%</td><td>✅ 但仅 2 场</td></tr>
+  </table>
+
+  <h3>DRM 主导与 FVS 主导的冷门类型对比</h3>
+  <table>
+    <tr><th>主导信号</th><th>条件</th><th>场次</th><th>平局率</th><th>逆转率</th><th>建议动作</th></tr>
+    <tr><td>DRM 主导</td><td>DRM>=2 + FVS<=1</td><td>38</td><td>55%</td><td>45%</td><td><span class="tag tag-bad">优先押平局</span></td></tr>
+    <tr><td>FVS 主导</td><td>FVS>=2 + DRM<=1</td><td>12</td><td>50%</td><td>50%</td><td><span class="tag tag-ok">不可翻转</span></td></tr>
+    <tr><td>双警告</td><td>FVS>=3 + DRM>=2</td><td>4</td><td>100%</td><td>0%</td><td><span class="tag tag-bad">押平局(样本少)</span></td></tr>
+  </table>
+</div>
+
+<!-- Section 6: Final decision matrix -->
+<div class="card">
+  <h2>五、最终决策矩阵（校准后）</h2>
+
+  <p>结合 FVS/DRM 校准 + 冷门翻转条件，构建新的12格决策矩阵</p>
+
+  <table>
+    <tr>
+      <th rowspan="2">校准后<br>FVS\DRM</th>
+      <th colspan="5">校准后 DRM</th>
+    </tr>
+    <tr>
+      <th>DRM原始=0<br>有效=4</th>
+      <th>DRM原始=1<br>有效=5</th>
+      <th>DRM原始=2<br>有效=5</th>
+      <th>DRM原始=3<br>有效=4</th>
+      <th>DRM原始=4<br>有效=5</th>
+    </tr>
+    <tr>
+      <td><strong>FVS原始=0 → 有效=5</strong></td>
+      <td class="matrix-cell ok">✅ 标准<br>押热门</td>
+      <td class="matrix-cell warn">⚠️ 减仓<br>押热门</td>
+      <td class="matrix-cell warn">⚠️ 减仓<br>注意平局</td>
+      <td class="matrix-cell ok">谨慎<br>样本少</td>
+      <td class="matrix-cell bad">🔴 改押平局<br>77%平率</td>
+    </tr>
+    <tr>
+      <td><strong>FVS原始=1 → 有效=6</strong></td>
+      <td class="matrix-cell flip">🔄 押反方向<br>58%冷门</td>
+      <td class="matrix-cell flip">🔄 押反方向<br>含平局</td>
+      <td class="matrix-cell flip">🔄 押反方向<br>含平局</td>
+      <td class="matrix-cell flip">🔄 押反方向<br>稀少</td>
+      <td class="matrix-cell bad">🔴 押平局/反<br>含平局</td>
+    </tr>
+    <tr>
+      <td><strong>FVS原始=2 → 有效=3</strong></td>
+      <td class="matrix-cell fire">🔥 核心押热门<br>80%命中</td>
+      <td class="matrix-cell ok">✅ 押热门<br>减仓</td>
+      <td class="matrix-cell bad">🔴 押平局<br>100%(3场)</td>
+      <td class="matrix-cell nodata">—</td>
+      <td class="matrix-cell nodata">—</td>
+    </tr>
+    <tr>
+      <td><strong>FVS原始=3 → 有效=5</strong></td>
+      <td class="matrix-cell ok">⚠️ 谨慎<br>55%命中</td>
+      <td class="matrix-cell nodata">—</td>
+      <td class="matrix-cell bad">🔴 押平局<br>1场样本</td>
+      <td class="matrix-cell nodata">—</td>
+      <td class="matrix-cell nodata">—</td>
+    </tr>
+    <tr>
+      <td><strong>FVS原始=4 → 有效=4</strong></td>
+      <td class="matrix-cell fire">🔥 押热门巨星<br>71%命中</td>
+      <td class="matrix-cell bad">🔴 押平局<br>1场样本</td>
+      <td class="matrix-cell fire">🔥 押热门<br>1场样本</td>
+      <td class="matrix-cell nodata">—</td>
+      <td class="matrix-cell nodata">—</td>
+    </tr>
+    <tr>
+      <td><strong>FVS原始=5 → 有效=0</strong></td>
+      <td class="matrix-cell fire">🔥 核心押热门<br>100% (2场)</td>
+      <td class="matrix-cell nodata">—</td>
+      <td class="matrix-cell fire">🔥 押热门<br>100% (2场)</td>
+      <td class="matrix-cell nodata">—</td>
+      <td class="matrix-cell nodata">—</td>
+    </tr>
+  </table>
+
+  <div class="finding">
+    <h3>12个信号组合，只有4个值得押热门</h3>
+    <p>🔥 <strong>FVS原始=2 + DRM=0（80%命中率）</strong> — 系统的核心价值就在这个组合<br>
+    🔥 <strong>FVS原始=4-5 + DRM=0 / DRM=2（71-100%）</strong> — 巨星局，相信巨星<br>
+    🔥 <strong>DRM=0 + FVS=0（52%）</strong> — 基线水平，标准仓位可维持</p>
+  </div>
+
+  <div class="finding">
+    <h3>3个信号组合应该改押冷门/平局</h3>
+    <p>🔄 <strong>FVS原始=1（任何DRM）（58%冷门方向）</strong> — 弱警告=隐式反买信号<br>
+    🔴 <strong>FVS原始=0 + DRM=4（77%平局）</strong> — 无FVS+高DRM=高概率平局<br>
+    🔴 <strong>DRM主导（FVS<=1+DRM>=2）（55%平局）</strong> — 押平局优先</p>
+  </div>
+</div>
+
+<!-- Section 7: Key insights -->
+<div class="card">
+  <h2>六、核心洞察总结</h2>
+
+  <div class="finding">
+    <h3>洞察 1：FVS 不是"越高越危险"</h3>
+    <p>FVS 是 U 型曲线，不是线性。FVS=2（73%）比 FVS=4（57%）更准。高分 FVS 往往来自巨星球队触发规则，实际风险反而低。</p>
+  </div>
+
+  <div class="finding">
+    <h3>洞察 2：DRM 的真实价值是 DRM=0</h3>
+    <p>DRM=0（62%）才是最强的信号——没有平局风险时，市场预测更可靠。DRM=4（46%）因为 DRM-7 虚高，反而最差。</p>
+  </div>
+
+  <div class="finding">
+    <h3>洞察 3：FVS=1 是隐式冷门信号，不是无信号</h3>
+    <p>FVS=1 的 26 场中 58% 是冷门方向。之前清零是错的——应该改为"反买"。</p>
+  </div>
+
+  <div class="finding">
+    <h3>洞察 4：冷门翻转有条件，不是所有否决区都能反买</h3>
+    <p>DRM≥2+FVS≤1 → 55%平局/45%逆转 → 优先押平局。FVS 主导(FVS≥2+DRM≤1) → 刚好 50/50 → 不可翻转。巨星(FVS≥4+DRM=0) → 71%热门赢 → 绝不可反买。</p>
+  </div>
+
+  <div class="finding">
+    <h3>洞察 5：解决方案是"经验映射"，不是"调分"</h3>
+    <p>与其重新设计 FVS/DRM 计分规则（复杂、容易过拟合），不如直接建立 <strong>FVS/DRM 原始分到决策动作的经验映射表</strong>。每次回测更新映射关系，框架不变。</p>
+  </div>
+</div>
+
+<div class="footer">
+  <p>数据来源: 2022世界杯(64场) + 2018世界杯(64场) + 2024欧洲杯(51场) = 179场</p>
+  <p>生成日期: 2026-06-23 | 工具: cross_tournament_backtest.py</p>
+</div>
+
+</div>
+
+<script>
+const baseline = 54.7;
+
+// FVS Chart
+new Chart(document.getElementById('fvsChart'), {
+  type: 'bar',
+  data: {
+    labels: ['FVS=0', 'FVS=1', 'FVS=2', 'FVS=3', 'FVS=4', 'FVS=5'],
+    datasets: [{
+      label: '命中率 %',
+      data: [51.5, 42.3, 73.1, 53.8, 57.1, 100],
+      backgroundColor: ['#b2bec3','#fab1a0','#55efc4','#dfe6e9','#ffeaa7','#55efc4'],
+      borderColor: ['#636e72','#e17055','#00b894','#b2bec3','#fdcb6e','#00b894'],
+      borderWidth: 1
+    }, {
+      label: '基线 54.7%',
+      data: [54.7, 54.7, 54.7, 54.7, 54.7, 54.7],
+      type: 'line',
+      borderColor: '#d63031',
+      borderDash: [5,5],
+      borderWidth: 2,
+      pointRadius: 0,
+      fill: false
+    }]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    plugins: {
+      title: { display: true, text: 'FVS 原始分 vs 命中率（U 型曲线）' },
+      legend: { position: 'bottom' }
+    },
+    scales: {
+      y: { beginAtZero: true, max: 110,
+           title: { display: true, text: '命中率 %' } }
+    }
+  }
+});
+
+new Chart(document.getElementById('drmChart'), {
+  type: 'bar',
+  data: {
+    labels: ['DRM=0', 'DRM=1', 'DRM=2', 'DRM=3', 'DRM=4'],
+    datasets: [{
+      label: '命中率 %',
+      data: [61.9, 50.0, 52.7, 57.1, 45.8],
+      backgroundColor: ['#55efc4','#dfe6e9','#ffeaa7','#dfe6e9','#fab1a0'],
+      borderColor: ['#00b894','#b2bec3','#fdcb6e','#b2bec3','#e17055'],
+      borderWidth: 1
+    }, {
+      label: '基线 54.7%',
+      data: [54.7, 54.7, 54.7, 54.7, 54.7],
+      type: 'line',
+      borderColor: '#d63031',
+      borderDash: [5,5],
+      borderWidth: 2,
+      pointRadius: 0,
+      fill: false
+    }]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    plugins: {
+      title: { display: true, text: 'DRM 原始分 vs 命中率（DRM=0 最佳，DRM=4 最差）' },
+      legend: { position: 'bottom' }
+    },
+    scales: {
+      y: { beginAtZero: true, max: 80,
+           title: { display: true, text: '命中率 %' } }
+    }
+  }
+});
+
+new Chart(document.getElementById('flipChart'), {
+  type: 'bar',
+  data: {
+    labels: ['FVS0+DRM4\n13场', 'DRM主导\n38场', 'FVS1+任何DRM\n6场', 'FVS2+DRM2\n3场', 'FVS3+DRM0\n5场', 'FVS4+DRM0\n2场'],
+    datasets: [
+      { label: '平局', data: [77, 55, 67, 100, 60, 0],
+        backgroundColor: '#74b9ff' },
+      { label: '逆转(非平局)', data: [23, 45, 33, 0, 40, 100],
+        backgroundColor: '#fab1a0' }
+    ]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    plugins: {
+      title: { display: true, text: '有信号的错误预测 → 实际冷门类型分布' },
+      legend: { position: 'bottom' }
+    },
+    scales: {
+      x: { stacked: true },
+      y: { stacked: true, beginAtZero: true, max: 100,
+           title: { display: true, text: '占该组 %' } }
+    }
+  }
+});
+</script>
+</body>
+</html>
