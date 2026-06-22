@@ -1,9 +1,9 @@
 ---
 name: football-odds-analyst
-description: "Football odds analyst v3.4.0 — OCI 5-dimension objective indicator engine. FVS/DRM replaced with change-based measurement. Historical pattern lookup. Cold flip detection. 179-match calibration."
+description: "Football odds analyst v3.5.1 — OCI 5-dimension objective indicator engine. File responsibility separation. Historical pattern lookup. Cold flip detection. 179-match calibration."
 allowed-tools: Read, Write, Bash, WebSearch, WebFetch
 agent_created: true
-version: "3.5.0"
+version: "3.5.1"
 released: 2026-06-23
 references: references/knowledge-base.md, references/betting-sop.md, references/postmortem.md
 dependencies:
@@ -13,7 +13,7 @@ dependencies:
     description: "500.com deep data scraper — provides per-match 6-page deep analysis JSON"
 ---
 
-# Football Odds Analyst v3.5.0 — 文件分责体系
+# Football Odds Analyst v3.5.1 — 文件分责体系
 
 > **文件分工**：
 > - `references/knowledge-base.md`（KB-0~KB-19）→ **盘口分析**：赔率解读、陷阱检测、MBI、OCI客观指标、DRM平局因子、偏离检测
@@ -388,6 +388,7 @@ assets/report-template.html 作为基础模板，注入以下模块：
 
 ### Changelog
 
+- **v3.5.1**：**四文件分责清理 + 统计审计**：(1) 四文件严格分责: knowledge-base(盘口分析)/betting-sop(投注执行)/postmortem(复盘回测) (2) 撤回4条拍脑袋结论(统计显著性不足) (3) 新增OCI4_CONVERGE(59.7%, p=0.034)权重提升 (4) KB-18(仓位)+KB-13.2(信号分级)+KB-13.8b(EV阈值)→移入betting-sop (5) KB-20(回测验证)→移入postmortem
 - **v3.5.0**：**客观指标体系重构**：(1) KB-16完全重写: 13条静态FVS规则替换为5个OCI客观变化指标 (2) KB-17清理: 废除DRM-7/9/10, DRM降为OCI辅助因子 (3) KB-18新增第四档(冷门翻转) (4) KB-19重写: 废除赛事感知, 改为5条客观偏离信号 (5) KB-20新增OCI模式库查表 (6) 核心原则: 全部基于盘口客观变化, 排除主观标签
 - **v3.4.0**：**跨赛事回测驱动重构**：(1) **三档仓位引擎**：KB-18, 核心78%/标准52%/不投区, 仓位乘数化 (2) **FVS-1A清零**: FVS=1→0（三个赛事42%反向指标）(3) **DRM-7降权**: +2→+1, 不再自动触发VETO, 新增DRM-9/10 (4) **边缘探测器**: KB-19, Pinnacle开盘偏差+量价背离+赛事类型感知 (5) **回测验证框架**: KB-20, 三关验证流程 (6) 跨赛事数据: wc2018_backtest.json(64场) + euro2024_backtest.json(51场) (7) 版本v3.3.2→v3.4.0
 - **v3.3.2**：**用户配置固化**：(1) Step 10 恢复参考比分输出（附带免责）(2) Step 11 默认本金 ¥100 计算仓位 (3) Step 12 报告为亮色模式（浅底深字） (4) 更新自检清单和输出验证项
