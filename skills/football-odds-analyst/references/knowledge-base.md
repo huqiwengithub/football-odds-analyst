@@ -428,62 +428,27 @@ All 4 true → over boost:
 
 ---
 
-## KB-8: Supplementary Methodology
+## KB-8: Supplementary Methodology (Quick Reference)
 
-### Kelly Index
+### Kelly Criterion
 ```
-Kelly[H] = payout_rate × avgP[H] / (1/odds_H)
-Interpretation: Kelly >1.05 → positive signal; all <0.90 → high vig, downgrade
-```
-
-### AH Live 4 Patterns
-```
-1. Late drop (AH −0.25 in 4h) → against dropping side (38% cover)
-2. Late rise (AH +0.25 in 6h) → for rising side (65% cover)
-3. Water rise >0.15 → against that side (42%)
-4. Water drop >0.10 → for that side (genuine confidence)
+f* = (bp - q) / b
+where f* = fraction of bankroll, b = net odds, p = win probability, q = loss probability
 ```
 
-### Heat Manipulation 3 Tactics
+### Asian Handicap Conversion (Quick)
 ```
-1. Water heating: water 1.95→1.75, AH unchanged + Betfair vol >60% → confirmed, reverse
-2. Line suppression: opening ≥0.25 shallow + later rises → genuine signal
-3. Water baiting: underdog water 2.30→2.00, AH unchanged → favorite is true direction
-```
-
-### Live AH Four Mantras
-| AH Change | Water Change | Meaning | Action |
-|-----------|-------------|---------|--------|
-| Rise | Drop | Genuinely bullish | Follow fav |
-| Rise | Rise | Bait (false) | Avoid/under |
-| Drop | Rise | Bearish | Follow under |
-| Drop | Drop | Suppress (false) | Bet favorite |
-
-### OU Analysis
-```
-Expected goals = (GF_home×GA_away/avg + GF_away×GA_home/avg) / 2
-  Expected > OU +0.5 → over; < OU −0.5 → under; within ±0.5 → neutral
-
-Draw exclusion (all 4 true → low draw → over boost):
-  1. Both no 0-0 in last 3  2. Combined GF >2.5
-  3. OU 2.5 over water ≤1.85  4. No defensive fortress (Rule #27)
-
-OU pathways:
-  Over water drop + AH unchanged → +15% over | Over water rise >0.15 → check Betfair
-  Water stable (<0.05) → initial analysis | OU 2.5→2.75 + over water drop → strong over
-  OU 2.5→2.25 → market lean under | 1X2 2.XX-3.XX-2.XX → draw +8-12% → under
-  AH deep (≥-1.5) + OU moderate → fav covers, limited goals
-  AH shallow (±0.25) + OU high (≥3.0) → attacking, both score likely
+Probability -> AH line approximation:
+  P(home) - 0.50 > 0.02 -> 0    > 0.08 -> 0.25  > 0.14 -> 0.5
+               > 0.20 -> 0.75  > 0.27 -> 1.0   > 0.33 -> 1.25
+               > 0.38 -> 1.5   > 0.42 -> 1.75  > 0.47 -> 2.0
 ```
 
-### Signal Weight System
-- 1X2: Kelly>1.05 (+12%) | BF divergence (−15%) | BF vol>65% (−10%)
-- AH: Rise+water same (+15%) | Drop+water same (−15%) | Water drop>0.10 (+10%)
-- OU: Expected>OU+0.5 (+15% over) | Draw exclusion all (+10% over) | 2-3-2 odds (−10% over)
-- **Cap**: max 90%, min 10%
-
----
-
+### Over/Under Line to Goal Expectation
+```
+OU 2.5 -> xG ~2.5  |  OU 2.0 -> xG ~2.0  |  OU 3.0 -> xG ~3.0
+OU 2.25 -> xG ~2.25 |  OU 2.75 -> xG ~2.75
+```
 ## KB-9: Post-Mortem (Historical)
 
 ### 28-Match Cycle (6/12–6/19)
@@ -511,135 +476,14 @@ OU pathways:
 
 ---
 
-## KB-9b: 2022WC回测观察 (Historical)
+## KB-9b: 2022WC回测观察 (Historical - Summary Only)
 
-> **数据源**: Pinnacle 收盘赔率 × 30家博彩公司 × 64场
-> **基准准确率**: Pinnacle 34/64 = 53.1% | 开盘价 36/64 = 56.2% | 30家平均 = 53.1% (无额外信息)
-> **⚠️ 重要声明**: 以下所有内容均为"待验证观察项"，非方法论修正。
->   加入规则的门槛: (1) 在 **≥2 个独立赛事** (如 2018 WC + 五大联赛) 被验证;
->   (2) 回测中不会降低已有系统的准确率;
->   (3) 通过 Step 13 权重合成模型的叠加测试 (新增因子不能与现有因子过度共线)。
+> 完整回测报告见项目根目录 `跨赛事FVSDRM回测报告.html`
 
----
-
-### OBS-1: 淘汰赛平局概率偏差 (待验证, ⚠️ 64场单源, 逐阶段样本≤8)
-
-| 阶段 | 场次 | 实际平局 | 市场定价 | 偏差 | 统计有效性 |
-|:---|:---:|:---:|:---:|:---:|:---:|
-| R16 | 8 | 25% | 23% | +2pp | ❌ 样本太小 |
-| QF | 4 | 50% | 27% | +23pp | ❌ 4场 |
-| SF | 2 | 0% | 29% | -29pp | ❌ 2场 |
-| Final | 1 | 100% | 31% | +69pp | ❌ 1场 |
-| 3rd | 1 | 0% | 27% | -27pp | ❌ 1场 |
-| **淘汰赛合计** | **16** | **31%** | **25%** | **+6pp** | ⚠️ 边缘 |
-| 小组赛(对照) | 48 | 21% | 24% | -3pp | 基准 |
-
-**现状**: 淘汰赛+6pp vs 小组赛-3pp, 差异9pp。单看淘汰赛自身是小样本噪音 (每阶段1-8场)。
-**建议**: 不写入规则。在淘汰赛分析时口头备注"注意平局概率可能被低估", 但不做自动修正。
-**验证条件**: 需用 2018 WC (16场淘汰赛) + 欧冠淘汰赛 (32场) 验证后再定阈值。
-
----
-
-### OBS-2: 小组赛60-70% "死亡区间" (待验证, 11场)
-
-| 去水胜率区间 | 场次 | 准确率 | 判定 |
-|:---|:---:|:---:|:---:|
-| 50-55% | 9 | 56% | 随机 |
-| 55-60% | 8 | **75%** | ✅ 良好 |
-| 60-65% | 4 | 50% | ⚠️ |
-| **65-70%** | **7** | **43%** | **⚠️ 低于基准** |
-| 70-80% | 3 | 67% | 小样本 |
-| >80% | 5 | 80% | ✅ 良好 |
-
-**现状**: 60-70% 区间 11 场仅 45% 准确率, 低于 Pinnacle 整体 53%。但逐区间样本量太小。
-**建议**: 不写入规则。在 Step 7 6D 评分中, 如果小组赛 + 去水胜率在60-70%之间 → 6D自动-1 (通胀警告)。已有 6D 通胀惩罚机制覆盖此场景, 不需要新增规则。
-**验证条件**: 用 2018 WC 小组赛 + 2026 当前小组赛数据验证。
-
----
-
-### OBS-3: 超低赔率(>70%)失误率 (已排除, 10场仅1个真冷门)
-
-P≥70% 的比赛 10 场 80% 准确。唯一不可解释的冷门: 阿根廷 1-2 沙特 (P=86%)。
-其余所有失误在模型误差的合理范围内。
-
-**不形成规则的理由**: 
-- 10场8正确 = 20%失误率, 在统计学上与模型预期一致
-- 没有可复现的模式可供规则捕捉
-- 如果强行加"反叙事检查" → 会把所有高置信度预测都打折扣, 反而降低准确率
-
-**建议**: 删除"超低赔率反叙事检查"的构想。
-
----
-
-### OBS-4: 开盘 vs 收盘分歧 (已排除, 2/64场无统计意义)
-
-开盘56.2% vs 收盘53.1% 相差 3.1pp, 但:
-- 开盘正确而收盘错误: 仅 2 场
-- 开盘错误而收盘正确: 0 场
-- 双双错误: 28 场 (88% 的错误场次)
-
-这意味着: **当开盘和收盘方向一致时 (62/64场), 两者正确率完全相同**。
-分歧仅发生在 2/64 场, 不足以支撑任何权重调整。
-
-**不形成规则的理由**:
-- "开盘权重0.6/收盘权重0.4"会改变 62/64 场本来一致的方向, 引入不确定性
-- 2 场分歧中开盘都对, 但样本太小无法确认这是规律还是运气
-- 30家市场平均 = Pinnacle收盘, 说明收盘已收敛到最优定价
-
-**建议**: 删除"开盘尊重原则"构想。保持现状: Pinnacle收盘作为基准, 开盘仅作为 Step 5 背景参考。
-
----
-
-### OBS-5: C档排除 (通过验证, 可嵌入已有 6D 系统)
-
-| 去水胜率 | 场次 | 准确率 |
-|:---|:---:|:---:|
-| <50% | 19 | 32% |
-| <45% | 16 | 25% |
-| <40% | 7 | 14% |
-
-**趋势清晰**: 置信度越低 → 准确率越低, 且下降速度远超线性。
-**但现有 6D 系统已有覆盖**: 6D < 3 时已标记"有限参考", 6D ≤ 2 时标记"高风险跳过"。
-去水<45% = 6D 自然≤3。不需要新增规则。
-
-**建议**: 在 6D 评分指标中明确注解: "去水<45% 的比赛, 无论 6D 评分如何, 自动至少降1档"。
-此条是唯一通过验证的观察项, 且不新增规则, 只是强化已有 6D 系统的执行边界。
-
----
-
-### 总结: KB-9b 方法论影响
-
-| 原"修正" | 结论 | 实际动作 |
-|:---|:---|:---|
-| #1 淘汰赛平局 | ❌ 不写入 | 口头备注, 待 2018 WC 验证 |
-| #2 小组赛陷阱 | ❌ 不写入 | 6D 通胀惩罚已覆盖此场景 |
-| #3 超低赔率 | ❌ 删除构想 | 不新增规则 |
-| #4 开盘尊重 | ❌ 删除构想 | 保持 Pinnacle 收盘基准不变 |
-| #5 C档排除 | ✅ 可强化 | 6D 评分边界注解: 去水<45% → 自动-1 |
-    (a) 单场投注 (非串关) 且 Kelly 系数 < 0.08
-    (b) 超过 2 个以上 C 档比赛同日出现 → 当日全跳过
-```
-
-### 64 场错误模式统计
-
-| 错误类型 | 场次 | 占比 | 发生场景 |
-|:---|:---:|:---:|:---|
-| 热门→平局 (Home→Draw) | 8 | 27% | 小组赛, 热门1.50-2.50 |
-| 客热→平局 (Away→Draw) | 7 | 23% | 淘汰赛居多 (5/7) |
-| 大冷(主→客) | 9 | 30% | 小组赛叙事驱动 |
-| 大冷(客→主) | 6 | 20% | 小组赛末轮/轮换 |
-
-### 对 500.com 竞彩的校准
-```
-500.com 百家平均 SPF 与 Pinnacle 收盘方向完全一致 (64/64 相同)。
-差别只在赔率绝对值 (竞彩抽水~11% vs 国际~3%):
-  - 竞彩 SPF = 国际 SPF × (0.89~0.93)
-  - 竞彩 2 串 1 过关 = 国际过关 × 0.85 (二次抽水)
-  预测方向时不需要区分数据源。
-```
-
----
-
+### 核心发现
+1. 开盘(56.2%)比收盘(53.1%)更准 — 市场移动改善0场、恶化2场
+2. DRI高≠风险高 — 高DRI来自压倒性热门，反而更准(62% vs 50%)
+3. Pinnacle=市场平均 — 64场完全一致，无套利空间
 ## KB-10: MBI — Multi-Bookmaker Intelligence Framework
 
 > **Rationale**: Pinnacle is the gold standard but not infallible. 30-bookmaker data from 500.com enables consensus-weighted analysis that captures signals Pinnacle alone misses.
