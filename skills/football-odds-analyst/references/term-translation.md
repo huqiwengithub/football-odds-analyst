@@ -21,8 +21,8 @@
 | Resistance Wall | 有多少抛压在顶着 |
 | Circuit Breaker | 亏到多少就该停手 |
 | Trap | 盘口里的坑/陷阱 |
-| Pinnacle | 最精明的那家博彩公司 |
-| bet365 | 英国那家大型博彩公司 |
+| Pinnacle | Pinnacle（保留原名，行业内最精明的博彩公司） |
+| bet365 | bet365（保留原名） |
 | OCI | 盘口变化指标 |
 | confidence / 信心分 | 系统有多大的把握 |
 | deviation / 偏离信号 | 市场出现的异常信号 |
