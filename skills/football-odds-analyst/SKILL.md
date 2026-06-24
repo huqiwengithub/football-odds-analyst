@@ -1,10 +1,10 @@
 ---
 name: football-odds-analyst
-description: "Football odds analyst v3.7.0 — Pin方向单一判定+平局独立模型+否定信号检查. 2026WC 44场校准. 数据源分离+缓存+大白话输出."
+description: "Football odds analyst v3.8.1 — 平局信号分级(一级/二级)+胆排除条件+离散绝对值+胆识别+Kelly注码. 2026WC 44场校准."
 allowed-tools: Read, Write, Bash, WebSearch, WebFetch
 agent_created: true
-version: "3.7.0"
-released: 2026-06-24
+version: "3.8.1"
+released: 2026-06-25
 references: references/knowledge-base.md, references/betting-sop.md
 dependencies:
   - name: 500com-football-scraper
@@ -13,7 +13,7 @@ dependencies:
     description: "500.com deep data scraper — provides per-match 6-page deep analysis JSON"
 ---
 
-# Football Odds Analyst v3.7.0 — Pin方向 + 否定检查 + 平局独立模型
+# Football Odds Analyst v3.8.1 — Pin方向 + 平局分级 + 胆识别 + Kelly注码
 
 > **⚠️ 三大铁律**:
 > 1. **分析用全球数据** (Steps 1-10.5): 只用 Pinnacle + 30 家博彩公司欧赔/亚盘/成交量
@@ -178,9 +178,9 @@ dependencies:
   - **A 类（仓位型）**：机构被动调价，与基本面无关 → 降权/忽略
 - 输出：触发清单 + 分类 + 综合判定（计数阈值已废弃，以分类加权为准）
 
-### Step 9 — 方向判定 (v3.7.1: Pin方向 + 动机修正 + 平局分级 + 反投)
+### Step 9 — 方向判定 (v3.8.1: Pin方向 + 动机修正 + 平局分级 + 反投)
 
-> **v3.7.1 更新**: 新增动机修正和反投框架。详见 knowledge-base.md KB-17(平局)+KB-17b(动机+反投)。
+> **v3.8.1 更新**: 新增动机修正、反投框架和平局信号分级（一级/二级）。详见 knowledge-base.md KB-17(平局)+KB-17b(动机+反投)。
 
 ```
 方向判定逻辑 (三步):
@@ -196,9 +196,11 @@ dependencies:
 
   3. 否定检查:
      a. KB-19偏离≥2条+动机冲突 → "跳过" (若对手赔率2-6→反投)
-     b. KB-17平局5条≥3条 → "跳过"
+     b. KB-17平局二级信号≥3条 → "跳过"
      c. Kelly(Pin方向)>1.05 → 仓位降0.5x
      d. 必发方向≠Pin方向 → 仓位降0.5x
+     e. KB-17平局一级信号触发1条 → 仓位降0.5x + 不入核心链接 (v3.8.1)
+        触发2条一级信号 → 强制"跳过"
 
 反投规则 (KB-17b):
   动机Pin冲突 + mot_gap>0.30 + 偏离≥2 + 对手赔率2.00~6.00
@@ -361,7 +363,7 @@ SOP 速览（每步详情见 betting-sop.md）:
 □ 术语翻译已检查（所有英文缩写按翻译表转大白话）
 □ 免责声明已包含（含比分预测免责）
 □ 时间戳标注为北京时间
-□ 引擎版本号 v3.6.1 + 数据截止时间已标注
+□ 引擎版本号 v3.8.1 + 数据截止时间已标注
 □ 使用亮色模式（浅色背景，深色文字）
 □ 参考比分已附带"仅供娱乐参考"
 □ 所有金额为 ¥ 展示，默认本金 ¥100
@@ -587,6 +589,8 @@ assets/report-template.html 作为基础模板，注入以下模块：
 回测复盘统一使用 `football-backtest-workflow/` 子技能。详见 Step 13 赛后回测触发器。
 
 ### Changelog
+
+- **v3.8.1**: **平局信号分级+胆排除+离散绝对值**（2026-06-25 回测#20260624驱动）: (1) KB-17.3 平局信号从等权5条计数改为一级/二级分级体系 — 新增第0条一级信号: Pinnacle平赔降幅≥20%单条触发降仓(来源: 英格兰0-0加纳平赔-33%被原阈值3.20过滤) (2) SKILL.md Step 9 否定检查新增e条: 一级平局信号触发→降仓0.5x+不入核心链接 (3) betting-sop.md 胆识别新增2条排除条件: 平赔降幅≥20%自动降为候选 + 离散度绝对值>25自动降为候选 (4) KB-19.1 偏离信号新增第7条: 离散度绝对值>25作为独立偏离信号(与上升>20%独立计数)
 
 - **v3.7.0**: **Pin方向单一判定+信号精简**（2026-06-24 WC44场校准驱动）: (1) Step 9 废除 MBI×0.6+OCI×0.3+traps×0.1 复合公式 — 44场数据证实该公式比单纯Pin方向低16.4pp (2) 方向判定改为Pin收盘最低赔率方向+否定检查(偏离≥3条→跳过/平局≥3条→跳过/Kelly>1.05降仓) (3) knowledge-base.md KB-16 重写为信号可靠性矩阵(Kelly 43.2%/OCI-1 38.6%/Prob 31.8%确认为反向指标并删除) (4) KB-17 废除DRM打分,改为平局5条触发计数 (5) KB-19 偏离从冷门翻转改为否定信号 (6) Step 10.5-10.6 精简为两步检查 (7) 删除OCI五分位体系和179场权重查表
 
