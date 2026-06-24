@@ -582,7 +582,53 @@ def parse_touzhu(html_text):
         text = summary_match.group(1).replace('|', '').strip()
         result["data_summary"] = text
 
+    # ── 模拟盈亏: Transaction Flow (v3.8.0) ──
+    # Parse the structured table: each row = [side, buy/sell, volume, time, ratio%]
+    idx_pl = html_text.find('模拟盈亏')
+    if idx_pl >= 0:
+        chunk = html_text[idx_pl:idx_pl+5000]
+        rows = re.findall(r'<tr[^>]*>(.*?)</tr>', chunk, re.DOTALL)
+        transactions = []
+        for row in rows:
+            cells = re.findall(r'<td[^>]*>(.*?)</td>', row, re.DOTALL)
+            if len(cells) >= 5:
+                cell_texts = [re.sub(r'<[^>]+>', '', c).strip() for c in cells]
+                if cell_texts[0] in ('主', '客', '平') and cell_texts[1] in ('买', '卖'):
+                    transactions.append({
+                        'side': cell_texts[0],
+                        'direction': cell_texts[1],
+                        'volume': float(cell_texts[2]) if cell_texts[2] else 0,
+                        'time': cell_texts[3],
+                        'ratio_pct': float(cell_texts[4].rstrip('%')) if cell_texts[4] else 0,
+                    })
+        if transactions:
+            result["pl_flow"] = {
+                'transactions': transactions,
+                'count': len(transactions),
+                'summary': _compute_pl_flow_summary(transactions),
+            }
+
     return result
+
+
+def _compute_pl_flow_summary(transactions):
+    """Compute net flow direction from transaction log."""
+    sides = {'主': 'home', '客': 'away', '平': 'draw'}
+    summary = {}
+    for cn, en in sides.items():
+        side_txns = [t for t in transactions if t['side'] == cn]
+        if side_txns:
+            buy_vol = sum(t['volume'] for t in side_txns if t['direction'] == '买')
+            sell_vol = sum(t['volume'] for t in side_txns if t['direction'] == '卖')
+            net = buy_vol - sell_vol
+            summary[en] = {
+                'buy_volume': buy_vol,
+                'sell_volume': sell_vol,
+                'net_flow': net,
+                'flow_direction': 'absorbing' if net < 0 else 'hedging',
+                'tx_count': len(side_txns),
+            }
+    return summary
 
 
 # ─── Main: Fetch + Parse All ─────────────────────────────────
