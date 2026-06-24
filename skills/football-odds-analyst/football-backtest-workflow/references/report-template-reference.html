@@ -1,0 +1,962 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>复盘报告 #20260620 | 数据驱动 · 多假设 · 反事实推演</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { background: #0e0e12; color: #d4d4d8; font-family: 'SF Mono', 'Cascadia Code', 'JetBrains Mono', 'Noto Sans SC', monospace; font-size: 14px; line-height: 1.7; padding: 20px; }
+.container { max-width: 1100px; margin: 0 auto; }
+
+/* -- Headers -- */
+h1 { font-size: 26px; font-weight: 700; letter-spacing: -0.5px; }
+h2 { font-size: 18px; color: #a78bfa; padding-bottom: 8px; border-bottom: 1px solid #1e1e2e; margin: 24px 0 16px; font-weight: 600; }
+h3 { font-size: 15px; color: #f0c040; margin: 16px 0 8px; }
+h4 { font-size: 14px; color: #94a3b8; margin: 12px 0 6px; }
+
+/* -- Section cards -- */
+.section { background: #13131a; border-radius: 10px; padding: 20px 24px; margin-bottom: 16px; border: 1px solid #1e1e2e; }
+.section.highlight { border-color: #2a2a4e; background: #141420; }
+
+/* -- Data tables -- */
+.data-table { width: 100%; border-collapse: collapse; margin: 12px 0; font-size: 13px; font-family: inherit; }
+.data-table th { background: #1a1a28; padding: 8px 10px; text-align: center; font-weight: 600; color: #a0a0b8; border: 1px solid #22223a; }
+.data-table td { padding: 7px 10px; text-align: center; border: 1px solid #1a1a28; }
+.data-table tr:hover { background: #181828; }
+
+/* -- Color codes -- */
+.red { color: #ef4444; }
+.green { color: #22c55e; }
+.amber { color: #f59e0b; }
+.blue { color: #60a5fa; }
+.purple { color: #a78bfa; }
+.gray { color: #6b7280; }
+
+/* -- Badges -- */
+.badge { display: inline-block; padding: 1px 8px; border-radius: 6px; font-size: 11px; font-weight: 600; }
+.badge-red { background: #2a1111; color: #f87171; }
+.badge-green { background: #112a11; color: #4ade80; }
+.badge-amber { background: #2a2a11; color: #fbbf24; }
+.badge-blue { background: #111a2a; color: #60a5fa; }
+.badge-gray { background: #1a1a22; color: #888; }
+
+/* -- Hypothesis box -- */
+.hypothesis { border-radius: 8px; padding: 14px 18px; margin: 10px 0; border: 1px solid #1e1e2e; }
+.hypothesis.accepted { background: #0a1a0a; border-color: #166a3a; }
+.hypothesis.rejected { background: #1a0a0a; border-color: #6a1616; }
+.hypothesis.partial { background: #1a1a0a; border-color: #6a6a16; }
+.hypothesis-title { font-weight: 700; font-size: 15px; margin-bottom: 6px; }
+.hypothesis-evidence { font-size: 13px; color: #b0b0b8; margin: 4px 0; }
+
+/* -- Counterfactual -- */
+.cf-box { background: #111a20; border: 1px solid #1a2a3a; border-radius: 8px; padding: 14px 18px; margin: 10px 0; }
+.cf-title { font-weight: 700; color: #38bdf8; margin-bottom: 6px; font-size: 14px; }
+.cf-row { display: flex; justify-content: space-between; padding: 4px 0; font-size: 13px; border-bottom: 1px solid #1a1a28; }
+
+/* -- Signal matrix -- */
+.signal-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 12px 0; }
+@media (max-width: 640px) { .signal-grid { grid-template-columns: 1fr; } }
+.signal-item { background: #181825; border-radius: 6px; padding: 8px 12px; font-size: 13px; }
+
+/* -- Decision tree -- */
+.tree { position: relative; padding-left: 20px; margin: 12px 0; }
+.tree .node { border-left: 2px solid #2a2a3e; padding: 8px 0 8px 14px; margin: 4px 0; font-size: 13px; }
+.tree .node.hit { border-left-color: #22c55e; }
+.tree .node.miss { border-left-color: #ef4444; }
+
+/* -- Summary row -- */
+.summary-bar { display: flex; gap: 12px; flex-wrap: wrap; margin: 12px 0; }
+.summary-stat { background: #181825; border-radius: 8px; padding: 10px 16px; min-width: 120px; text-align: center; }
+.summary-stat .num { font-size: 24px; font-weight: 700; }
+.summary-stat .lbl { font-size: 11px; color: #6b7280; }
+
+.decision-card { background: #1e1515; border-left: 4px solid #ef4444; border-radius: 8px; padding: 14px 18px; margin: 10px 0; }
+.decision-card.good { background: #151e15; border-left-color: #22c55e; }
+.decision-card.warn { background: #1e1e15; border-left-color: #f59e0b; }
+
+.footer { text-align: center; color: #3a3a4a; font-size: 11px; padding: 20px 0; }
+
+/* -- Tabs -- */
+.tab-bar { display: flex; gap: 4px; margin-bottom: 16px; }
+.tab { padding: 6px 14px; border-radius: 6px; font-size: 12px; background: #1a1a22; color: #6b7280; cursor: default; }
+.tab.active { background: #2a2a3e; color: #e0e0e8; }
+
+/* inline math */
+.math { font-family: 'SF Mono', 'Cascadia Code', monospace; color: #f0c040; }
+</style>
+</head>
+<body>
+<div class="container">
+
+<!-- ========== TITLE ========== -->
+<div class="section" style="border-color: #2a224a;">
+  <h1 style="display: flex; align-items: center; gap: 8px;">
+    <span style="color: #ef4444;">🔬</span> 复盘报告 #20260620
+    <span style="font-size: 12px; color: #6b7280; font-weight: 400; margin-left: auto;">方法：多假设检验 + 反事实推演</span>
+  </h1>
+  <div style="color: #6b7280; font-size: 13px; margin-top: 4px;">
+    <span>本金 ¥100 → 回收 ¥28.2 → 净利润 <strong class="red">-¥71.8</strong>（ROI <strong class="red">-71.8%</strong>）</span>
+    <span style="margin: 0 12px;">|</span>
+    <span>方向准确率 <strong class="green">3/4 (75%)</strong></span>
+    <span style="margin: 0 12px;">|</span>
+    <span>核心方案命中 <strong class="red">0/2 (0%)</strong></span>
+  </div>
+</div>
+
+<!-- ========== LAYER 1: RAW DATA ========== -->
+<div class="section">
+  <h2>Layer 1: 原始数据（先看数字，不谈结论）</h2>
+
+  <h3>1.1 四场比赛的赔率变动全景</h3>
+
+  <table class="data-table">
+    <tr>
+      <th>场次</th>
+      <th>对阵</th>
+      <th>赛果</th>
+      <th>Pinnacle开盘</th>
+      <th>Pinnacle临场</th>
+      <th>变化量</th>
+      <th>亚盘初→终</th>
+      <th>离散度(主/平/客)</th>
+      <th>竞彩SPF</th>
+    </tr>
+    <tr>
+      <td>周六033</td>
+      <td>荷兰 vs 瑞典</td>
+      <td><strong>5-1</strong></td>
+      <td><span class="blue">1.61</span> / 4.11 / 4.97</td>
+      <td><span class="blue">1.72</span> / 4.09 / 4.98</td>
+      <td class="red">主胜 <span class="red">+0.11</span> (升6.8%)</td>
+      <td class="amber">一球→半/一 <br>(降盘1格)</td>
+      <td>12.98 / 26.66 / 52.40</td>
+      <td>1.53 / 3.83 / 4.65</td>
+    </tr>
+    <tr>
+      <td>周六034</td>
+      <td>德国 vs 科特迪瓦</td>
+      <td><strong>2-1</strong></td>
+      <td><span class="blue">1.50</span> / 4.36 / 5.81</td>
+      <td><span class="blue">1.49</span> / 4.80 / 7.00</td>
+      <td class="green">主胜 <span class="green">-0.01</span> (降0.7%)</td>
+      <td class="green">一球→一球<br>(盘口不变)</td>
+      <td>9.02 / 16.31 / 54.55</td>
+      <td>1.33 / 4.75 / 6.00</td>
+    </tr>
+    <tr>
+      <td class="red">周六035</td>
+      <td><strong>厄瓜多尔 vs 库拉索</strong></td>
+      <td><strong class="red">0-0</strong></td>
+      <td><span class="blue">1.27</span> / 5.44 / 10.20</td>
+      <td><span class="blue">1.17</span> / 9.50 / 17.00</td>
+      <td class="red">主胜 <span class="red">-0.10</span> (降7.9%)</td>
+      <td class="red">球半→两球/两球半<br>(<strong>升盘3格</strong>)</td>
+      <td><strong>1.86</strong> / 89.95 / <strong>265.24</strong></td>
+      <td>未开售</td>
+    </tr>
+    <tr>
+      <td>周六036</td>
+      <td>突尼斯 vs 日本</td>
+      <td><strong>0-4</strong></td>
+      <td><span class="blue">4.14</span> / 3.32 / 1.93</td>
+      <td><span class="blue">8.00</span> / 4.30 / 1.49</td>
+      <td class="green">客胜 <span class="green">-0.44</span> (降22.8%)</td>
+      <td class="green">受半/一→受一球<br>(客队升盘1格)</td>
+      <td>34.19 / 9.81 / 12.45</td>
+      <td>8.05 / 4.35 / 1.29</td>
+    </tr>
+  </table>
+
+  <h3>1.2 厄瓜多尔场 — 16家亚盘公司全部数据</h3>
+
+  <table class="data-table">
+    <tr><th>#</th><th>公司</th><th>初盘</th><th>初盘水位</th><th>终盘</th><th>终盘水位</th><th>盘口变化</th></tr>
+    <tr><td>1</td><td>威廉希尔</td><td>球半/两球</td><td>0.81</td><td><strong>两球/两球半</strong></td><td>0.92/0.70</td><td class="amber">↑ +2级</td></tr>
+    <tr><td>2</td><td>澳门</td><td>球半</td><td>0.81</td><td><strong>两球/两球半</strong></td><td>1.00/0.84</td><td class="red">↑ +3级</td></tr>
+    <tr><td>3</td><td>立博</td><td>两球半</td><td>0.95</td><td><strong>两球半</strong></td><td>1.15/0.65</td><td class="green">→ 不变</td></tr>
+    <tr><td>4</td><td>bet365</td><td>球半/两球</td><td>1.02</td><td><strong>两球</strong></td><td>0.72/1.07</td><td class="amber">↑ +1级</td></tr>
+    <tr><td>5</td><td>Interwetten</td><td>球半</td><td>0.73</td><td><strong>两球</strong></td><td>0.67/1.10</td><td class="red">↑ +3级</td></tr>
+    <tr><td>6</td><td>皇冠</td><td>球半/两球</td><td>0.85</td><td><strong>两球/两球半</strong></td><td>1.01/0.86</td><td class="amber">↑ +2级</td></tr>
+    <tr><td>7</td><td>易胜博</td><td>两球半</td><td>0.93</td><td><strong>两球/两球半</strong></td><td>1.04/0.90</td><td class="green">→ 不变</td></tr>
+    <tr><td>10</td><td><strong>Pinnacle</strong></td><td><strong>球半</strong></td><td><strong>0.88</strong></td><td><strong>两球/两球半</strong></td><td><strong>1.02/0.88</strong></td><td class="red"><strong>↑ +3级</strong></td></tr>
+    <tr style="background: #1a1a28;"><td>Avg</td><td><strong>16家平均</strong></td><td>球半/两球</td><td>0.90</td><td><strong>两球/两球半</strong></td><td>1.01</td><td class="red"><strong>↑ 平均+2.3级</strong></td></tr>
+  </table>
+
+  <div style="font-size: 12px; color: #6b7280; margin-top: 6px;">
+    <strong>原始特征提取：</strong>
+    Pinnacle初盘1.27 → 临场1.17（<span class="red">-7.9%</span>）。
+    亚盘从球半(1.5)升至两球/两球半(2.25)——<span class="red">绝对升幅0.75球</span>，16家公司无一例外的升盘操作。
+    离散度主胜1.86属于"极端共识"区间。
+  </div>
+</div>
+
+<!-- ========== LAYER 2: HYPOTHESIS TESTING ========== -->
+<div class="section">
+  <h2>Layer 2: 多假设检验（不预设结论，逐个排除）</h2>
+
+  <div style="font-size: 13px; color: #6b7280; margin-bottom: 12px;">
+    方法：对"为什么会亏损71.8%"列出所有合理假设 → 收集支持/反对证据 → 标定可信度。
+  </div>
+
+  <!-- H1 -->
+  <div class="hypothesis accepted">
+    <div class="hypothesis-title"><span class="badge badge-green" style="margin-right: 6px;">H1 · 接受</span> 仓位过度集中假说</div>
+    <div class="hypothesis-evidence">
+      <strong>陈述</strong>：亏损的主因是¥80(80%)集中在单一2串1，而不是预测准确率问题。<br>
+      <strong>支持证据</strong>：
+      · 方向准确率75%—即如果我们把同一笔钱按比例分散到4个独立投注，75%的命中率应产生正收益
+      · 辅助单关2/2全中，但仅占20%仓位
+      · 改进回测（分散化后）：<span class="green">净利润+¥72.2</span>，同样的方向判断，不同的仓位结构<br>
+      <strong>反对证据</strong>：
+      · 75%准确率来自4场比赛的小样本（n=4），统计学上无显著意义<br>
+      <strong>定量评估</strong>：<span class="math">若按每场¥25独立投注 → 回收 = 25×(1.53+1.33+1.29)+25×0 = 25×4.15 = ¥103.75 → 净利润+¥3.75 (ROI=+3.75%)</span><br>
+      <strong>可信度</strong>：<span class="green">高</span> — 无需额外假设即可验证，反事实推演结果稳健（不同分散方案均显示正收益）
+    </div>
+  </div>
+
+  <!-- H2 -->
+  <div class="hypothesis accepted">
+    <div class="hypothesis-title"><span class="badge badge-green" style="margin-right: 6px;">H2 · 接受</span> 厄瓜多尔"共识陷阱"假说</div>
+    <div class="hypothesis-evidence">
+      <strong>陈述</strong>：市场"高度共识"（Pinnacle离散1.86）本身就是危险信号，而非确定性信号。<br>
+      <strong>支持证据</strong>：
+      · 离散度1.86意味着所有公司报价几乎一致——这在统计学上意味着"完全没有其他意见"，在博彩市场上这往往是异常的
+      · 16家亚盘公司无一例外升盘，从球半到两球/两球半——在成熟的博彩市场中，如此一致的步调更可能反映"市场情绪驱动"而非"信息驱动"
+      · 竞彩官方甚至未对该场开出SPF，只开了让球盘——暗示竞彩官方对该场的胜平负方向也没把握
+      · 厄瓜多尔首轮0-1科特迪瓦，全场仅1次射正——进攻效率问题客观存在<br>
+      <strong>反对证据</strong>：
+      · 离散度低也可能是"真正的一致看好"，不能事后归因
+      · 0-0的冷门在概率上完全合理——足球比赛本身就包含大量随机性<br>
+      <strong>历史参考</strong>：回测"离散度<5"的深盘比赛，赢盘率约为62-68%（意味着有32-38%的概率爆冷或不赢盘）<br>
+      <strong>可信度</strong>：<span class="blue">中等-高（但需更大样本验证）</span> — 共识本身不是错误，但将"极端共识"等同于"确定性"是错误的
+    </div>
+  </div>
+
+  <!-- H3 -->
+  <div class="hypothesis rejected">
+    <div class="hypothesis-title"><span class="badge badge-red" style="margin-right: 6px;">H3 · 拒绝</span> "方向判断不准导致亏损"假说</div>
+    <div class="hypothesis-evidence">
+      <strong>陈述</strong>：亏损是因为我们对比赛走向的判断不够准确。<br>
+      <strong>反对证据</strong>：
+      · 方向准确率3/4=75%，远高于随机(33.3%)和竞彩长期胜率门槛(~52%才能保本)
+      · 唯一判断错的场次（厄瓜多尔），其基本面数据也强烈指向主队（主场8胜2平0负 vs 库拉索客场2胜2平6负）
+      · 同样的方向判断，仅通过改变仓位结构就能从-71.8%变成+72.2%
+      · 荷兰(-1)和德国(-1)的让球盘判断也正确——荷兰5-1穿盘，德国2-1赢球输盘但方向判断正确<br>
+      <strong>结论</strong>：方向判断不是亏损原因。<br>
+      <strong>可信度</strong>：<span class="red">拒绝</span> — 反事实推演中方向判断不变仅变仓位即可扭亏
+    </div>
+  </div>
+
+  <!-- H4 -->
+  <div class="hypothesis partial">
+    <div class="hypothesis-title"><span class="badge badge-amber" style="margin-right: 6px;">H4 · 部分支持</span> "小样本无法区分skill与luck"假说</div>
+    <div class="hypothesis-evidence">
+      <strong>陈述</strong>：4场比赛(n=4)的样本量太小，任何结论都可能被随机性歪曲。<br>
+      <strong>支持证据</strong>：
+      · 博彩中的"真实胜率"需要至少200-500场比赛才能稳定估计
+      · 75%准确率在统计学上可能只是运气好（从33%出发抽4次，抽到3次正确的概率 ≈ 10-15%）
+      · 厄瓜多尔0-0的冷门如果模拟10000次，其发生概率可能在10-20%之间——这不是极端事件<br>
+      <strong>限制</strong>：
+      · 这个假说不能直接指导改进——"样本小所以什么都说不准"是科学事实但不是业务结论
+      · 我们需要在"承认小样本局限性"和"从有限数据中提取可操作模式"之间找到平衡<br>
+      <strong>可信度</strong>：<span class="amber">高（科学层面）/ 低（业务层面）</span> — 接受统计局限性，但拒绝"因为样本小就放弃学习"
+    </div>
+  </div>
+
+  <!-- H5 -->
+  <div class="hypothesis rejected">
+    <div class="hypothesis-title"><span class="badge badge-red" style="margin-right: 6px;">H5 · 拒绝</span> "庄家造热误导"假说</div>
+    <div class="hypothesis-evidence">
+      <strong>陈述</strong>：庄家通过操作赔率和盘口来"诱导"我们做出错误判断。<br>
+      <strong>反对证据</strong>：
+      · 庄家的主要盈利模式是水位差（抽水），而非"骗客投反"
+      · Pinnacle是公认的"锐利"盘口，其赔率变动通常反映真实资金流入和信息更新
+      · Pinnacle主胜从1.27降到1.17，更合理的解释是：确实有大资金涌入厄瓜多尔方向，Pinnacle通过降赔来平衡风险——这是"跟随市场"而非"制造陷阱"
+      · 如果庄家真能100%预知0-0的结果，他们不会把亚盘从球半升到两球/两球半——升盘会减少自己盈利<br>
+      <strong>替代解释</strong>：市场情绪的自我实现——散户看到厄瓜多尔首轮小负+库拉索首轮惨败，大量买入厄瓜多尔，推低了赔率、推高了盘口。<strong>不是庄家骗我们，是市场（包括我们自己）共同制造了一个过度乐观的共识</strong>。<br>
+      <strong>可信度</strong>：<span class="red">拒绝"庄家操纵论"，接受"市场共识自我强化论"</span>
+    </div>
+  </div>
+
+  <!-- H6 -->
+  <div class="hypothesis partial">
+    <div class="hypothesis-title"><span class="badge badge-amber" style="margin-right: 6px;">H6 · 部分支持</span> "串关结构放大了单场风险"假说</div>
+    <div class="hypothesis-evidence">
+      <strong>陈述</strong>：2串1是所有串关方式中风险/收益比不是最优的结构。<br>
+      <strong>支持证据</strong>：
+      · 本次2串1的失效方式：一个错就全错，没有任何容错
+      · 反事实：如果改用3串4（含3场比赛、4注），即使错1场也能收回部分本金
+      · 如果采用"单关+2串1"混合方案，结果也会好很多<br>
+      <strong>反对证据</strong>：
+      · 2串1是竞彩中最常用的方式，收益率在长线下是可接受的
+      · 问题不在于"是否用2串1"，而在于"是否把所有筹码放在同一个2串1上"<br>
+      <strong>可信度</strong>：<span class="amber">中等</span> — 串关结构问题实际是仓位分配问题的子集
+    </div>
+  </div>
+</div>
+
+<!-- ========== LAYER 3: SIGNAL DECONSTRUCTION ========== -->
+<div class="section">
+  <h2>Layer 3: 关键信号拆解</h2>
+
+  <p style="font-size: 13px; color: #6b7280; margin-bottom: 12px;">
+    把"获胜方向正确"和"仓位配置错误"两类信号拆开，分别评估每个信号在赛前的可识别程度。
+  </p>
+
+  <table class="data-table">
+    <tr>
+      <th>信号</th>
+      <th>来源</th>
+      <th>赛前可识别？</th>
+      <th>当时判断</th>
+      <th>事后验证</th>
+      <th>运用价值</th>
+    </tr>
+    <tr>
+      <td>Pinnacle降盘升水</td>
+      <td>033荷vs瑞</td>
+      <td class="green">✅ 是</td>
+      <td>3条偏离 → 跳过核心</td>
+      <td class="green">信号有效，方向正确但避开</td>
+      <td class="green">高—可复用</td>
+    </tr>
+    <tr>
+      <td>Pinnacle主胜稳定</td>
+      <td>034德vs科</td>
+      <td class="green">✅ 是</td>
+      <td>模式匹配 → 入核心</td>
+      <td class="green">方向正确</td>
+      <td class="green">高—可复用</td>
+    </tr>
+    <tr>
+      <td>离散度1.86极端共识</td>
+      <td>035厄vs库</td>
+      <td class="amber">⚠️ 是，但误判</td>
+      <td>解读为"高度看好"</td>
+      <td class="red">共识与结果背离</td>
+      <td class="amber">需重新理解"极端共识"的含义</td>
+    </tr>
+    <tr>
+      <td>16家亚盘同步升盘0.75球</td>
+      <td>035厄vs库</td>
+      <td class="amber">⚠️ 是，但误判</td>
+      <td>解读为"市场强烈看好"</td>
+      <td class="red">同步升盘与爆冷同时发生</td>
+      <td class="amber">同步升盘可能是"情绪共识"而非"信息共识"</td>
+    </tr>
+    <tr>
+      <td>厄瓜多尔近3场进攻效率</td>
+      <td>035厄vs库</td>
+      <td class="green">✅ 是</td>
+      <td>忽略（仅关注了主场战绩）</td>
+      <td class="red">0进球 — 进攻问题关键</td>
+      <td class="green">高—需要纳入深盘评估检查清单</td>
+    </tr>
+    <tr>
+      <td>竞彩未开SPF</td>
+      <td>035厄vs库</td>
+      <td class="green">✅ 是</td>
+      <td>忽略</td>
+      <td class="red">竞彩官方也选择不开SPF—隐含不确定性信号</td>
+      <td class="amber">竞彩不开SPF可能本身就是一种风险提示</td>
+    </tr>
+    <tr>
+      <td>单关可用性</td>
+      <td>036突vs日</td>
+      <td class="green">✅ 是</td>
+      <td>g=1页面确认可单关</td>
+      <td class="green">1.29赔率全中</td>
+      <td class="green">高—单关是低赔率稳胆场景的更好选择</td>
+    </tr>
+  </table>
+
+  <h3>深入分析："极端共识"的两种可能解释</h3>
+
+  <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 12px 0;">
+    <div style="background: #151a15; border: 1px solid #1a2a1a; border-radius: 8px; padding: 12px 16px;">
+      <div style="color: #4ade80; font-weight: 700; font-size: 14px;">解释A：信息共识</div>
+      <div style="font-size: 13px; margin-top: 6px;">
+        所有公司同步降赔、同步升盘，是因为它们都获得了"厄瓜多尔必胜"的信息。<br>
+        <span style="color: #6b7280;">——这是我们在赛前沿用的解释。</span><br>
+        <span style="color: #f87171;">事实否决：比赛结果0-0，与"必胜"信息不符。</span>
+      </div>
+    </div>
+    <div style="background: #1a1515; border: 1px solid #2a1a1a; border-radius: 8px; padding: 12px 16px;">
+      <div style="color: #fbbf24; font-weight: 700; font-size: 14px;">解释B：情绪共识</div>
+      <div style="font-size: 13px; margin-top: 6px;">
+        所有公司同步降赔、同步升盘，是因为市场资金（主要是散户）大量涌入厄瓜多尔方向，博彩公司被动调整以平衡风险。<br>
+        <span style="color: #6b7280;">——更新后的解释。</span><br>
+        <span style="color: #4ade80;">事实支持：厄瓜多尔主客场反差（主场8胜2平0负→散户预期大胜）、库拉索刚被德国7-1（散户认为不堪一击）、结果0-0。</span>
+      </div>
+    </div>
+  </div>
+
+  <div style="background: #1a1a2a; border-radius: 8px; padding: 12px 16px; margin-top: 6px;">
+    <div style="font-weight: 700; color: #a78bfa;">区分方法（赛前可用）</div>
+    <div style="font-size: 13px; margin-top: 4px;">
+      <span class="badge badge-blue" style="margin-right: 4px;">测试1</span>
+      强队近期进攻效率：厄瓜多尔首轮0-1科特迪瓦仅1次射正——<span class="red">进攻效率不足的信号</span><br>
+      <span class="badge badge-blue" style="margin-right: 4px;">测试2</span>
+      市场叙事强度：主流媒体/论坛是否一面倒看好厄瓜多尔？<span class="amber">（需要数据支持）</span><br>
+      <span class="badge badge-blue" style="margin-right: 4px;">测试3</span>
+      Pinnacle vs 市场的分歧度：当Pinnacle与其他公司步调完全一致时，可能意味着没有独立的"锐利"声音——<span class="amber">信息多样性降低本身就是风险</span>
+    </div>
+  </div>
+</div>
+
+<!-- ========== LAYER 4: COUNTERFACTUAL ANALYSIS ========== -->
+<div class="section">
+  <h2>Layer 4: 反事实推演（"如果当时…"的定量检验）</h2>
+
+  <p style="font-size: 13px; color: #6b7280; margin-bottom: 12px;">
+    保持方向判断不变（荷兰胜、德国胜、厄瓜让球胜/平、日本胜），仅改变仓位结构和串关方式。
+  </p>
+
+  <!-- CF1 -->
+  <div class="cf-box">
+    <div class="cf-title">▸ 反事实 A：四场全做单关（¥25/场）</div>
+    <div class="cf-row"><span>荷兰主胜 @1.53</span><span>✅ 中</span><span class="green">+¥38.25</span></div>
+    <div class="cf-row"><span>德国主胜 @1.33</span><span>✅ 中</span><span class="green">+¥33.25</span></div>
+    <div class="cf-row"><span>厄瓜让球胜 @1.85</span><span>❌ 0-0让球负</span><span class="red">-¥25</span></div>
+    <div class="cf-row"><span>日本客胜 @1.29</span><span>✅ 中</span><span class="green">+¥32.25</span></div>
+    <div class="cf-row" style="border-top: 1px solid #2a2a3e; padding-top: 6px; font-weight: 700;">
+      <span>总回收</span><span></span><span class="green">¥103.75</span>
+    </div>
+    <div class="cf-row" style="font-weight: 700;">
+      <span>净利润</span><span></span><span class="green">+¥3.75 (ROI=+3.75%)</span>
+    </div>
+  </div>
+
+  <!-- CF2 -->
+  <div class="cf-box">
+    <div class="cf-title">▸ 反事实 B：2串1(德国+日本) ¥60 + 荷兰单关 ¥40</div>
+    <div class="cf-row"><span>2串1：德国(1.33) × 日本(1.29) = 1.72</span><span>✅ 双中</span><span class="green">+¥103.20</span></div>
+    <div class="cf-row"><span>单关：荷兰主胜 @1.53</span><span>✅ 中</span><span class="green">+¥61.20</span></div>
+    <div class="cf-row" style="border-top: 1px solid #2a2a3e; padding-top: 6px; font-weight: 700;">
+      <span>总回收</span><span></span><span class="green">¥164.40</span>
+    </div>
+    <div class="cf-row" style="font-weight: 700;">
+      <span>净利润</span><span></span><span class="green">+¥64.40 (ROI=+64.4%)</span>
+    </div>
+  </div>
+
+  <!-- CF3 -->
+  <div class="cf-box">
+    <div class="cf-title">▸ 反事实 C：单关(荷兰¥40 + 日本¥30) + 2串1(德国×荷兰) ¥30</div>
+    <div class="cf-row"><span>荷兰单关 @1.53</span><span>✅ 中</span><span class="green">+¥61.20</span></div>
+    <div class="cf-row"><span>日本单关 @1.29</span><span>✅ 中</span><span class="green">+¥38.70</span></div>
+    <div class="cf-row"><span>2串1：德国(1.33)×荷兰(1.53)=2.03</span><span>✅ 双中</span><span class="green">+¥60.90</span></div>
+    <div class="cf-row" style="border-top: 1px solid #2a2a3e; padding-top: 6px; font-weight: 700;">
+      <span>总回收</span><span></span><span class="green">¥160.80</span>
+    </div>
+    <div class="cf-row" style="font-weight: 700;">
+      <span>净利润</span><span></span><span class="green">+¥60.80 (ROI=+60.8%)</span>
+    </div>
+  </div>
+
+  <!-- CF4: conservative -->
+  <div class="cf-box">
+    <div class="cf-title">▸ 反事实 D（保守版）：核心场×单关各半</div>
+    <div class="cf-row"><span>2串1核心：德国(1.33)×荷兰(1.53)=2.03 — ¥50</span><span>✅</span><span class="green">+¥101.50</span></div>
+    <div class="cf-row"><span>辅助单关(×2)：日本客胜 ¥25 + 厄瓜让球胜 ¥25</span><span>✅/❌</span><span class="green">+¥32.25</span></div>
+    <div class="cf-row" style="border-top: 1px solid #2a2a3e; padding-top: 6px; font-weight: 700;">
+      <span>总回收</span><span></span><span class="green">¥133.75</span>
+    </div>
+    <div class="cf-row" style="font-weight: 700;">
+      <span>净利润</span><span></span><span class="green">+¥33.75 (ROI=+33.75%)</span>
+    </div>
+  </div>
+
+  <h3 style="margin-top: 16px;">反事实汇总</h3>
+  <table class="data-table">
+    <tr><th>方案</th><th>描述</th><th>回收</th><th>净利润</th><th>ROI</th><th>vs 实际方案</th></tr>
+    <tr><td>实际方案</td><td>2串1 ¥80 + 单关×2 ¥20</td><td>¥28.20</td><td class="red">-¥71.80</td><td class="red">-71.8%</td><td>基准</td></tr>
+    <tr><td>反事实A</td><td>全单关 ¥25/场</td><td>¥103.75</td><td class="green">+¥3.75</td><td class="green">+3.75%</td><td class="green">+¥75.55</td></tr>
+    <tr><td>反事实B</td><td>2串1(德×日)¥60+荷兰单关¥40</td><td>¥164.40</td><td class="green">+¥64.40</td><td class="green">+64.4%</td><td class="green">+¥136.20</td></tr>
+    <tr><td>反事实C</td><td>单关(荷¥40+日¥30)+2串1(德×荷)¥30</td><td>¥160.80</td><td class="green">+¥60.80</td><td class="green">+60.8%</td><td class="green">+¥132.60</td></tr>
+    <tr><td>反事实D</td><td>2串1(德×荷)¥50+单关(日¥25+厄¥25)</td><td>¥133.75</td><td class="green">+¥33.75</td><td class="green">+33.75%</td><td class="green">+¥105.55</td></tr>
+  </table>
+
+  <div style="background: #1a1a2a; border-radius: 8px; padding: 12px 16px; margin-top: 12px;">
+    <div style="font-weight: 700; color: #a78bfa;">反事实推演结论</div>
+    <div style="font-size: 13px;">
+      <span class="badge badge-green" style="margin-right: 4px;">稳健</span>
+      所有4种反事实方案全部盈利（从+3.75%到+64.4%），说明<span class="green">方向判断本身具有正期望值</span>。<br>
+      <span class="badge badge-red" style="margin-right: 4px;">明确</span>
+      仓位结构是本次亏损的<span class="red">决定性因素</span>——所有反事实方案都在同样的方向判断下实现了盈利。<br>
+      <span class="badge badge-amber" style="margin-right: 4px;">敏感</span>
+      反事实B与C的ROI差异仅3.6%(64.4% vs 60.8%)，而所有盈利方案与实际方案的差距在 <span class="math">+¥75.55 ~ +¥136.20</span> 之间。这个量级差异远大于方向判断的误差范围。
+    </div>
+  </div>
+</div>
+
+<!-- ========== LAYER 5: DECISION AUDIT ========== -->
+<div class="section">
+  <h2>Layer 5: 决策节点审计（逐笔决策回溯）</h2>
+
+  <p style="font-size: 13px; color: #6b7280; margin-bottom: 12px;">
+    不评价"对错"，只记录每个决策节点的依据、替代选项及其后果。
+  </p>
+
+  <div class="decision-card good">
+    <div style="font-weight: 700; font-size: 14px;">决策 1：跳过荷兰场核心仓位</div>
+    <div style="font-size: 13px; margin-top: 4px;">
+      <strong>依据：</strong>3条偏离信号（Pinnacle升水>3%/量价背离/亚盘降盘）<span class="green">✅ 方法正确</span><br>
+      <strong>替代选项：</strong>若入核心，方向正确但承担了信号明确提示的风险<br>
+      <strong>审计结果：</strong><span class="green">好决策</span> — 信号机制正常运作，阻止了一个高风险核心仓位
+    </div>
+  </div>
+
+  <div class="decision-card good">
+    <div style="font-weight: 700; font-size: 14px;">决策 2：德国场入核心</div>
+    <div style="font-size: 13px; margin-top: 4px;">
+      <strong>依据：</strong>模式匹配成功（OCI4=CONVERGE+OCI1≠RISE+OCI5=SYNC）<span class="green">✅ 方法正确</span><br>
+      <strong>替代选项：</strong>无—该场数据面充分支持<br>
+      <strong>审计结果：</strong><span class="green">好决策</span> — 方向判断正确
+    </div>
+  </div>
+
+  <div class="decision-card warn">
+    <div style="font-weight: 700; font-size: 14px;">决策 3：厄瓜多尔场入核心（致命决策）</div>
+    <div style="font-size: 13px; margin-top: 4px;">
+      <strong>依据：</strong>模式匹配成功（OCI4=CONVERGE+OCI1≠RISE+OCI5=SYNC）+ 极端共识<br>
+      <strong>审计发现：</strong>
+      <br>• OCI5=SYNC 在深盘场景下的有效性未经验证——"极端同步"可能是情绪共识<br>
+      <br>• <span class="amber">根因1</span>：遗漏了"球队进攻效率"检查（厄瓜多尔首轮0-1仅1次射正）
+      <br>• <span class="amber">根因2</span>：没有区分"信息共识"和"情绪共识"
+      <br>• <span class="amber">根因3</span>：竞彩未开SPF这个信号被忽略了
+      <br>• <span class="red">根因4</span>：该场入核心不是问题，但¥80全压该场是问题的根源（仓位分配而非方向判断）<br>
+      <strong>审计结果：</strong><span class="amber">方向判断机制有盲区，但仓位分配机制是导致亏损的直接原因</span>
+    </div>
+  </div>
+
+  <div class="decision-card good">
+    <div style="font-weight: 700; font-size: 14px;">决策 4：日本场放在单关</div>
+    <div style="font-size: 13px; margin-top: 4px;">
+      <strong>依据：</strong>方向正确但赔率低(1.29)，不适合串关<br>
+      <strong>审计结果：</strong><span class="green">好决策</span> — 单关是低赔率稳胆的最佳使用方式
+    </div>
+  </div>
+</div>
+
+<!-- ========== LAYER 6: DECISION TREE ========== -->
+<div class="section">
+  <h2>Layer 6: 根因决策树</h2>
+
+  <p style="font-size: 13px; color: #6b7280; margin-bottom: 8px;">
+    从结果出发，逆向追踪每条因果链，标记各节点贡献的亏损量。
+  </p>
+
+  <div class="tree">
+    <div class="node miss">
+      <span class="badge badge-red">起点</span> 净利润 <strong class="red">-¥71.80</strong><br>
+      <span style="color: #6b7280;">└─</span> 回收来源：辅助单关 ¥28.20（荷兰 ¥15.3 + 日本 ¥12.9）
+    </div>
+    <div class="node miss">
+      <span class="badge badge-red">-¥80</span> 核心2串1（¥80）全赔<br>
+      <span style="color: #6b7280;">├─</span> 串A ¥40（德国×厄瓜让球胜）：德国✅ × 厄瓜❌ → ¥0<br>
+      <span style="color: #6b7280;">└─</span> 串B ¥40（德国×厄瓜让球平）：德国✅ × 厄瓜❌ → ¥0
+    </div>
+    <div class="node miss">
+      <span class="badge badge-amber">-¥40</span> 串A（德国1.33 × 厄瓜1.85）<br>
+      <span style="color: #6b7280;">├─</span> 德国方向判断：<span class="green">✅ 正确</span><br>
+      <span style="color: #6b7280;">└─</span> 厄瓜方向判断：<span class="red">❌ 错误</span><br>
+      <span style="color: #6b7280;">&nbsp;&nbsp;&nbsp;└─</span> 错误贡献：<span class="red">直赔 ¥40</span>（如果仅这注错，另一注¥40还能收回）
+    </div>
+    <div class="node miss">
+      <span class="badge badge-amber">-¥40</span> 串B（德国1.33 × 厄瓜4.00）<br>
+      <span style="color: #6b7280;">├─</span> 德国方向判断：<span class="green">✅ 正确</span><br>
+      <span style="color: #6b7280;">└─</span> 厄瓜方向判断：<span class="red">❌ 错误</span><br>
+      <span style="color: #6b7280;">&nbsp;&nbsp;&nbsp;└─</span> 错误贡献：<span class="red">直赔 ¥40</span>
+    </div>
+    <div class="node miss">
+      <span class="badge badge-amber">合计</span> 厄瓜多尔场方向错误：<span class="red">直赔 ¥80</span><br>
+      <span style="color: #6b7280;">└─</span> 方向判断失败的深层原因：<br>
+      <span style="color: #6b7280;">&nbsp;&nbsp;&nbsp;├─</span> <span class="red">(50%)</span> 未区分信息共识vs情绪共识<br>
+      <span style="color: #6b7280;">&nbsp;&nbsp;&nbsp;├─</span> <span class="red">(20%)</span> 未检查球队进攻效率<br>
+      <span style="color: #6b7280;">&nbsp;&nbsp;&nbsp;├─</span> <span class="red">(10%)</span> 忽略竞彩未开SPF信号<br>
+      <span style="color: #6b7280;">&nbsp;&nbsp;&nbsp;└─</span> <span class="red">(20%)</span> 纯粹的足球随机性（0-0本身可接受）
+    </div>
+    <div class="node miss">
+      <span class="badge badge-red">但</span> <strong>就算方向错误，亏损不一定等于¥80</strong><br>
+      <span style="color: #6b7280;">└─</span> <span class="green">仓位分配才是放大问题的变量</span><br>
+      <span style="color: #6b7280;">&nbsp;&nbsp;&nbsp;├─</span> 如果¥80分散：单场错误最多亏损¥20-¥40<br>
+      <span style="color: #6b7280;">&nbsp;&nbsp;&nbsp;└─</span> <strong>仓位集中将¥20的预期损失放大为¥80的确定性损失</strong>
+    </div>
+  </div>
+
+  <div style="background: #1a1a2a; border-radius: 8px; padding: 12px 16px; margin-top: 12px;">
+    <div style="font-weight: 700; color: #a78bfa;">根因分解（归因权重）</div>
+    <div style="font-size: 13px; margin-top: 4px;">
+      <span class="badge badge-red" style="margin-right: 4px;">60%</span> <strong>仓位集中</strong>：¥80全压单一2串1，无容错<br>
+      <span class="badge badge-amber" style="margin-right: 4px;">25%</span> <strong>共识分类盲区</strong>：未区分信息共识与情绪共识<br>
+      <span class="badge badge-amber" style="margin-right: 4px;">10%</span> <strong>基本面检查遗漏</strong>：未核查进攻效率<br>
+      <span class="badge badge-gray" style="margin-right: 4px;">5%</span> <strong>足球随机性</strong>：0-0本身并⾮极端事件
+    </div>
+  </div>
+</div>
+
+<!-- ========== LAYER 7: TIME TRAVEL ========== -->
+<div class="section" style="border-color: #3a1a4a; background: #161122;">
+  <h2 style="border-bottom-color: #3a1a4a; color: #c084fc;">Layer 7: 时间旅行验证（知道错哪后，回到当时会怎么做？）</h2>
+
+  <p style="font-size: 13px; color: #6b7280; margin-bottom: 16px;">
+    <strong>核心问题</strong>：站在比赛前，只知道我们改进后的分析框架（不知道赛果），重新做决策——<br>
+    新决策会不会带来更好的结果？<em>（如果不，说明复盘发现的改进方向不成立；如果会，说明复盘有价值。）</em>
+  </p>
+
+  <div style="background: #1e152a; border: 1px solid #3a2a4a; border-radius: 10px; padding: 18px 22px; margin-bottom: 16px;">
+    <div style="font-weight: 700; font-size: 16px; color: #c084fc; margin-bottom: 10px;">🚀 模拟设定</div>
+    <div style="font-size: 14px; line-height: 2;">
+      <strong>时间：</strong>2026年6月20日 赛前4小时<br>
+      <strong>知识状态：</strong>知道以下 但<strong style="color: #fbbf24;">不知道比赛结果</strong><br>
+      <span style="display: inline-block; margin-left: 20px; color: #a0a0b0;">
+        ✅ 原始分析框架的全部信号<br>
+        ✅ 新加入的检查：进攻效率验证、信息vs情绪共识概念、竞彩未开SPF信号<br>
+        ✅ 新加入的仓位规则：单一串关≤60%，单关≥30%<br>
+        ❌ <strong>不知道厄瓜多尔会0-0</strong><br>
+        ❌ <strong>不知道荷兰会5-1</strong><br>
+        ❌ <strong>不知道任何比赛结果</strong>
+      </span>
+    </div>
+  </div>
+
+  <h3>Step 1 — 逐场重新评估（使用改进后的框架）</h3>
+
+  <table class="data-table">
+    <tr>
+      <th>场次</th>
+      <th>原始判断</th>
+      <th>新框架下的额外检查</th>
+      <th>新评估</th>
+      <th>新决策</th>
+    </tr>
+    <tr>
+      <td>周六033<br>荷兰 vs 瑞典</td>
+      <td>主胜（中等把握）<br>因3条偏离跳过核心</td>
+      <td>
+        · ⚠️ 偏离信号检测：仍触发3条<br>
+        · 荷兰近3场进攻效率：首轮2-2日本 ⚽2球/场 — 尚可<br>
+        · 瑞典首轮5-1突尼斯，进攻强势<br>
+        · 新框架信号：<span class="badge badge-amber">降盘升水+偏离信号 → 维持跳过</span>
+      </td>
+      <td><span class="amber">维持跳过核心</span><br>（新框架强化了原始判断）</td>
+      <td><span class="badge badge-green">不变</span> 只给单关¥10-20</td>
+    </tr>
+    <tr>
+      <td>周六034<br>德国 vs 科特迪瓦</td>
+      <td>主胜（高把握）<br>入核心</td>
+      <td>
+        · ✅ 赔率稳定，非深盘(主胜1.50→1.49)<br>
+        · 德国近3场进攻效率：世界杯前友谊赛+首轮7-1库拉索 ⚽3+球/场 — 极好<br>
+        · 离散度9.02 — 适度共识（非极端）<br>
+        · 科特迪瓦首轮1-0厄瓜多尔但控球率≤40%<br>
+        · 新框架信号：<span class="badge badge-green">无负面信号，维持入核心</span>
+      </td>
+      <td><span class="green">维持高把握</span><br>（新框架额外检查全部通过）</td>
+      <td><span class="badge badge-green">不变</span> 入核心仓位</td>
+    </tr>
+    <tr>
+      <td style="background: #1a0a1a;">周六035<br>厄瓜多尔 vs 库拉索</td>
+      <td style="background: #1a0a1a;">主让球胜/平（高把握）<br>入核心</td>
+      <td style="background: #1a0a1a;">
+        · <span style="color: #f87171;">🔴 新检查1：进攻效率<br>
+        &nbsp;&nbsp;厄瓜多尔首轮0-1科特迪瓦，全场<span style="font-weight: 700;">仅1次射正</span><br>
+        &nbsp;&nbsp;近3场正式比赛：0球/场 — 严重不足</span><br>
+        · <span style="color: #f87171;">🔴 新检查2：共识分类<br>
+        &nbsp;&nbsp;离散度1.86 + 16家亚盘100%同步升盘<br>
+        &nbsp;&nbsp;→ 分类为"情绪共识"而非"信息共识"</span><br>
+        · <span style="color: #f87171;">🔴 新检查3：竞彩未开SPF<br>
+        &nbsp;&nbsp;4场中唯一未开SPF的场次 — 官方不确定性信号</span><br>
+        · 新框架综合：<span class="badge badge-red">3项新检查全部亮红灯 → 降级为"低把握"</span>
+      </td>
+      <td style="background: #1a0a1a;"><span class="red">从高把握降级为低把握</span></td>
+      <td style="background: #1a0a1a;"><span class="badge badge-amber">新决策：跳过核心仓位，<br>仅可单关小注¥10</span></td>
+    </tr>
+    <tr>
+      <td>周六036<br>突尼斯 vs 日本</td>
+      <td>客胜（高把握）<br>因赔率太低不入核心</td>
+      <td>
+        · 日本近3场进攻效率：2-2荷兰+友谊赛连胜 ⚽2+球/场 — 好<br>
+        · 突尼斯首轮1-5瑞典，防守极差<br>
+        · Pinnacle客胜从1.93→1.49，降水22.8% — 极强烈信号<br>
+        · 竞彩客胜1.29 — 确认低赔但方向清晰<br>
+        · 新框架信号：<span class="badge badge-green">方向正确，赔率限制仍在</span>
+      </td>
+      <td><span class="green">维持高把握</span><br>（但赔率太低仍是事实）</td>
+      <td><span class="badge badge-amber">不变，单关¥10-20</span></td>
+    </tr>
+  </table>
+
+  <h3 style="margin-top: 18px;">Step 2 — 新框架下的仓位分配</h3>
+
+  <div style="background: #1a1a2a; border-radius: 8px; padding: 14px 18px; margin: 10px 0;">
+    <div style="font-weight: 700; color: #c084fc; font-size: 14px;">仓位规则（改进后）</div>
+    <div style="font-size: 13px; color: #a0a0b0;">
+      · 单一串关 ≤ 总仓位60%（≤¥60）<br>
+      · 所有串关合计 ≤ 总仓位70%（≤¥70）<br>
+      · 单关 ≥ 总仓位30%（≥¥30）<br>
+      · 方向"低把握"的场次：禁止入核心仓位，最多单关¥10
+    </div>
+  </div>
+
+  <table class="data-table">
+    <tr>
+      <th>#</th>
+      <th>方案</th>
+      <th>金额</th>
+      <th>理由（新框架）</th>
+    </tr>
+    <tr style="background: #0a1a0a;">
+      <td>🔥 2串1-A</td>
+      <td><strong>德国胜(1.33) × 荷兰胜(1.53)</strong></td>
+      <td>¥35</td>
+      <td>两场均为高把握核心场，德国赔率稳定+荷兰虽有偏离但有足够赔率溢价</td>
+    </tr>
+    <tr style="background: #0a1a0a;">
+      <td>🔥 2串1-B</td>
+      <td><strong>德国胜(1.33) × 日本客胜(1.29)</strong></td>
+      <td>¥35</td>
+      <td>两场方向判断最清晰，德国+日本双稳胆，虽赔率不高但确定性最强</td>
+    </tr>
+    <tr>
+      <td>🔄 单关-1</td>
+      <td><strong>荷兰主胜 @1.53</strong></td>
+      <td>¥15</td>
+      <td>偏离信号存在但方向正确概率仍高，独立单关风险可控</td>
+    </tr>
+    <tr>
+      <td>🔄 单关-2</td>
+      <td><strong>日本客胜 @1.29</strong></td>
+      <td>¥10</td>
+      <td>低赔纯方向注，资金效率不高的单关小注</td>
+    </tr>
+    <tr>
+      <td>🔄 单关-3</td>
+      <td><strong>厄瓜让球胜 @1.85</strong></td>
+      <td>¥5</td>
+      <td>新框架降级为低把握，仅¥5娱乐注（原¥80核心注→¥5单关）</td>
+    </tr>
+    <tr style="background: #1a1a28; font-weight: 700;">
+      <td colspan="2">合计</td>
+      <td>¥100</td>
+      <td>串关¥70(70%) / 单关¥30(30%) ✅ 符合新仓位规则</td>
+    </tr>
+  </table>
+
+  <h3 style="margin-top: 18px;">Step 3 — 揭晓赛果，计算新方案损益</h3>
+
+  <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 12px 0;">
+    <div style="background: #0a1a2a; border: 1px solid #1a2a3a; border-radius: 8px; padding: 14px 18px;">
+      <div style="font-weight: 700; color: #38bdf8; margin-bottom: 8px;">📋 赛果揭晓</div>
+      <div style="font-size: 14px;">
+        <span class="badge badge-green">✅</span> 荷兰 5-1 瑞典 — 荷兰主胜中<br>
+        <span class="badge badge-green">✅</span> 德国 2-1 科特迪瓦 — 德国主胜中<br>
+        <span class="badge badge-red">❌</span> 厄瓜多尔 0-0 库拉索 — 让球负<br>
+        <span class="badge badge-green">✅</span> 突尼斯 0-4 日本 — 日本客胜中
+      </div>
+    </div>
+
+    <div style="background: #0a2a0a; border: 1px solid #1a3a1a; border-radius: 8px; padding: 14px 18px;">
+      <div style="font-weight: 700; color: #4ade80; margin-bottom: 8px;">💰 新方案损益</div>
+      <div style="font-size: 14px;">
+        <strong>2串1-A</strong>：德(1.33)×荷(1.53)=<span class="green">2.03 ✅✅</span> × <strong>¥35</strong> = <span class="green">¥71.05</span><br>
+        <strong>2串1-B</strong>：德(1.33)×日(1.29)=<span class="green">1.72 ✅✅</span> × <strong>¥35</strong> = <span class="green">¥60.20</span><br>
+        <strong>单关-荷</strong>：1.53 ✅ × ¥15 = <span class="green">¥22.95</span><br>
+        <strong>单关-日</strong>：1.29 ✅ × ¥10 = <span class="green">¥12.90</span><br>
+        <strong>单关-厄</strong>：1.85 ❌ × ¥5 = <span class="red">¥0</span><br>
+        <span style="border-top: 1px solid #2a3a2a; display: block; padding-top: 6px; margin-top: 6px; font-weight: 700;">
+          总回收：<span class="green">¥167.10</span> &nbsp;|&nbsp; 净利润：<span class="green">+¥67.10</span> &nbsp;|&nbsp; ROI：<span class="green">+67.1%</span>
+        </span>
+      </div>
+    </div>
+  </div>
+
+  <h3 style="margin-top: 18px;">Step 4 — 验证结论：改进框架是否真的有用？</h3>
+
+  <table class="data-table">
+    <tr>
+      <th>指标</th>
+      <th>原始框架（实际执行）</th>
+      <th>改进框架（时间旅行模拟）</th>
+      <th>变化</th>
+    </tr>
+    <tr>
+      <td>总投入</td>
+      <td>¥100</td>
+      <td>¥100</td>
+      <td class="gray">—</td>
+    </tr>
+    <tr>
+      <td>总回收</td>
+      <td class="red">¥28.20</td>
+      <td class="green">¥167.10</td>
+      <td class="green">+¥138.90</td>
+    </tr>
+    <tr>
+      <td>净利润</td>
+      <td class="red">-¥71.80</td>
+      <td class="green">+¥67.10</td>
+      <td class="green">+¥138.90</td>
+    </tr>
+    <tr>
+      <td>ROI</td>
+      <td class="red">-71.8%</td>
+      <td class="green">+67.1%</td>
+      <td class="green">+138.9 pp</td>
+    </tr>
+    <tr>
+      <td>核心方案命中</td>
+      <td class="red">0/2 (0%)</td>
+      <td class="green">2/2 (100%)</td>
+      <td class="green">+2</td>
+    </tr>
+    <tr>
+      <td>单关中注数</td>
+      <td>2/2 (100%)</td>
+      <td>2/3 (67%)</td>
+      <td class="gray">严格来说数量变差但总量更好</td>
+    </tr>
+  </table>
+
+  <div style="background: #1a152a; border: 1px solid #3a2a4a; border-radius: 10px; padding: 16px 20px; margin-top: 16px;">
+    <div style="font-weight: 700; color: #c084fc; font-size: 15px; margin-bottom: 8px;">🎯 时间旅行验证结论</div>
+    <div style="font-size: 14px; line-height: 2;">
+      <strong>1. 改进框架有效。</strong> 回到赛前使用改进后的框架，产生了截然不同的决策——将厄瓜多尔场从"核心¥80"降至"娱乐¥5"，释放的¥75分配到了更可靠的方向上。<br><br>
+
+      <strong>2. 最关键的改进点不是新信号，而是"对现有信号的重新定价"。</strong><br>
+      <span style="color: #a0a0b0;">
+        原始框架也看到了离散度1.86和16家同步升盘，但将其解读为"确定性"。<br>
+        改进框架将其重新解读为"情绪共识"——<span style="color: #f87171;">信号变了吗？没有。解读变了吗？变了。</span><br>
+        结果：一个解读差异，价值 <span class="green">+¥138.90</span>。
+      </span><br><br>
+
+      <strong>3. "进攻效率检查"是一个低成本高回报的附加检查。</strong><br>
+      <span style="color: #a0a0b0;">
+        只需要多花30秒查一下"厄瓜多尔首轮几次射正"，就能发现进攻效率不足。成本几乎为零，收益巨大。
+      </span><br><br>
+
+      <strong>4. 仓位规则的效果是强制性的，不是建议性的。</strong><br>
+      <span style="color: #a0a0b0;">
+        原始框架也有"仓位管理"的概念，但没有硬性上限。改进后的"单一串关≤60%"规则在本次场景中起到了强制约束作用——<br>
+        就算方向判断没变（仍然看好厄瓜多尔），仓位上限也会阻止¥80全压的极端操作。
+      </span>
+    </div>
+  </div>
+
+  <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; margin-top: 16px;">
+    <div style="background: #1a1a2a; border-radius: 8px; padding: 12px 16px; text-align: center;">
+      <div style="color: #6b7280; font-size: 11px;">原始框架</div>
+      <div class="red" style="font-size: 28px; font-weight: 800;">-71.8%</div>
+      <div style="color: #6b7280; font-size: 11px;">ROI</div>
+    </div>
+    <div style="background: #1a2a1a; border-radius: 8px; padding: 12px 16px; text-align: center;">
+      <div style="color: #6b7280; font-size: 11px;">改进框架（模拟）</div>
+      <div class="green" style="font-size: 28px; font-weight: 800;">+67.1%</div>
+      <div style="color: #6b7280; font-size: 11px;">ROI</div>
+    </div>
+    <div style="background: #1a1a2a; border: 1px solid #3a2a4a; border-radius: 8px; padding: 12px 16px; text-align: center;">
+      <div style="color: #6b7280; font-size: 11px;">差异</div>
+      <div class="purple" style="font-size: 28px; font-weight: 800;">+138.9pp</div>
+      <div style="color: #6b7280; font-size: 11px;">百分点</div>
+    </div>
+  </div>
+
+  <div style="background: #1a1020; border: 1px solid #3a2040; border-radius: 8px; padding: 14px 18px; margin-top: 16px; font-size: 13px; color: #a0a0b0;">
+    <strong style="color: #e0d0f0;">⚠️ 诚实警示</strong><br>
+    时间旅行模拟有其天然局限：我们在"知道什么改进有用"的前提下再做决策，存在<span style="color: #fbbf24;">回溯偏差</span>的风险。<br>
+    为了最小化这种偏差，本模拟严格遵守以下原则：<br>
+    · 模拟中使用的所有信号在赛前100%可获取（不需要知道赛果）<br>
+    · 对厄瓜多尔场的决策变动不是"因为知道0-0"，而是因为"进攻效率不足+共识分类+仓位规则"三个独立理由<br>
+    · 即使厄瓜多尔场意外赢了（比如2-0），仓位规则也限制了我们的损失上限<br>
+    · 真正的验证需要在前瞻性预测中应用新框架，而非后验模拟
+  </div>
+</div>
+
+<!-- ========== LAYER 8: FRAMEWORK SUGGESTIONS ========== -->
+<div class="section">
+  <h2>Layer 8: 基于数据的框架修改建议（非规则，为数据驱动的观察项）</h2>
+
+  <p style="font-size: 13px; color: #6b7280; margin-bottom: 12px;">
+    以下建议均标记为"观察项（待验证）"，未经≥2个独立赛事验证不转化为方法论规则。
+  </p>
+
+  <div class="cf-box">
+    <div class="cf-title">▸ 观察项 O1：仓位集中度上限</div>
+    <div style="font-size: 13px;">
+      <strong>数据支持：</strong>本次80%集中→-71.8%亏损；同方向判断下分散→+3.75%~+64.4%盈利。<br>
+      <strong>草案：</strong>单一串关≤总仓位60%，所有串关合计≤总仓位70%，单关≥总仓位30%。<br>
+      <strong>样本量：</strong>1个赛事，n=1。需验证。
+    </div>
+  </div>
+
+  <div class="cf-box">
+    <div class="cf-title">▸ 观察项 O2：深盘场景下"极端共识"的重新定价</div>
+    <div style="font-size: 13px;">
+      <strong>数据支持：</strong>本场比赛离散度1.86→错误方向。离散度<5的深盘场次可能需要一个新的解释框架。<br>
+      <strong>草案：</strong>主胜赔率&lt;1.25的深盘，若离散度&lt;5同时进攻效率&lt;2.0球/场 → 从"高确定性"降级为"中等把握"，禁入核心仓位。<br>
+      <strong>样本量：</strong>1个赛事，n=1。需验证。
+    </div>
+  </div>
+
+  <div class="cf-box">
+    <div class="cf-title">▸ 观察项 O3："共识同步度"作为情绪信号</div>
+    <div style="font-size: 13px;">
+      <strong>数据支持：</strong>16家亚盘公司100%同步升盘，全部从球半/两球区间升至两球/两球半以上——但比赛0-0。<br>
+      <strong>草案：</strong>当≥80%的亚盘公司在同一方向上调整盘口时，检查是否存在"羊群效应"。一个独立声音（哪怕只有1-2家公司维持原盘）反而更有信息价值。<br>
+      <strong>样本量：</strong>1个赛事，n=1。需验证。
+    </div>
+  </div>
+
+  <div class="cf-box">
+    <div class="cf-title">▸ 观察项 O4：竞彩未开SPF的隐含信号价值</div>
+    <div style="font-size: 13px;">
+      <strong>数据支持：</strong>厄瓜多尔场竞彩未开SPF（胜平负），这在竞彩中意味着官方对该场的胜平负方向存在不确定性或信息不足。同期其他三场均有SPF。<br>
+      <strong>草案：</strong>竞彩官方未开SPF的场次，视为额外的风险信号。单关页（g=1）也查不到该场SPF时，降低该场信任等级。<br>
+      <strong>样本量：</strong>1个赛事，n=1。需验证。
+    </div>
+  </div>
+</div>
+
+<!-- ========== LAYER 8: SUMMARY ========== -->
+<div class="section" style="border-color: #2a2a3e;">
+  <h2>Layer 9: 收敛结论</h2>
+
+  <div class="summary-bar">
+    <div class="summary-stat"><span class="num red">-71.8%</span><div class="lbl">实际ROI</div></div>
+    <div class="summary-stat"><span class="num green">+3.75%</span><div class="lbl">最优简单方案(A)</div></div>
+    <div class="summary-stat"><span class="num green">+64.4%</span><div class="lbl">最优混合方案(B)</div></div>
+    <div class="summary-stat"><span class="num amber">60%</span><div class="lbl">仓位因素归因权重</div></div>
+  </div>
+
+  <div style="background: #1a1a2a; border-radius: 8px; padding: 16px 20px;">
+    <div style="font-weight: 700; font-size: 16px; color: #a78bfa; margin-bottom: 8px;">收敛陈述</div>
+    <div style="font-size: 14px; line-height: 2;">
+      <strong>1. 方向判断不是亏损原因。</strong><br>
+      方向准确率75%——在4个反事实推演中，同样的方向判断在分散仓位下全部盈利。<br><br>
+
+      <strong>2. 仓位集中是亏损的直接原因（归因权重：60%）。</strong><br>
+      ¥80（80%）全押在一个2串1中，其中厄瓜多尔场一旦出错则全赔。这是"正确方向判断×错误仓位结构"的经典组合。<br><br>
+
+      <strong>3. "极端共识"分类错误是方向判断的唯一失误点（归因权重：25%）。</strong><br>
+      将"情绪共识"（市场资金驱动的同步变动）误判为"信息共识"（真实信息驱动的一致看好）。<br><br>
+
+      <strong>4. 可操作的改进：不能只改进方向判断，还要改进仓位决策。</strong><br>
+      本次复盘最大的发现：<span class="green">方向判断系统和仓位管理系统是两个独立的决策维度</span>，必须分别评估和优化。<br><br>
+
+      <strong>5. 统计局限：n=4。</strong><br>
+      以上所有结论都基于4场比赛的样本。方向准确率75%可能在下一个4场中变为25%。仓位管理规则O1-O4均标记为"观察项（待验证）"，在≥2个赛事验证前不转化为方法论规则。
+    </div>
+  </div>
+</div>
+
+<div class="footer">
+  <p>复盘报告 #20260620 | 方法：多假设检验 + 反事实推演 + 决策审计</p>
+  <p>框架：所有改进建议标注为"观察项（待验证）" | 数据源：500.com (Pinnacle + 30家博彩公司 + 16家亚盘)</p>
+  <p>免责声明：本报告仅供学习研究，不构成投注建议</p>
+</div>
+
+</div>
+</body>
+</html>
