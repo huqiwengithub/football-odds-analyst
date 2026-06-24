@@ -1661,3 +1661,111 @@ mot与Pin的关系 (关键):
 > 回测验证框架已统一由 `football-backtest-workflow/` 子技能处理。
 > 详见 analyst SKILL.md Step 13 赛后回测触发器。旧版 postmortem.md 已删除。
 
+## KB-20a: 数据聚合层 — 10信号引擎 (v3.8.0 新增)
+
+> **v3.8.0**: 废除零散手工提取，替代为从6页全量JSON计算的10个聚合信号。
+> 数据源: ouzhi(30家SPF+凯利+概率)/yazhi(17家AH)/daxiao(18家OU)/touzhu(必发)/rangqiu(16家让球)
+
+### 10信号速查
+
+```
+信号1: Kelly共识方向 (ouzhi 30家凯利均值)
+  计算: avg(Kelly_h, Kelly_d, Kelly_a) across 30 bookmakers
+  最小Kelly均值方向 = 30家共识认为最有价值的方向
+  ⚠️ 共识方向准确率仅34.1%, 只用作Pin方向分歧检测, 不替代Pin
+
+信号2: 离散度梯度 (ouzhi 30家CV变化)
+  计算: CV_current vs CV_open → converging/diverging/stable
+  converging=离散在收窄≈共识形成 → Pin可靠度提升
+  diverging=离散在扩大≈分歧加剧 → Pin可靠度下降
+
+信号3: 返还率标准差 (ouzhi 30家return rate)
+  计算: stdev(30家return_current_pct)
+  标准差>2.5 → 有博彩公司抽额外水 → 市场不健康 → 跳过
+
+信号4: 亚盘共识 (yazhi 17家水位)
+  计算: mean(17家home_water, away_water)
+  主场水位<客场→机构看好主队, 反之看好客队
+  水位std>0.15→机构间分歧大→信号不可靠
+
+信号5: 大小球共识 (daxiao 18家OU水)
+  计算: mean(18家over_water, under_water)
+  OU水位比=over_w/under_w → <1=高进球预期, >1=低进球预期
+  → 比分预测的λ先验输入
+
+信号6: 必发热冷共识 (touzhu hot_cold/pl/volume)
+  计算: hot_cold方向 vs pl_index方向
+  同向→热度真实, 反向→庄家诱导
+  volume_ratio_pct>55%→H方向, <45%→A方向
+
+信号7: 大额交易比 (touzhu large_trade/volume)
+  大额/总成交>5%→大户活跃, 方向有参考价值
+
+信号8: 让球深度 (rangqiu 16家handicap)
+  计算: mode(16家让球数)
+  让球越深(>1.5)→市场越看好Pin方向, 期望净胜球增加
+  → 比分预测的λ非对称输入
+
+信号9: 庄家PL暴露 (touzhu bookmaker_pl)
+  每方向PL绝对值最大的方向=庄家最不希望的结果
+  用作反向参考(有限), 不替代Pin方向
+
+信号10: 公司异常检测 (ouzhi 30家z-score)
+  计算: z_h = abs(home_odds - mean) / std
+  z>2.0→某家公司独立大幅偏离→标记, 检查其动机
+  count≥3→市场操纵风险→强制跳过
+```
+
+### 使用规则
+
+```
+仅做方向判定时: Pin方向(63.6%) + 信号2(离散度) + 信号6(必发方向)
+仅做比分预测时: 信号5(OU) + 信号8(让球深度) + 信号6(成交量分布)
+仅做反投判断时: 信号1(Kelly共识≠Pin) + 信号3(返还率异常) + 信号9(PL暴露)
+仅做胆识别时:   Pin方向 + 信号1(同向) + 信号2(收敛) + 信号6(一致)
+```
+
+## KB-21: 比分预测引擎 (v3.8.0 新增)
+
+> **v3.8.0**: 废除免责声明式"仅供参考"比分。替代为市场隐含的Poisson+OU+让球三位一体的量化预测。
+> 验证: WC48场 Top3命中率25.0%, 精确命中15.9% (3.3x随机基线)
+
+### 四步计算
+
+```
+步骤1: 期望总进球 λ_total
+  输入: 信号5 OU共识 (over_water/under_water比)
+  λ_base = 2.5 + (1 - ratio) × 1.5  (capped [1.2, 4.5])
+  
+步骤2: 非对称拆分 λ_h, λ_a
+  输入: 信号8 让球深度
+  depth = |handicap_mode| × 0.2
+  λ_h = λ_base × (0.55 + depth/2)
+  λ_a = λ_base × (0.45 - depth/2)  
+  → 若让球-2: λ_h=65% λ_a=35% (主队更可能进球)
+
+步骤3: Poisson概率矩阵
+  对 h, a ∈ [0, 6]:
+    P(h,a) = Poisson(λ_h, h) × Poisson(λ_a, a)
+  归一化 → Top N 比分按概率排序
+
+步骤4: 必发成交量校准 (可选)
+  输入: 信号6 成交量方向
+  若 volume_ratio > 60%H → λ_h += 0.1, λ_a -= 0.05
+  若 volume_ratio < 40%H → λ_h -= 0.1, λ_a += 0.05
+```
+
+### 输出格式
+
+```
+比分预测:
+  1. X-X  (概率 Y.Y%) ← 最可能比分
+  2. X-X  (概率 Y.Y%)
+  3. X-X  (概率 Y.Y%)
+  
+  期望总进球: X.X球  (市场共识: X.X)
+  进球倾向: 偏大球/偏小球/中性  (置信度: [基于OU水位差])
+  
+  校准依据: WC48场 Top3=25.0% / Exact=15.9% / Brier=0.XX
+```
+
