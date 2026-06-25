@@ -1,9 +1,9 @@
 ---
 name: football-odds-analyst
-description: "Football odds analyst v3.10.1 — 保守优先(3串3默认)+EV筛选+竞彩官网+全6类基本面. 179场校准."
+description: "Football odds analyst v3.10.2 — 竞彩硬约束+数据分界墙+三档仓位(竞彩deVig). 179场校准."
 allowed-tools: Read, Write, Bash, WebSearch, WebFetch
 agent_created: true
-version: "3.10.1"
+version: "3.10.2"
 released: 2026-06-25
 references: references/knowledge-base.md, references/betting-sop.md, references/fundamentals/
 dependencies:
@@ -361,15 +361,17 @@ dependencies:
 
 ### Step 11 — 组合构建 + 仓位执行
 - **⚠️ 必须先读 `references/betting-sop.md` 完整五步流程**
-- **⚠️ 保守优先筛选链 (v3.10.1)**:
-  - 入串门槛: 每腿 deVig 概率 ≥ 0.55 (竞彩去水)
-  - 默认载体: 🛡️ 3串3 (¥75) — 仅在 ALL 4 条件满足时升级为 🔥 3串4 (¥100)
-  - 回血门槛: 2串1 ≥ 2.00 (¥25×2.0=¥50→错1场回收50%)
-  - 载体层级: 3串3(默认) → 3串4(升级) → 2串1(回退) → 空仓(跳过)
-- **⚠️ EV 筛选**: 串关 EV = 竞彩_P_hit × 竞彩_payout − 1 (竞彩市场自洽)
-- **⚠️ 竞彩数据源**: 主源 500.com (trade页SPF + rangqiu页RQSPF), 交叉验证 sporttery.cn
-- **⚠️ 穿盘风险前置检查 (v3.8.2)**: 让球深度≥1.5球的候选执行 1.1b
-- **⚠️ 单关可用性检查**: 核验 g=1 页面
+- **⚠️ ⛔ 数据分界墙 (v3.10.2)**: 
+  - Step 11 只允许使用竞彩官方赔率 (500.com trade页 + sporttery.cn)
+  - Pinnacle/百家平均赔率绝对禁止进入投注计算
+  - 允许从分析层传入: Pin方向 / 穿盘概率 / mot / 偏离计数 (仅此4项)
+- **⚠️ 竞彩可用性硬门 (1.1)**: SPF可用? RQSPF可用? 不可投场次直接剔除
+- **⚠️ 三档仓位 (1.2)**:
+  - 🔥 A类 (deVig≥0.65): 重仓, 入串关核心 → ¥25/注
+  - ➡️ B类 (deVig 0.55-0.65): 中仓, 入串关非核心 → ¥25/注
+  - ⚡ C类 (deVig<0.55+EV>0): 不入串关, 仅试探单关 ¥10-20
+- **⚠️ 默认载体**: 🛡️ 3串3 (¥75) → 仅 ALL 4条件满足时升级 🔥 3串4 (¥100)
+- **⚠️ 穿盘风险前置检查 (1.1b)**: 让球深度≥1.5球的候选执行
 
 ### Step 12 — 报告生成
 - **详见下方 Step 12 章节**
