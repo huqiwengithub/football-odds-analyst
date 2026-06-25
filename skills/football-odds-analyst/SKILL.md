@@ -1,11 +1,11 @@
 ---
 name: football-odds-analyst
-description: "Football odds analyst v3.8.2 — 深盘穿盘风险前置检查+Poisson投注接入+动机流失精炼+死亡区间观察项. 2026WC 44场+6场校准."
+description: "Football odds analyst v3.9.0 — 基本面量化(ELO/FIFA/新闻协议)+深盘穿盘保护+动机流失精炼. 2026WC校准."
 allowed-tools: Read, Write, Bash, WebSearch, WebFetch
 agent_created: true
-version: "3.8.2"
+version: "3.9.0"
 released: 2026-06-25
-references: references/knowledge-base.md, references/betting-sop.md
+references: references/knowledge-base.md, references/betting-sop.md, references/fundamentals/
 dependencies:
   - name: 500com-football-scraper
     required: true
@@ -13,7 +13,7 @@ dependencies:
     description: "500.com deep data scraper — provides per-match 6-page deep analysis JSON"
 ---
 
-# Football Odds Analyst v3.8.2 — Pin方向 + 平局分级 + 胆识别 + Kelly注码 + 穿盘保护
+# Football Odds Analyst v3.9.0 — Pin方向 + 基本面量化 + 穿盘保护 + 新闻协议
 
 > **⚠️ 三大铁律**:
 > 1. **分析用全球数据** (Steps 1-10.5): 只用 Pinnacle + 30 家博彩公司欧赔/亚盘/成交量
@@ -74,6 +74,21 @@ dependencies:
 
 所需字段：`ouzhi`（pinnacle + all_bookmakers + dispersion）、`yazhi`、`shuju`、`touzhu`、`basic`。
 
+### Step 0a — 加载基本面数据 (v3.9.0 新增)
+
+```
+加载 references/fundamentals/team_strength.json:
+  对每场比赛的两队:
+    查 ELO 评分 → 计算 ELO 差距 → 查表得预期净胜球+冷门概率
+    查 FIFA 排名 → 计算排名差距
+    查实力档位 → S/A/B/C/D/E
+  输出: 两队 ELO 对比 + 实力差 + 预期净胜球区间
+
+新闻搜索 (Step 1.5 阶段执行):
+  遵循 references/fundamentals/news-protocol.md 白名单/黑名单
+  只搜事实事件 (伤病/首发/天气/突发事件), 不做情感分析
+```
+
 > ⚠️ **【必读】竞彩赔率数据源⚠️**
 > **分层使用原则**:
 > - **分析层 (Steps 1-10.5)**: 使用 Pinnacle + 30 家博彩公司的全球数据（来自 ouzhi/yazhi/shuju/touzhu 页面）做盘口分析、MBI、OCI
@@ -117,15 +132,55 @@ dependencies:
 - 确认 6 页完整（ouzhi / yazhi / rangqiu / daxiao / shuju / touzhu）
 - 输出：`N 场比赛数据就绪，[队名列表]`
 
-### Step 1.5 — 反叙事筛查
+### Step 1.5 — 反叙事筛查 + 新闻搜索
 - 新闻驱动？首秀/关键缺席？历史平局率 >27%？
+- **v3.9.0 新增**: 执行 `references/fundamentals/news-protocol.md` 新闻搜索
+  - 仅搜白名单场景 (伤病/首发/天气/突发事件)
+  - 搜索结果必须与赔率变动时间戳交叉验证
+  - 新闻信号只降信心不翻方向
 - 参考 KB-5 平局基准线
 - 输出：`[场次编号] 触发反叙事：[原因]` 或 `无反叙事信号`
+  + 新闻信号面板: 伤病/突发事件/首发/赔率交叉
 
-### Step 2 — 基本面分析
-- H2H / 近期状态 / 伤停 / 排名
-- 权重 v2.0，参考 KB-5（基本面权重）和 KB-11（三档赛事参数）
-- 输出：`[场次] 基本面倾向：[方向]，强度：[高/中/低]`
+### Step 2 — 基本面量化分析 (v3.9.0 重构)
+
+> **v3.9.0**: 废除纯人工定性判断。替代为 ELO 量化对比 + 伤病 logit + 赛程体能检查。
+> 详细权重见 knowledge-base.md KB-5 (已更新), 数据见 references/fundamentals/team_strength.json。
+
+```
+基本面量化四维度:
+
+1. ELO 实力对比 (team_strength.json):
+   查两队 ELO → 计算差距 → 查表得:
+     ELO差≥200  → 碾压级, 预期净胜球>2.5, 冷门<8%
+     ELO差100-200 → 明显差距, 预期净胜球1.0-2.5, 冷门8-15%
+     ELO差50-100  → 中等差距, 预期净胜球0.5-1.0, 冷门15-25%
+     ELO差0-50    → 接近, 预期净胜球0-0.5, 冷门25-40%
+
+2. 伤病/停赛 (news-protocol.md 场景 1):
+   核心缺阵 → logit -0.15 | 双核缺阵 → -0.30 | 防线重组 → 对方+0.10
+   轮换缺阵 → 不计入
+
+3. 赛程体能 (Liansai API 比赛日期间隔):
+   休息 <3 天 → 体能紧张
+   休息 3-4 天 → 一般
+   休息 ≥5 天 → 充分
+
+4. 小组形势 (Liansai API 积分):
+   生死战 (必须赢才能出线) → +0.05 动机
+   无关紧要 (已出线/已淘汰) → −0.10 动机
+   正常争夺 → 0
+
+输出:
+  [场次] 基本面量化:
+    ELO差: [+XXX]  → 预期净胜球: [X.X], 冷门概率: [XX%]
+    实力档: [S/A/B/C/D/E] vs [S/A/B/C/D/E]
+    伤病: [X人核心缺阵] → logit [-0.XX]
+    赛程: 休息[X]天 → 体能: [充分/一般/紧张]
+    形势: [生死战/无关紧要/正常]
+    基本面倾向: [方向], 量化强度: [高/中/低]
+      (强度规则: ELO差≥100+无核心缺阵→高 | ELO差50-99或1人缺阵→中 | ELO差<50或≥2人缺阵→低)
+```
 
 ### Step 3a — MBI 多机构共识（三方向并行）
 - **必须先读 KB-10**
@@ -293,11 +348,12 @@ dependencies:
 ### 步骤完成自检（Step 12 前必须逐项打勾）
 
 ```
-□ Step 0  match_list 已获取（含 shuju_id）| 逐场检查共享缓存后加载/抓取完成
+□ Step 0  match_list 已获取（含 shuju_id）| 逐场检查共享缓存后加载/抓取完成 | team_strength.json 已加载
+□ Step 0a 基本面数据已加载（ELO对比+实力差+预期净胜球）
 □ Step 0.5 市场健康检查已完成（KB-14 → MPC/Veto/Breaker）
 □ Step 1  队名已校验（KB-0），6 页齐全
-□ Step 1.5 反叙事已输出（有/无信号）
-□ Step 2  基本面已输出（倾向+强度+参考 KB）
+□ Step 1.5 反叙事已输出 + 新闻搜索已执行（news-protocol.md 白名单）+ 新闻信号面板
+□ Step 2  基本面量化已输出（ELO差+预期净胜球+伤病logit+赛程+形势+量化强度）
 □ Step 3a MBI 面板已输出（6 模块全）
 □ Step 3b Pinnacle 真实概率已输出
 □ Step 4  盘口偏差+触发陷阱编号已输出
@@ -594,6 +650,8 @@ assets/report-template.html 作为基础模板，注入以下模块：
 回测复盘统一使用 `football-backtest-workflow/` 子技能。详见 Step 13 赛后回测触发器。
 
 ### Changelog
+
+- **v3.9.0**: **基本面量化+新闻协议**（2026-06-25）: (1) 新增 references/fundamentals/ 模块 — team_strength.json (ELO/FIFA/实力差/64队数据) + news-protocol.md (白名单/黑名单/交叉验证/3条量化规则) + README.md (模块说明) (2) SKILL.md Step 0a 新增基本面数据加载 (3) Step 1.5 新增新闻搜索 (伤病/首发/天气/突发事件, 白名单限定, 赔率时间戳交叉验证, 新闻只降信心不翻方向) (4) Step 2 从纯人工定性重构为 ELO 量化四维度 (实力对比/伤病logit/赛程体能/小组形势) (5) 版本号 3.8.2→3.9.0
 
 - **v3.8.2**: **深盘穿盘保护+动机流失精炼**（2026-06-25 回测驱动）: (1) betting-sop.md 新增1.1b深盘穿盘风险前置检查 — 让球深度≥1.5球时读取Poisson穿盘概率, <60%剔除让球胜, <50%剔除该场 (来源: 摩洛哥让-2球赢4:2但穿盘失败, 赛前Poisson预测穿盘概率仅~55%) (2) betting-sop.md 1.2a新增动机流失精炼检查 — 赔率大涨>20%时增加竞彩-Pinnacle价差+让球深度二层验证, 防止小组末轮过度反应 (来源: 瑞士赔率涨31%被跳过但实际2:1胜, 竞彩赔率2.21远低于Pinnacle2.53) (3) SKILL.md Step 10 穿盘概率成为必输出字段, Step 11 新增穿盘风险前置检查引用 (4) knowledge-base.md KB-17.5 新增3条观察项: O-15(死亡区间信号豁免), O-16(动机流失价差验证), O-17(穿盘概率<60%阈值) — 均为n=1, 待跨赛事验证 (5) 版本号 3.8.1→3.8.2
 
