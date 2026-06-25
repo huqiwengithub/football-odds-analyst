@@ -1,9 +1,9 @@
 ---
 name: football-odds-analyst
-description: "Football odds analyst v3.8.1 — 平局信号分级(一级/二级)+胆排除条件+离散绝对值+胆识别+Kelly注码. 2026WC 44场校准."
+description: "Football odds analyst v3.8.2 — 深盘穿盘风险前置检查+Poisson投注接入+动机流失精炼+死亡区间观察项. 2026WC 44场+6场校准."
 allowed-tools: Read, Write, Bash, WebSearch, WebFetch
 agent_created: true
-version: "3.8.1"
+version: "3.8.2"
 released: 2026-06-25
 references: references/knowledge-base.md, references/betting-sop.md
 dependencies:
@@ -13,7 +13,7 @@ dependencies:
     description: "500.com deep data scraper — provides per-match 6-page deep analysis JSON"
 ---
 
-# Football Odds Analyst v3.8.1 — Pin方向 + 平局分级 + 胆识别 + Kelly注码
+# Football Odds Analyst v3.8.2 — Pin方向 + 平局分级 + 胆识别 + Kelly注码 + 穿盘保护
 
 > **⚠️ 三大铁律**:
 > 1. **分析用全球数据** (Steps 1-10.5): 只用 Pinnacle + 30 家博彩公司欧赔/亚盘/成交量
@@ -236,6 +236,7 @@ dependencies:
   比分预测 (带概率%):
     1. X-X (Y.Y%)  2. X-X (Y.Y%)  3. X-X (Y.Y%)
   期望进球: X.X球
+  穿盘概率: XX% (让球深度≥1.5球时必输出，供 Step 11 穿盘风险检查使用)
   校准: WC48场 Top3=25.0% Exact=15.9%
 ```
 
@@ -267,6 +268,10 @@ dependencies:
 
 ### Step 11 — 组合构建 + 仓位执行
 - **⚠️ 必须先读 `references/betting-sop.md` 完整五步流程**
+- **⚠️ 穿盘风险前置检查 (v3.8.2)**: 在执行投注建议前，对让球深度≥1.5球的候选执行 betting-sop.md 1.1b 穿盘概率检查
+  - 读取 Step 10 Poisson 输出的穿盘概率
+  - 穿盘概率<60% → 剔除让球胜方向出串关
+  - 穿盘概率<50% → 该场完全剔除出候选池
 - **⚠️ 单关可用性检查**: 在执行投注建议前，核验每场比赛是否支持单关玩法
   - 参考: `https://trade.500.com/jczq/?playid=312&g=1` — 此页面列出的比赛支持单关
   - 只有该页面出现的比赛才能推荐单关投注
@@ -301,10 +306,10 @@ dependencies:
 □ Step 7  6D 每场得分已输出
 □ Step 8  49 条陷阱全扫描+分类加权判定（A/B/C）已输出
 □ Step 9  每场方向判定+信号来源分解已输出
-□ Step 10 进球倾向（偏大/偏小/中性）已输出 + 参考比分（附免责）
+□ Step 10 进球倾向（偏大/偏小/中性）已输出 + 参考比分（附免责）+ 穿盘概率（让球深度≥1.5球时）
 □ Step 10.5 OCI客观指标+DRM平局因子已分析 → 输出综合信心分
 □ Step 10.6 三档仓位+偏离检测已执行 → 输出档位归属 + 偏离计数 + 翻转方向
-□ Step 11 betting-sop.md 已读 → 过关方案已输出（按¥100本金计算）
+□ Step 11 betting-sop.md 已读 → 穿盘风险已检查 → 过关方案已输出（按¥100本金计算）
 □ Step 12 报告已生成（亮色模式 + 比分附免责 + ¥明细 + 回报矩阵）
 □ Step 13 已主动询问用户是否需要回测并处理用户答复
 ```
@@ -589,6 +594,8 @@ assets/report-template.html 作为基础模板，注入以下模块：
 回测复盘统一使用 `football-backtest-workflow/` 子技能。详见 Step 13 赛后回测触发器。
 
 ### Changelog
+
+- **v3.8.2**: **深盘穿盘保护+动机流失精炼**（2026-06-25 回测驱动）: (1) betting-sop.md 新增1.1b深盘穿盘风险前置检查 — 让球深度≥1.5球时读取Poisson穿盘概率, <60%剔除让球胜, <50%剔除该场 (来源: 摩洛哥让-2球赢4:2但穿盘失败, 赛前Poisson预测穿盘概率仅~55%) (2) betting-sop.md 1.2a新增动机流失精炼检查 — 赔率大涨>20%时增加竞彩-Pinnacle价差+让球深度二层验证, 防止小组末轮过度反应 (来源: 瑞士赔率涨31%被跳过但实际2:1胜, 竞彩赔率2.21远低于Pinnacle2.53) (3) SKILL.md Step 10 穿盘概率成为必输出字段, Step 11 新增穿盘风险前置检查引用 (4) knowledge-base.md KB-17.5 新增3条观察项: O-15(死亡区间信号豁免), O-16(动机流失价差验证), O-17(穿盘概率<60%阈值) — 均为n=1, 待跨赛事验证 (5) 版本号 3.8.1→3.8.2
 
 - **v3.8.1**: **平局信号分级+胆排除+离散绝对值**（2026-06-25 回测#20260624驱动）: (1) KB-17.3 平局信号从等权5条计数改为一级/二级分级体系 — 新增第0条一级信号: Pinnacle平赔降幅≥20%单条触发降仓(来源: 英格兰0-0加纳平赔-33%被原阈值3.20过滤) (2) SKILL.md Step 9 否定检查新增e条: 一级平局信号触发→降仓0.5x+不入核心链接 (3) betting-sop.md 胆识别新增2条排除条件: 平赔降幅≥20%自动降为候选 + 离散度绝对值>25自动降为候选 (4) KB-19.1 偏离信号新增第7条: 离散度绝对值>25作为独立偏离信号(与上升>20%独立计数)
 
