@@ -1,9 +1,9 @@
 ---
 name: football-odds-analyst
-description: "Football odds analyst v3.9.0 — 基本面量化(ELO/FIFA/新闻协议)+深盘穿盘保护+动机流失精炼. 2026WC校准."
+description: "Football odds analyst v3.9.1 — 量化动机修正(可计算mot)+基本面量化+穿盘保护+新闻协议. 179场校准."
 allowed-tools: Read, Write, Bash, WebSearch, WebFetch
 agent_created: true
-version: "3.9.0"
+version: "3.9.1"
 released: 2026-06-25
 references: references/knowledge-base.md, references/betting-sop.md, references/fundamentals/
 dependencies:
@@ -13,7 +13,7 @@ dependencies:
     description: "500.com deep data scraper — provides per-match 6-page deep analysis JSON"
 ---
 
-# Football Odds Analyst v3.9.0 — Pin方向 + 基本面量化 + 穿盘保护 + 新闻协议
+# Football Odds Analyst v3.9.1 — Pin方向 + 量化动机修正 + 基本面量化 + 穿盘保护
 
 > **⚠️ 三大铁律**:
 > 1. **分析用全球数据** (Steps 1-10.5): 只用 Pinnacle + 30 家博彩公司欧赔/亚盘/成交量
@@ -233,21 +233,26 @@ dependencies:
   - **A 类（仓位型）**：机构被动调价，与基本面无关 → 降权/忽略
 - 输出：触发清单 + 分类 + 综合判定（计数阈值已废弃，以分类加权为准）
 
-### Step 9 — 方向判定 (v3.8.1: Pin方向 + 动机修正 + 平局分级 + 反投)
+### Step 9 — 方向判定 (v3.9.0: 量化动机修正 + Pin方向 + 平局分级 + 反投)
 
-> **v3.8.1 更新**: 新增动机修正、反投框架和平局信号分级（一级/二级）。详见 knowledge-base.md KB-17(平局)+KB-17b(动机+反投)。
+> **v3.9.0 更新**: 动机修正从 AI 主观定性改为量化算法。
+> mot 值由 Step 2 输出的小组积分+ELO差距+赛程间隔自动计算 (KB-17.2.2)。
+> 基线准确率更新为 54.7% (179场全量), 分段见 KB-16。
 
 ```
 方向判定逻辑 (三步):
 
   1. Pin方向 = Pinnacle收盘赔率最低的那一方向 (H/D/A)
-     基线准确率: 63.6% (WC48场校准)
+     基线准确率: 54.7% (179场全量), 分段见 KB-16
 
-  2. 动机修正 (KB-17.2):
-     规则1: Pin深盘+R1 → draw risk=HIGH → "跳过"
-     规则2: Pin深盘+mot<0.25 → draw risk=VERY HIGH → "跳过" + 可选反投
-     规则3: Pin均衡+mot_gap<0.15 → 仓位降0.5x
-     规则4: Pin深盘+R3+生死战 → draw risk=LOW → 正常
+  2. 动机修正 (KB-17.2 量化算法):
+     a. 判定轮次 (R1/R2/R3): Liansai API 同组比赛日期 → 推导
+     b. 计算 mot: base_situation (小组积分榜查表) + elo_adjust + rest_adjust
+     c. 执行四规则 (优先级: 规则4 > 规则2 > 规则1 > 规则3):
+        规则4: Pin<1.50 + R3 + Pin方向方mot≥0.85 → ✅ 生死战Pin可靠 (覆盖1/2)
+        规则2: Pin方赔率<1.50 + Pin方向方mot<0.25 → 🚫 强制跳过 (可选反投)
+        规则1: Pin<1.50 + R1 → 🚫 跳过 (例外: 信号豁免→候选0.5x, 见 O-15)
+        规则3: Pin∈[1.80,2.20] + mot_gap<0.15 → ⚠️ 仅降仓0.5x
 
   3. 否定检查:
      a. KB-19偏离≥2条+动机冲突 → "跳过" (若对手赔率2-6→反投)
@@ -267,9 +272,10 @@ dependencies:
   ```
   ┌─ 方向判定 ─────────────────────────────────────────┐
   │ Pin方向: [H/D/A] (Pinnacle收盘赔率 X.XX最低)     │
-  │ 动机修正: [无/深盘慢热/动机流失/均衡对耗/生死战]   │
+  │ 动机修正: [无/深盘慢热(R1)/动机流失(mot=X.XX)/    │
+  │           均衡对耗/生死战(R3+mot=X.XX)]             │
   │ 偏离信号: [N/6条] → [正常/降仓/跳过/反投]         │
-  │ 平局标记: [无/跳过]                               │
+  │ 平局标记: [无/一级信号N条/二级信号N条→跳过]        │
   │ 最终方向: [H/跳过/A/🔄反投]                        │
   └──────────────────────────────────────────────────────┘
   ```
@@ -650,6 +656,8 @@ assets/report-template.html 作为基础模板，注入以下模块：
 回测复盘统一使用 `football-backtest-workflow/` 子技能。详见 Step 13 赛后回测触发器。
 
 ### Changelog
+
+- **v3.9.1**: **动机修正量化**（2026-06-25）: (1) KB-17.2 完全重写 — 废除 AI 主观定性 mot 判断, 替代为可计算算法: 轮次判定(R1/R2/R3, 从Liansai API推导) + mot = base_situation(小组积分榜查表) + elo_adjust + rest_adjust (2) 四规则全部改用可量化输入: Pin方向方mot替代原始mot, 规则4明确Pin方向方mot≥0.85触发 (3) 新增规则优先级(规则4>规则2>规则1>规则3) (4) SKILL.md Step 9 同步更新为量化算法, Pin基线63.6%→54.7%(179场全量), 信号面板新增mot数值显示 (5) KB-17b 删减重复mot表 (6) 版本 3.9.0→3.9.1
 
 - **v3.9.0**: **基本面量化+新闻协议**（2026-06-25）: (1) 新增 references/fundamentals/ 模块 — team_strength.json (ELO/FIFA/实力差/64队数据) + news-protocol.md (白名单/黑名单/交叉验证/3条量化规则) + README.md (模块说明) (2) SKILL.md Step 0a 新增基本面数据加载 (3) Step 1.5 新增新闻搜索 (伤病/首发/天气/突发事件, 白名单限定, 赔率时间戳交叉验证, 新闻只降信心不翻方向) (4) Step 2 从纯人工定性重构为 ELO 量化四维度 (实力对比/伤病logit/赛程体能/小组形势) (5) 版本号 3.8.2→3.9.0
 
