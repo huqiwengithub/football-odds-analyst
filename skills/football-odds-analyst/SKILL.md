@@ -1,9 +1,9 @@
 ---
 name: football-odds-analyst
-description: "Football odds analyst v3.9.3 — 积分榜双源验证(500.com+WebSearch)+通用化(mot禁编造). 179场校准."
+description: "Football odds analyst v3.9.4 — 全6类基本面量化(ELO+形态+H2H+伤病+赛程+形势)+双源积分验证. 179场校准."
 allowed-tools: Read, Write, Bash, WebSearch, WebFetch
 agent_created: true
-version: "3.9.3"
+version: "3.9.4"
 released: 2026-06-25
 references: references/knowledge-base.md, references/betting-sop.md, references/fundamentals/
 dependencies:
@@ -13,7 +13,7 @@ dependencies:
     description: "500.com deep data scraper — provides per-match 6-page deep analysis JSON"
 ---
 
-# Football Odds Analyst v3.9.2 — Pin方向 + 积分榜强制抓取 + 量化动机修正 + 基本面量化
+# Football Odds Analyst v3.9.4 — Pin方向 + 全6类基本面量化 + 量化动机修正
 
 > **⚠️ 三大铁律**:
 > 1. **分析用全球数据** (Steps 1-10.5): 只用 Pinnacle + 30 家博彩公司欧赔/亚盘/成交量
@@ -94,7 +94,16 @@ dependencies:
         → 四验证任一失败 → STANDINGS_INVALID, 禁止 mot 计算
      d. 输出验证报告 (数据源/四验证/交叉验证/状态/时间戳)
 
-3. 新闻搜索 (Step 1.5 阶段执行):
+3. 获取形态+H2H数据 (v3.9.4 新增):
+   对每场候选比赛:
+     WebFetch https://odds.500.com/fenxi/shuju-{shuju_id}.shtml
+     遵循 references/fundamentals/form-h2h-protocol.md:
+       a. 近期形态: 近10场 total/home/away W-D-L/GF/GA → form_score
+       b. 交锋历史: 近N次 H2H → h2h_score (时效加权)
+       c. 预计阵容: 伤病/停赛标注
+     量化输出: form_score + h2h_score → 传入 Step 2
+
+4. 新闻搜索 (Step 1.5 阶段执行):
    遵循 references/fundamentals/news-protocol.md 白名单/黑名单
 ```
 
@@ -151,13 +160,13 @@ dependencies:
 - 输出：`[场次编号] 触发反叙事：[原因]` 或 `无反叙事信号`
   + 新闻信号面板: 伤病/突发事件/首发/赔率交叉
 
-### Step 2 — 基本面量化分析 (v3.9.0 重构)
+### Step 2 — 基本面量化分析 (v3.9.4 重构)
 
-> **v3.9.0**: 废除纯人工定性判断。替代为 ELO 量化对比 + 伤病 logit + 赛程体能检查。
-> 详细权重见 knowledge-base.md KB-5 (已更新), 数据见 references/fundamentals/team_strength.json。
+> **v3.9.4**: 全 6 类基本面补全。新增近期形态 + H2H 交锋 + 赛程体能独立层。
+> 数据源: ELO/FIFA (team_strength.json) + 积分榜 (standings-protocol) + 形态/H2H (form-h2h-protocol via shuju页)。
 
 ```
-基本面量化四维度:
+基本面量化六维度:
 
 1. ELO 实力对比 (team_strength.json):
    查两队 ELO → 计算差距 → 查表得:
@@ -166,29 +175,43 @@ dependencies:
      ELO差50-100  → 中等差距, 预期净胜球0.5-1.0, 冷门15-25%
      ELO差0-50    → 接近, 预期净胜球0-0.5, 冷门25-40%
 
-2. 伤病/停赛 (news-protocol.md 场景 1):
+2. 近期形态 (form-h2h-protocol.md, shuju页抓取):
+   form_score = (W×3+D×1)/(P×3), 近10场 + 主客分拆
+   形态方向: ≥0.70→强势 / 0.40-0.70→一般 / <0.40→低迷
+   主客分裂: |home_score−away_score|>0.30→标记
+   形态×ELO交互: 逆势/悖论/共振 → 仓位调整
+
+3. 交锋历史 (form-h2h-protocol.md, shuju页抓取):
+   时效窗口: <5年→全权重 / 5-10年→0.5x / >10年→0.2x
+   h2h_score = (W+0.5×D)/P (时效期内)
+   无时效期内交锋 → null (无参考价值, 不影响判定)
+
+4. 伤病/停赛 (news-protocol.md 场景 1):
    核心缺阵 → logit -0.15 | 双核缺阵 → -0.30 | 防线重组 → 对方+0.10
-   轮换缺阵 → 不计入
 
-3. 赛程体能 (Liansai API 比赛日期间隔):
-   休息 <3 天 → 体能紧张
-   休息 3-4 天 → 一般
-   休息 ≥5 天 → 充分
+5. 赛程体能 (Liansai API 比赛日期间隔):
+   休息 <3 天 → 体能紧张 | 休息 3-4 天 → 一般 | 休息 ≥5 天 → 充分
+   下一场重要性: 如为淘汰赛→轮换意愿低/如无关紧要→轮换意愿高
 
-4. 小组形势 (Liansai API 积分):
-   生死战 (必须赢才能出线) → +0.05 动机
-   无关紧要 (已出线/已淘汰) → −0.10 动机
-   正常争夺 → 0
+6. 小组形势 (Liansai API 积分 + standings-protocol 验证):
+   mot = base_situation(积分榜查表) + elo_adjust + rest_adjust (KB-17.2.2)
 
 输出:
   [场次] 基本面量化:
-    ELO差: [+XXX]  → 预期净胜球: [X.X], 冷门概率: [XX%]
-    实力档: [S/A/B/C/D/E] vs [S/A/B/C/D/E]
+    ELO差: [+XXX] → 预期净胜球:[X.X], 冷门概率:[XX%]
+    实力档: [S-E] vs [S-E]
+    近期形态: 主队 [XW-XD-XL] form:[X.XX→强势/一般/低迷]
+               客队 [XW-XD-XL] form:[X.XX→强势/一般/低迷]
+               [主客分裂标记] [形态×ELO交互标记]
+    交锋: 近[X]次 主[X]胜[X]平客[X]胜, 时效:[有效/降权/过旧]
+          H2H方向:[主队占优/均势/客队占优/无参考]
     伤病: [X人核心缺阵] → logit [-0.XX]
-    赛程: 休息[X]天 → 体能: [充分/一般/紧张]
-    形势: [生死战/无关紧要/正常]
+    赛程: 休息[X]天, 下一场在[X]天后 → 体能:[充分/一般/紧张]
+    形势: [生死战/无关紧要/正常], mot:[X.XX]
     基本面倾向: [方向], 量化强度: [高/中/低]
-      (强度规则: ELO差≥100+无核心缺阵→高 | ELO差50-99或1人缺阵→中 | ELO差<50或≥2人缺阵→低)
+      (强度规则: ELO差≥100+无核心缺阵+form≥0.50→高
+                  ELO差50-99或form=0.30-0.49→中
+                  ELO差<50或form<0.30→低)
 ```
 
 ### Step 3a — MBI 多机构共识（三方向并行）
@@ -364,11 +387,11 @@ dependencies:
 
 ```
 □ Step 0  match_list 已获取（含 shuju_id）| 逐场检查共享缓存后加载/抓取完成 | team_strength.json 已加载
-□ Step 0a 基本面数据已加载 | 积分榜已抓取+四验证+WebSearch交叉验证 → STANDINGS_VERIFIED
+□ Step 0a 基本面全量加载: ELO+积分榜(四验证+WebSearch)+形态H2H(shuju页)✅
 □ Step 0.5 市场健康检查已完成（KB-14 → MPC/Veto/Breaker）
 □ Step 1  队名已校验（KB-0），6 页齐全
 □ Step 1.5 反叙事已输出 + 新闻搜索已执行（news-protocol.md 白名单）+ 新闻信号面板
-□ Step 2  基本面量化已输出（ELO差+预期净胜球+伤病logit+赛程+形势+量化强度）
+□ Step 2  基本面量化六维度已输出（ELO+形态+H2H+伤病+赛程+形势+量化强度）
 □ Step 3a MBI 面板已输出（6 模块全）
 □ Step 3b Pinnacle 真实概率已输出
 □ Step 4  盘口偏差+触发陷阱编号已输出
@@ -666,7 +689,11 @@ assets/report-template.html 作为基础模板，注入以下模块：
 
 ### Changelog
 
-- **v3.9.3**: **积分榜通用化+双源交叉验证**（2026-06-25）: (1) standings-protocol.md 从 1.0→2.0 — 适用范围从世界杯单赛事扩展到所有含小组赛的赛事 (欧洲杯/非洲杯/亚洲杯/美洲杯/欧冠小组赛); 新增适用判定逻辑 (2) 新增搜索引擎交叉验证步骤 — WebSearch "[赛事] 小组积分榜" 对照 500.com 主源, ≥80%一致→VERIFIED, <80%→DISCREPANCY (3) URL 构造通用化: zuqiu-{sid}/jifen-{jid}/, 含 sid/jid 获取方法 (4) 四验证保留, 新增"禁止未验证数据进入 mot 计算"铁律 (5) SKILL.md Step 0a 同步更新为双源流程 (6) 版本 3.9.2→3.9.3
+- **v3.9.4**: **全6类基本面补全 — 近期形态+H2H交锋**（2026-06-25）: (1) 新增 fundamentals/form-h2h-protocol.md — 从 shuju 页提取形态/H2H/预计阵容, 量化 form_score + h2h_score + 形态×ELO交互信号 (2) SKILL.md Step 0a 新增形态+H2H数据获取 (shuju页WebFetch) (3) Step 2 从四维度扩展为六维度: ELO+形态+H2H+伤病+赛程+形势 (4) 形态方向: form≥0.70强势/0.40-0.70一般/<0.40低迷 + 主客分裂 + 形态×ELO交互(逆势/悖论/共振) (5) H2H时效加权: <5年1.0x/5-10年0.5x/>10年0.2x (6) 量化强度规则更新: 新增 form_score 参与判定 (7) 版本 3.9.3→3.9.4
+
+- **v3.9.3**: **积分榜通用化+双源交叉验证**（2026-06-25）: (1) standings-protocol.md v1.0→v2.0 — 适用范围扩展至所有含小组赛赛事 + WebSearch交叉验证 (2) URL通用化: zuqiu-{sid}/jifen-{jid}/ (3) 三重保障: 主源+数学自检+搜索对照
+
+- **v3.9.2**: **积分榜获取协议 — 修复AI编造积分致命bug**（2026-06-25）: (1) 新增 standings-protocol.md (2) Step 0a 积分榜强制抓取 (3) 德国6分被错报为3分的bug修复
 
 - **v3.9.0**: **基本面量化+新闻协议**（2026-06-25）: (1) 新增 references/fundamentals/ 模块 — team_strength.json (ELO/FIFA/实力差/64队数据) + news-protocol.md (白名单/黑名单/交叉验证/3条量化规则) + README.md (模块说明) (2) SKILL.md Step 0a 新增基本面数据加载 (3) Step 1.5 新增新闻搜索 (伤病/首发/天气/突发事件, 白名单限定, 赔率时间戳交叉验证, 新闻只降信心不翻方向) (4) Step 2 从纯人工定性重构为 ELO 量化四维度 (实力对比/伤病logit/赛程体能/小组形势) (5) 版本号 3.8.2→3.9.0
 
