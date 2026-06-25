@@ -1,9 +1,9 @@
 ---
 name: football-odds-analyst
-description: "Football odds analyst v3.10.0 — EV驱动串关筛选+竞彩官网数据源+全6类基本面量化. 179场校准."
+description: "Football odds analyst v3.10.1 — 保守优先(3串3默认)+EV筛选+竞彩官网+全6类基本面. 179场校准."
 allowed-tools: Read, Write, Bash, WebSearch, WebFetch
 agent_created: true
-version: "3.10.0"
+version: "3.10.1"
 released: 2026-06-25
 references: references/knowledge-base.md, references/betting-sop.md, references/fundamentals/
 dependencies:
@@ -361,13 +361,13 @@ dependencies:
 
 ### Step 11 — 组合构建 + 仓位执行
 - **⚠️ 必须先读 `references/betting-sop.md` 完整五步流程**
-- **⚠️ EV 驱动串关筛选 (v3.10.0)**: 废除 3串1≥4.50/4串1≥8.00 任意阈值
-  - 3串1 腿: EV = P_hit × payout − 1, EV<−0.05→裁剪, EV>+0.05→保留
-  - EV 使用竞彩自身去水概率 (竞彩市场自洽, 见 KB-13.8b)
-  - 2串1 1.65 底线保留 (数学推导: ¥25×1.65=错1场回血, 非任意阈值)
-- **⚠️ 竞彩数据源 (v3.10.0)**: 主源 500.com (trade页SPF + rangqiu页RQSPF)
-  - 交叉验证: sporttery.cn 官网 (SportteryAPI MCP 可用时对比)
-  - 数据源协议: `references/fundamentals/sporttery-protocol.md`
+- **⚠️ 保守优先筛选链 (v3.10.1)**:
+  - 入串门槛: 每腿 deVig 概率 ≥ 0.55 (竞彩去水)
+  - 默认载体: 🛡️ 3串3 (¥75) — 仅在 ALL 4 条件满足时升级为 🔥 3串4 (¥100)
+  - 回血门槛: 2串1 ≥ 2.00 (¥25×2.0=¥50→错1场回收50%)
+  - 载体层级: 3串3(默认) → 3串4(升级) → 2串1(回退) → 空仓(跳过)
+- **⚠️ EV 筛选**: 串关 EV = 竞彩_P_hit × 竞彩_payout − 1 (竞彩市场自洽)
+- **⚠️ 竞彩数据源**: 主源 500.com (trade页SPF + rangqiu页RQSPF), 交叉验证 sporttery.cn
 - **⚠️ 穿盘风险前置检查 (v3.8.2)**: 让球深度≥1.5球的候选执行 1.1b
 - **⚠️ 单关可用性检查**: 核验 g=1 页面
 
@@ -681,6 +681,8 @@ assets/report-template.html 作为基础模板，注入以下模块：
 回测复盘统一使用 `football-backtest-workflow/` 子技能。详见 Step 13 赛后回测触发器。
 
 ### Changelog
+
+- **v3.10.1**: **保守优先投注策略**（2026-06-25）: (1) betting-sop.md 1.5 完全重写为保守优先筛选链 — 核心指标从"最大化回报"切换为"最大化不亏钱概率P(≥2正确)" (2) 新增 1.5a 入串概率门槛: 每腿 deVig≥0.55 才能入串, Pin方向概率<55%→不入串 (3) 1.5b 默认载体从 3串4→3串3(¥75), 3串4 仅在 ALL 4条件(deVig≥0.60+Kelly>0+3串1EV>+0.10+无风险警告)满足时升级 (4) 1.5c 回血门槛从 2串1≥1.65→2.00 (¥25×2.0=¥50→错1场回收50%) (5) 1.5f 阈值表更新 (6) SKILL.md Step 11 精简为保守优先筛选链 (7) 版本 3.10.0→3.10.1
 
 - **v3.10.0**: **EV驱动串关筛选+竞彩官网数据源**（2026-06-25）: (1) 废除 3串1≥4.50/4串1≥8.00 任意赔率阈值, 替代为 EV 驱动筛选 — 3串1腿 EV = P_hit×payout−1, EV<−0.05→裁剪 (2) 新增 fundamentals/sporttery-protocol.md — 竞彩官网 (webapi.sporttery.cn) 数据源协议, 含 SportteryAPI MCP 部署指南 (3) KB-13.8b EV公式更新: 从 Pinnacle_deVigProb 切换到竞彩自身去水概率 (竞彩市场自洽) (4) betting-sop.md 1.5 完全重写为 1.5a(2串1底线)+1.5b(EV筛选)+1.5c(竞彩EV公式)+1.5d(阈值表) (5) 2串1 1.65 底线保留 (数学推导, 非任意) (6) 版本 3.9.4→3.10.0
 
