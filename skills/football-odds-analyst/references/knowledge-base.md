@@ -1,8 +1,8 @@
-# Knowledge Base Reference — Football Odds Analyst v3.9.0: Pin分箱准确率+死亡区间屏蔽
+# Knowledge Base Reference — Football Odds Analyst v3.10.4
 
 > **Load trigger**: Read this file when SKILL.md instructs you to reference a specific section ($KB-N). Contains all detailed rules, formulas, trap definitions, scoring criteria, and methodology.
 >
-> **Reading strategy**: Start with KB-16 (Pin分箱准确率) + KB-17 (平局+动机修正) — v3.9.0核心. Then KB-6 + KB-7 for Step 10. KB-2 + KB-4 for traps/scoring. KB-10 for MBI.
+> **Reading strategy**: Start with KB-16 (Pin分箱准确率) + KB-17 (平局+量化动机修正) — v3.10.4 核心. Then KB-6 + KB-7 for Step 10. KB-2 + KB-4 for traps/scoring. KB-10 for MBI.
 >
 > **赛前对照检查**: 赛后回测复盘统一使用 `football-backtest-workflow/` 子技能（详见 SKILL.md Step 13）。赛前无需手动检查观察项。
 
@@ -310,29 +310,24 @@ D5: requires yazhi water data → if missing, D5 = 0.5
 Step 9 综合信心分计算公式：
 
 ```
+[已废除 — v3.7.0]
 综合信心分(方向) = MBI评分 × 0.6 + OCI权重 × 0.3 + 陷阱调整 × 0.1
 
-其中 陷阱调整：
-  - 触发 A 类平局陷阱（信息型）→ 平局置信度 +0.08
-  - 触发 B 类平局陷阱（诱导型）→ 平局置信度 -0.05
-  - 触发 C 类平局陷阱（仓位型）→ 忽略（不调整）
+此公式于 v3.7.0 废除。替代为: Pin方向 + 否定检查 (偏离≥3→跳过/平局≥3→跳过/Kelly>1.05降仓)
+详见 SKILL.md Step 9 当前版本。
+原公式中的陷阱分类标签 (A/B/C 平局陷阱) 已与 KB-2 的 A/B/C 方案交换, 不再适用。
 ```
 
 ### 平局方向输出条件
 
-平局可以被输出为最终方向，当且仅当：
-
-1. **平局综合信心分 ≥ 主胜综合信心分 且 ≥ 客胜综合信心分**
-2. **平局综合信心分 ≥ 0.08**（否则降档为"跳过"）
-
-若不满足条件 2，即使平局分数最高，仍输出次高分的主胜/客胜方向。
+[已废除 — v3.7.0]
+平局不再通过综合信心分判定。替代为 KB-17.3 平局信号分级 (一级/二级)。
 
 ### 与 knowledge-base.md 其他 KB 的关系
 
-- **KB-4（6D 评分）**: 新增 D7 维度 = 平局专项信号（权重 15%）
-- **KB-10（MBI 多机构共识）**: SCS/DRI 模块需输出三方向评分，禁止只输出最低赔率方向
-- **KB-16（OCI 客观指标）**: OCI-4 离散度需单独报告平局离散度
-- **KB-17（DRM 平局因子）**: DRM-1（deVig 平>28%）已纳入，无需重复
+[已废除 — v3.7.0]
+原引用 D7 维度从未实现 (KB-4 仅含 D1-D5)。OCI 五分位体系已于 v3.7.0 废除。
+DRM 打分体系已于 v3.7.0 废除。不再适用。
 
 ---
 
@@ -1794,7 +1789,7 @@ mot方向: mot 更高的那一边
 > **v3.8.0**: 废除零散手工提取，替代为从6页全量JSON计算的10个聚合信号。
 > 数据源: ouzhi(30家SPF+凯利+概率)/yazhi(17家AH)/daxiao(18家OU)/touzhu(必发)/rangqiu(16家让球)
 
-### 10信号速查
+### 11信号速查 (v3.8.0: 信号11新增, 原10信号扩充)
 
 ```
 信号1: Kelly共识方向 (ouzhi 30家凯利均值)

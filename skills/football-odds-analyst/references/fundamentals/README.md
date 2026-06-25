@@ -7,9 +7,12 @@
 
 ```
 fundamentals/
-├── README.md              ← 本文件（模块说明+使用指南）
-├── team_strength.json     ← ELO/FIFA排名 静态数据 (月更)
-├── news-protocol.md       ← 实时新闻搜索协议 (白名单+黑名单+交叉验证)
+├── README.md                ← 本文件（模块说明+使用指南）
+├── team_strength.json       ← ELO/FIFA排名 静态数据 (月更)
+├── news-protocol.md         ← 实时新闻搜索协议 (白名单+黑名单+交叉验证)
+├── standings-protocol.md    ← 小组积分榜获取协议 (双源验证+四道数学检验)
+├── form-h2h-protocol.md     ← 近期形态+H2H交锋协议 (shuju页提取)
+├── sporttery-protocol.md    ← 竞彩官网数据源协议 (MCP+API双通道, 四重降级)
 ```
 
 ## 数据层次
