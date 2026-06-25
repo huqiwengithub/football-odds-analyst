@@ -160,38 +160,40 @@ M串N容错 + 动态仓位分配 + 相关性隔离 + 杠铃结构
 
 找正EV信号，拒绝对"凑单"妥协。
 
-### 1.1 竞彩可用性检查 (P0 前置 — v3.10.2 强化)
+### 1.1 竞彩可用性检查 (P0 前置)
 
-> **⚠️ 这是投注决策的入口关卡。未通过此检查的比赛不得进入投注池。**
+> **⚠️ 投注决策入口。主源竞彩官网, 后备 500.com。**
 
 ```
-1. 获取竞彩当日可投注场次 (硬门):
+1. 尝试竞彩官方 API (主源):
+   WebFetch https://webapi.sporttery.cn/gateway/jc/football/getMatchCalculatorV1.qry
+   
+   → 成功 (JSON): ✅ 使用竞彩官网数据
+     提取: matchId / SPF赔率(had) / RQSPF赔率(hhad+goalLine)
+     标记: DATA=SPORTTERY_CN
+   
+   → 567 拦截: ⚠️ 降级到后备源
+     
+2. 后备源 500.com (主源不可用时):
    WebFetch https://trade.500.com/jczq/?playid=312&g=2
-   提取: 比赛编号 + SPF 赔率 (主胜/平/客胜)
+   提取: SPF 赔率
+   RQSPF: rangqiu 页 "竞*官*" 行
+   标记: DATA=500COM_FALLBACK
 
-2. 逐场判定 SPF 可用性:
-   该页面显示赔率 → SPF 可用 → 记录 spf_available=true
-   该页面未显示 → SPF 不可用 → 记录 spf_available=false
-
-3. 逐场判定 RQSPF 可用性:
-   对 spf_available=false 的场次:
-     检查 rangqiu 页面 "竞*官*" 行是否含让球赔率
-     有 → rqspf_available=true (让球替代) + 记录让球数
-     无 → 该场不可投注, 剔除
+3. 逐场可用性判定:
+   SPF 可用: 该场在竞彩官网 had pool 中存在
+   RQSPF 可用: 该场在竞彩官网 hhad pool 中存在 + 含 goalLine
+   SPF不可用 + RQSPF不可用 → 剔除, 标记 EXCLUDED
 
 4. 单关可用性:
    WebFetch https://trade.500.com/jczq/?playid=312&g=1
    该页面出现的比赛 → single_match_available=true
 
-5. 竞彩赔率提取 (仅从以下来源):
-   竞彩 SPF: trade.500.com/jczq/?playid=312&g=2 (该页为竞彩官方赔率)
-   竞彩 RQSPF: rangqiu 页 "竞*官*" 行 (第一行, 含让球数+即时赔率)
-   ⚠️ 严禁: Pinnacle / 百家平均 / bet365 / 威廉希尔赔率进入投注计算
-
-输出: 每场玩法可用性矩阵
-  [场次] SPF:[可用/不可用] RQSPF:[可用(让X球)/不可用] 单关:[是/否]
-  投注赔率: SPF[主X.XX/平X.XX/客X.XX] RQSPF[主X.XX/平X.XX/客X.XX]
-  不可投注场次: 标记 EXCLUDED, 不进入后续投注池
+输出: 每场玩法可用性矩阵 + 竞彩官方赔率
+  [场次] DATA=[SPORTTERY_CN/500COM_FALLBACK]
+         SPF:[可用: 主X.XX/平X.XX/客X.XX] / [不可用]
+         RQSPF:[可用: 让X球 主X.XX/平X.XX/客X.XX] / [不可用]
+         单关:[是/否]
 ```
 
 ### 1.2 比赛分级（A/B/C）

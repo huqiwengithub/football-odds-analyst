@@ -1,9 +1,9 @@
 ---
 name: football-odds-analyst
-description: "Football odds analyst v3.10.3 — 哑铃组合(保本层+博上层)+亏损梯度+竞彩硬约束. 179场校准."
+description: "Football odds analyst v3.10.4 — 竞彩官网主源(sporttery.cn)+哑铃组合+全6类基本面. 179场校准."
 allowed-tools: Read, Write, Bash, WebSearch, WebFetch
 agent_created: true
-version: "3.10.3"
+version: "3.10.4"
 released: 2026-06-25
 references: references/knowledge-base.md, references/betting-sop.md, references/fundamentals/
 dependencies:
@@ -112,12 +112,13 @@ dependencies:
 > - **分析层 (Steps 1-10.5)**: 使用 Pinnacle + 30 家博彩公司的全球数据（来自 ouzhi/yazhi/shuju/touzhu 页面）做盘口分析、MBI、OCI
 > - **执行层 (Step 11)**: 使用竞彩官方赔率做投注建议和 EV 计算
 >
-> **竞彩官方赔率的正确提取**:
-> - **竞彩 SPF (胜平负)**: 从 `https://trade.500.com/jczq/?playid=312&g=2` 页面提取"胜/平/负"三列（该页面显示的是竞彩官方SPF赔率）
-> - **竞彩 RQSPF (让球胜平负)**: 从 `https://odds.500.com/fenxi/rangqiu-{match_id}.shtml` 页面第一行 **"竞*官*"** 提取
->   - 行格式：`[让球数][初盘3值(主/平/客)][即时3值(主/平/客)]`
->   - 例如 `-12.253.182.702.003.253.11` = 让-1，初盘2.25/3.18/2.70，即时2.00/3.25/3.11
->   - 初盘和即时要区分清楚，两者可能差异巨大（深盘场竞彩可能降赔19%+）
+> **竞彩官方赔率的正确提取 (v2.0 优先级反转)**:
+> - 🥇 **主源: 竞彩官网 API** → `https://webapi.sporttery.cn/gateway/jc/football/getMatchCalculatorV1.qry`
+>   - SPF 赔率: had pool 的 home/draw/away.odds
+>   - RQSPF 赔率: hhad pool 的 home/draw/away.odds + goalLine (让球数)
+>   - 如被 567 拦截 → 自动降级到后备源
+> - 🥈 **后备: 500.com** → `https://trade.500.com/jczq/?playid=312&g=2` (SPF)
+>   - RQSPF: `odds.500.com/fenxi/rangqiu-{id}.shtml` → "竞*官*" 行
 > - **切勿**从 ouzhi 页面的"百家平均"列获取竞彩赔率
 >
 > **错误后果**：使用百家平均替代竞彩赔率，会导致赔率数量级错误（如1.92误为1.14），所有EV计算和串关方案全部失效。

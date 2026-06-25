@@ -1,124 +1,136 @@
-# 竞彩官网数据源协议 v1.0
+# 竞彩官网数据源协议 v2.0
 
-> **定位**: 中国体育彩票官方赔率数据源。作为 500.com 竞彩数据的交叉验证源。
-> **优先级**: 500.com 为主（可用），竞彩官网为辅（验证用）。
+> **P0 铁律**: 投注赔率以竞彩官网 (sporttery.cn) 为权威主源。500.com 为后备。
+>   **优先级反转**: v1.0 时 500.com 为主 → v2.0 竞彩官网为主。
+>   原因: 竞彩官网是中国体育彩票唯一官方数据源，500.com 可能有延迟。
 
 ---
 
-## 一、数据源
-
-### 主源: 竞彩官方 API
+## 一、主数据源: 竞彩官方 API
 
 ```
 API 端点: https://webapi.sporttery.cn/gateway/jc/football/getMatchCalculatorV1.qry
-说明: 竞彩官网 m.sporttery.cn 计算器页面使用的未公开公共 API
-返回: 完整竞彩赛事列表 + SPF/RQSPF/总进球/比分/半全场赔率
+页面入口: https://m.sporttery.cn/mjc/jsq/zqspf/
 
-⚠️ 限制: 该 API 对数据中心 IP 返回 HTTP 567（地理封锁）。
-         从本地机器（非数据中心 IP）可能可访问。
+返回数据结构 (来自 SportteryAPI 逆向):
+{
+  "matches": [
+    {
+      "matchId": 2040239,
+      "matchNumStr": "周五029",
+      "home": {"abbName": "美国"},
+      "away": {"abbName": "澳大利亚"},
+      "league": {"abbName": "世界杯"},
+      "markets": {
+        "had": {                              // SPF 胜平负
+          "poolNameZh": "胜平负",
+          "outcomes": [
+            {"key": "home", "odds": 1.44, "trend": "down"},
+            {"key": "draw", "odds": 3.90},
+            {"key": "away", "odds": 5.60}
+          ]
+        },
+        "hhad": {                             // RQSPF 让球胜平负
+          "poolNameZh": "让球胜平负",
+          "goalLine": "-1",                   // 主队让球数
+          "outcomes": [
+            {"key": "home", "odds": 2.10},
+            {"key": "draw", "odds": 3.35},
+            {"key": "away", "odds": 2.95}
+          ]
+        }
+      }
+    }
+  ]
+}
+
+⚠️ 限制: 该 API 对数据中心 IP 返回 HTTP 567。
+         从国内本地机器或通过代理可正常访问。
 ```
 
-### 开源封装: SportteryAPI
+## 二、获取流程 (带优雅降级)
 
 ```
-仓库: https://github.com/Johnserf-Seed/SportteryAPI
-说明: Cloudflare Worker REST API + 本地 MCP Server
-功能: 
-  - 自动去水概率计算 (noVigProb)
-  - 返还率/抽水比例
-  - 公平赔率推算
-  - Kelly/价值指标
+Step 0 竞彩数据获取:
 
-本地 MCP Server 部署:
-  git clone https://github.com/Johnserf-Seed/SportteryAPI
-  cd SportteryAPI
-  npm install && npm run mcp:local
-  → MCP Server 运行在本地，可直接从竞彩官网获取数据
+1. 尝试竞彩官方 API (主源):
+   WebFetch https://webapi.sporttery.cn/gateway/jc/football/getMatchCalculatorV1.qry
+   
+   → 返回 JSON 数组 → ✅ 主源获取成功
+     提取: 每场 matchId / SPF赔率(had) / RQSPF赔率(hhad) / 让球数(goalLine)
+     标记: DATA_SOURCE=SPORTTERY_CN
+   
+   → 返回 HTTP 567 (被拦截) → ⚠️ 主源不可用, 降级到后备源
+
+2. 后备源: 500.com (主源不可用时):
+   WebFetch https://trade.500.com/jczq/?playid=312&g=2
+   提取: SPF 赔率 (该页为竞彩官方赔率)
+   
+   对每场:
+     RQSPF: 从 rangqiu 页 "竞*官*" 行提取
+     标记: DATA_SOURCE=FALLBACK_500COM
+
+3. 交叉验证 (两者均可用时):
+   对每场同时有竞彩官网和 500.com 赔率的比赛:
+     对比 SPF 主胜赔率差异
+     差异 > 3% → ⚠️ 标记 CROSSCHECK_WARN, 以竞彩官网为准
+     差异 ≤ 3% → ✅ 标记 CROSSCHECK_OK
+
+4. 报告中的数据来源声明:
+   "[数据来源: 竞彩官网 sporttery.cn]" 或
+   "[数据来源: 500.com (竞彩官网不可用)]" 或
+   "[数据来源: 竞彩官网, 500.com 交叉验证通过]"
 ```
 
-### 后备: 500.com 竞彩数据 (当前在用)
+## 三、竞彩官网数据的关键指标
 
 ```
-SPF 赔率:  trade.500.com/jczq/?playid=312&g=2
-RQSPF 赔率: odds.500.com/fenxi/rangqiu-{match_id}.shtml → "竞*官*"行
-单关标记:  trade.500.com/jczq/?playid=312&g=1
+从竞彩官方赔率直接推导:
 
-⚠️ 500.com 显示的是竞彩官方赔率，但可能有几分钟延迟。
-   赛前关键时段以竞彩官网为最终权威。
-```
+  noVigProb (竞彩去水概率):
+    had 池: noVigProb_i = (1/odds_i) / (1/h + 1/d + 1/a)
+    这反映的是中国竞彩市场对该方向的实际定价
 
----
-
-## 二、数据对比验证
-
-```
-每次分析时执行 (Step 0a 阶段):
-
-1. 从 500.com 获取竞彩 SPF 赔率 (主源, 已实现)
-2. 从 500.com 获取竞彩 RQSPF 赔率 (rangqiu页"竞*官*"行, 已实现)
-3. (可选) 如果 SportteryAPI MCP 可用:
-     对比 500.com 赔率 vs 竞彩官网赔率
-     差异 > 3% → 标红警告, 以竞彩官网为准
-4. 无 MCP 时: 使用 500.com 数据 + 在报告中注明数据来源
-```
-
----
-
-## 三、SportteryAPI 提供的关键指标
-
-```
-从竞彩官方赔率直接推导 (比 Pinnacle deVig 更适合竞彩 EV 计算):
-
-  noVigProb: 竞彩市场的去水真实概率
-    计算: (1/odds_i) / Σ(1/odds_j) — 从竞彩赔率自身推导
-    优势: 反映的是中国竞彩市场对比赛的真实定价
+  returnRate (竞彩返还率):
+    单关: 1 / (1/h + 1/d + 1/a)
+    典型值: 88-89% (SPF), 略低 (让球)
     
-  fairOdds: 竞彩公平赔率
-    计算: 1/noVigProb
-    
-  returnRate (返还率):
-    计算: 1 / Σ(1/odds_i)
-    竞彩 SPF 返还率通常 ~88-89%
-    串关返还率 = 单关返还率^关数 (1关: 0.88, 2关: 0.78, 3关: 0.69)
+  EV (基于竞彩去水):
+    EV_single = noVigProb × odds − 1
+    EV_parlay = ∏ noVigProb_i × ∏ odds_i − 1
 
-  margin (抽水):
-    计算: 1 − returnRate
-    竞彩单关抽水 ~11-12%，远高于 Pinnacle 的 ~2%
+  goalLine (让球数, 来自 hhad 池):
+    正数 = 主队让球, 负数 = 客队让球
+    用于判定让球深度和穿盘风险
 ```
 
----
-
-## 四、EV 计算使用竞彩 noVigProb
+## 四、为什么竞彩官网为主
 
 ```
-当前做法 (KB-13.8b):
-  竞彩 EV = Pinnacle_deVigProb × 竞彩赔率 × 串关返奖率 − 1
+1. 权威性: 中国体育彩票唯一官方数据源
+2. 实时性: 赔率变动实时更新
+3. 完整性: 含 SPF + RQSPF + 比分 + 总进球 + 半全场全部玩法
+4. 一致性: EV 计算使用竞彩市场自身定价，不需 Pinnacle 换算
+5. 可用性: SPF 是否开售 / RQSPF 让球数 一目了然
 
-问题: Pinnacle 全球市场概率 ≠ 竞彩中国市场概率
-      两者之差可能高达 3-5%，导致 EV 系统性偏差
-
-优化方案 (如果 SportteryAPI 可用):
-  竞彩 EV = 竞彩_noVigProb × 竞彩赔率 − 1
-  串关 EV = ∏ 竞彩_noVigProb_i × ∏ 竞彩赔率_i − 1
-
-后备方案 (当前):
-  竞彩 EV = (1/竞彩赔率) / Σ(1/竞彩赔率_j) × 竞彩赔率 − 1
-  = 竞彩自身隐含去水概率 × 竞彩赔率 − 1
-  完全在竞彩市场内自洽，无需 Pinnacle 介入
+500.com 的问题:
+  1. 赔率可能是几分钟前的快照，赛前关键时段延迟影响大
+  2. rangqiu 页 "竞*官*" 行需要手动解析，易出错
+  3. 不会标注 SPF 为何未开售（深盘? 未开? 已停?）
 ```
 
----
-
-## 五、数据源优先级
+## 五、数据源优先级 (v2.0 反转)
 
 ```
 竞彩 SPF 赔率获取:
-  1. SportteryAPI MCP (如果已部署) ← 最准, 实时
-  2. trade.500.com/jczq/?playid=312&g=2 ← 可用, 可能有延迟
-  3. WebSearch 竞彩官网截图 ← 最后手段
+  1. webapi.sporttery.cn API                ← 🥇 主源, 实时官方
+  2. trade.500.com/jczq/?playid=312&g=2     ← 🥈 后备, 可能有延迟
 
 竞彩 RQSPF 赔率获取:
-  1. SportteryAPI MCP (hhad pool) ← 最准
-  2. odds.500.com/fenxi/rangqiu-{id}.shtml "竞*官*"行 ← 当前可用
-  3. WebSearch 竞彩官网让球页面 ← 最后手段
+  1. webapi.sporttery.cn API (hhad pool)    ← 🥇 主源, 含让球数+实时赔率
+  2. odds.500.com rangqiu页 "竞*官*"行      ← 🥈 后备, 需手动解析
+
+单关可用性:
+  1. webapi.sporttery.cn API (如含单关标记) ← 🥇
+  2. trade.500.com/jczq/?playid=312&g=1     ← 🥈
 ```
