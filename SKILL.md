@@ -1,9 +1,9 @@
 ---
 name: football-odds-analyst
-description: "Football odds analyst v3.9.1 — 量化动机修正(可计算mot)+基本面量化+穿盘保护+新闻协议. 179场校准."
+description: "Football odds analyst v3.9.2 — 积分榜强制抓取(防编造bug)+量化动机修正+基本面量化+穿盘保护. 179场校准."
 allowed-tools: Read, Write, Bash, WebSearch, WebFetch
 agent_created: true
-version: "3.9.1"
+version: "3.9.2"
 released: 2026-06-25
 references: references/knowledge-base.md, references/betting-sop.md, references/fundamentals/
 dependencies:
@@ -13,7 +13,7 @@ dependencies:
     description: "500.com deep data scraper — provides per-match 6-page deep analysis JSON"
 ---
 
-# Football Odds Analyst v3.9.1 — Pin方向 + 量化动机修正 + 基本面量化 + 穿盘保护
+# Football Odds Analyst v3.9.2 — Pin方向 + 积分榜强制抓取 + 量化动机修正 + 基本面量化
 
 > **⚠️ 三大铁律**:
 > 1. **分析用全球数据** (Steps 1-10.5): 只用 Pinnacle + 30 家博彩公司欧赔/亚盘/成交量
@@ -77,16 +77,21 @@ dependencies:
 ### Step 0a — 加载基本面数据 (v3.9.0 新增)
 
 ```
-加载 references/fundamentals/team_strength.json:
-  对每场比赛的两队:
-    查 ELO 评分 → 计算 ELO 差距 → 查表得预期净胜球+冷门概率
-    查 FIFA 排名 → 计算排名差距
-    查实力档位 → S/A/B/C/D/E
-  输出: 两队 ELO 对比 + 实力差 + 预期净胜球区间
+1. 加载 references/fundamentals/team_strength.json:
+   对每场比赛的两队:
+     查 ELO 评分 → 计算 ELO 差距 → 查表得预期净胜球+冷门概率
+     查 FIFA 排名 → 计算排名差距
+     查实力档位 → S/A/B/C/D/E
 
-新闻搜索 (Step 1.5 阶段执行):
-  遵循 references/fundamentals/news-protocol.md 白名单/黑名单
-  只搜事实事件 (伤病/首发/天气/突发事件), 不做情感分析
+2. 获取小组积分榜 (⚠️ 强制, mot 计算上游):
+   WebFetch https://liansai.500.com/zuqiu-19476/jifen-26226/
+   遵循 references/fundamentals/standings-protocol.md:
+     a. 提取 12 组 48 队 standings (P/W/D/L/GF/GA/GD/pts)
+     b. 四验证: W+D+L=P + GF-GA=GD + pts=W×3+D
+     c. 验证失败 → STANDINGS_INVALID, 禁止 mot 计算
+
+3. 新闻搜索 (Step 1.5 阶段执行):
+   遵循 references/fundamentals/news-protocol.md 白名单/黑名单
 ```
 
 > ⚠️ **【必读】竞彩赔率数据源⚠️**
@@ -355,7 +360,7 @@ dependencies:
 
 ```
 □ Step 0  match_list 已获取（含 shuju_id）| 逐场检查共享缓存后加载/抓取完成 | team_strength.json 已加载
-□ Step 0a 基本面数据已加载（ELO对比+实力差+预期净胜球）
+□ Step 0a 基本面数据已加载（ELO对比+实力差+预期净胜球）| 积分榜已抓取+四验证通过
 □ Step 0.5 市场健康检查已完成（KB-14 → MPC/Veto/Breaker）
 □ Step 1  队名已校验（KB-0），6 页齐全
 □ Step 1.5 反叙事已输出 + 新闻搜索已执行（news-protocol.md 白名单）+ 新闻信号面板
@@ -657,7 +662,7 @@ assets/report-template.html 作为基础模板，注入以下模块：
 
 ### Changelog
 
-- **v3.9.1**: **动机修正量化**（2026-06-25）: (1) KB-17.2 完全重写 — 废除 AI 主观定性 mot 判断, 替代为可计算算法: 轮次判定(R1/R2/R3, 从Liansai API推导) + mot = base_situation(小组积分榜查表) + elo_adjust + rest_adjust (2) 四规则全部改用可量化输入: Pin方向方mot替代原始mot, 规则4明确Pin方向方mot≥0.85触发 (3) 新增规则优先级(规则4>规则2>规则1>规则3) (4) SKILL.md Step 9 同步更新为量化算法, Pin基线63.6%→54.7%(179场全量), 信号面板新增mot数值显示 (5) KB-17b 删减重复mot表 (6) 版本 3.9.0→3.9.1
+- **v3.9.2**: **积分榜获取协议 — 修复 AI 编造积分的致命 bug**（2026-06-25）: (1) 新增 references/fundamentals/standings-protocol.md — 强制从 500.com 积分页 (zuqiu-19476/jifen-26226) 获取 12 组 48 队 standings, 含四验证 (W+D+L=P / GF-GA=GD / pts=W×3+D), 失败则标记 STANDINGS_INVALID (2) SKILL.md Step 0a 新增积分榜抓取步骤 (P0 强制) (3) KB-17.2.2 新增数据源引用 + 禁止 AI 编造积分的警告 (4) 自检清单更新 (5) 版本 3.9.1→3.9.2。Bug: 技能执行时 AI 编造了德国 3 分/科特迪瓦 6 分 (实为德国 6 分/科特迪瓦 3 分), 导致 mot 完全反转。
 
 - **v3.9.0**: **基本面量化+新闻协议**（2026-06-25）: (1) 新增 references/fundamentals/ 模块 — team_strength.json (ELO/FIFA/实力差/64队数据) + news-protocol.md (白名单/黑名单/交叉验证/3条量化规则) + README.md (模块说明) (2) SKILL.md Step 0a 新增基本面数据加载 (3) Step 1.5 新增新闻搜索 (伤病/首发/天气/突发事件, 白名单限定, 赔率时间戳交叉验证, 新闻只降信心不翻方向) (4) Step 2 从纯人工定性重构为 ELO 量化四维度 (实力对比/伤病logit/赛程体能/小组形势) (5) 版本号 3.8.2→3.9.0
 

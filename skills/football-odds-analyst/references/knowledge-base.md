@@ -1523,6 +1523,10 @@ Pinnacle 在 44 场中 0 次最低赔率是平局。
 
 #### 17.2.2 动机分数计算公式
 
+> **⚠️ 数据源**: base_situation 必须从积分榜字典取值, 禁止 AI 凭记忆编造。
+> 积分榜获取: WebFetch `https://liansai.500.com/zuqiu-19476/jifen-26226/`
+> 完整协议: `references/fundamentals/standings-protocol.md`
+
 ```
 mot = base_situation + elo_adjust + rest_adjust
 
