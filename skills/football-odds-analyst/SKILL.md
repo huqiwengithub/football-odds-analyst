@@ -1,9 +1,9 @@
 ---
 name: football-odds-analyst
-description: "Football odds analyst v3.10.2 — 竞彩硬约束+数据分界墙+三档仓位(竞彩deVig). 179场校准."
+description: "Football odds analyst v3.10.3 — 哑铃组合(保本层+博上层)+亏损梯度+竞彩硬约束. 179场校准."
 allowed-tools: Read, Write, Bash, WebSearch, WebFetch
 agent_created: true
-version: "3.10.2"
+version: "3.10.3"
 released: 2026-06-25
 references: references/knowledge-base.md, references/betting-sop.md, references/fundamentals/
 dependencies:
@@ -359,19 +359,21 @@ dependencies:
   - 升水>3% / 量价背离 / 市场分歧 / 平局>28% / OU下调>0.25
 - 输出：每场档位 + 仓位乘数 + 偏离计数 + 翻转方向
 
-### Step 11 — 组合构建 + 仓位执行
+### Step 11 — 哑铃组合构建 + 仓位执行
+
+> **v3.10.3 哑铃组合**: 不再把所有钱押在一个方向上。分层配置:
+>   🛡️ 保本层 (¥60-70) — 高概率 2串1, 错了也回收部分
+>   ⚡ 博上层 (¥20-30) — 低概率正EV, 轻仓单关, 以小博大
+>   💰 现金缓冲 (¥10-20) — 永不全押, 亏损永远有梯度
+
 - **⚠️ 必须先读 `references/betting-sop.md` 完整五步流程**
-- **⚠️ ⛔ 数据分界墙 (v3.10.2)**: 
-  - Step 11 只允许使用竞彩官方赔率 (500.com trade页 + sporttery.cn)
-  - Pinnacle/百家平均赔率绝对禁止进入投注计算
-  - 允许从分析层传入: Pin方向 / 穿盘概率 / mot / 偏离计数 (仅此4项)
-- **⚠️ 竞彩可用性硬门 (1.1)**: SPF可用? RQSPF可用? 不可投场次直接剔除
-- **⚠️ 三档仓位 (1.2)**:
-  - 🔥 A类 (deVig≥0.65): 重仓, 入串关核心 → ¥25/注
-  - ➡️ B类 (deVig 0.55-0.65): 中仓, 入串关非核心 → ¥25/注
-  - ⚡ C类 (deVig<0.55+EV>0): 不入串关, 仅试探单关 ¥10-20
-- **⚠️ 默认载体**: 🛡️ 3串3 (¥75) → 仅 ALL 4条件满足时升级 🔥 3串4 (¥100)
-- **⚠️ 穿盘风险前置检查 (1.1b)**: 让球深度≥1.5球的候选执行
+- **⚠️ ⛔ 数据分界墙**: 投注只用竞彩赔率, Pinnacle/百家平均只用于分析层
+- **⚠️ 竞彩可用性硬门 (1.1)**: SPF可用? RQSPF可用? 不可投直接剔除
+- **⚠️ 哑铃组合 (1.5)**:
+  - 🛡️ 保本层: deVig≥0.55, 3串3(¥75) 或 2串1(¥50), 2串1≥2.00
+  - ⚡ 博上层: EV>0 + 赔率≥3.00, 单关 ¥10-15/注, ≤2注/日
+  - 💰 现金缓冲: ¥10-20 永不动用
+- **⚠️ 穿盘风险**: 让球深度≥1.5球执行 1.1b
 
 ### Step 12 — 报告生成
 - **详见下方 Step 12 章节**
