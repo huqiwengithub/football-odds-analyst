@@ -1,9 +1,9 @@
 ---
 name: football-odds-analyst
-description: "Football odds analyst v3.9.4 — 全6类基本面量化(ELO+形态+H2H+伤病+赛程+形势)+双源积分验证. 179场校准."
+description: "Football odds analyst v3.10.0 — EV驱动串关筛选+竞彩官网数据源+全6类基本面量化. 179场校准."
 allowed-tools: Read, Write, Bash, WebSearch, WebFetch
 agent_created: true
-version: "3.9.4"
+version: "3.10.0"
 released: 2026-06-25
 references: references/knowledge-base.md, references/betting-sop.md, references/fundamentals/
 dependencies:
@@ -361,22 +361,15 @@ dependencies:
 
 ### Step 11 — 组合构建 + 仓位执行
 - **⚠️ 必须先读 `references/betting-sop.md` 完整五步流程**
-- **⚠️ 穿盘风险前置检查 (v3.8.2)**: 在执行投注建议前，对让球深度≥1.5球的候选执行 betting-sop.md 1.1b 穿盘概率检查
-  - 读取 Step 10 Poisson 输出的穿盘概率
-  - 穿盘概率<60% → 剔除让球胜方向出串关
-  - 穿盘概率<50% → 该场完全剔除出候选池
-- **⚠️ 单关可用性检查**: 在执行投注建议前，核验每场比赛是否支持单关玩法
-  - 参考: `https://trade.500.com/jczq/?playid=312&g=1` — 此页面列出的比赛支持单关
-  - 只有该页面出现的比赛才能推荐单关投注
-- **分析层面控制**: 竞彩 EV 转换公式见 KB-13.8（knowledge-base.md）
-- **仓位前置**: 先执行 Step 10.6 获取每场档位归属
-  - 🔥 核心仓位: 可入串关核心，全仓
-  - 🚫 跳过: 不投
-  - 🔄 冷门翻转: 仅单关（前提: 该场在 g=1 页面出现）
-- **五步 SOP（详情见 betting-sop.md）**: 信号筛选 → 物理拆分 → EV 非对称注码 → 账户微调 → 滚动风控+独立复盘
-- **💰 本金约定**: 默认投注总金额 **¥100**（即模拟购买¥100彩票）。3串4为主力方案（¥25×4注），不足3场时回退2串1。详见 betting-sop.md 第二步-A 注码分配模板。
-- **所有投注建议必须基于主队视角书写**（例: "主队让1球胜"而不是"客队+1球负"）
-- 输出：过关方案 + 仓位分配（¥金额明细）+ 回报矩阵
+- **⚠️ EV 驱动串关筛选 (v3.10.0)**: 废除 3串1≥4.50/4串1≥8.00 任意阈值
+  - 3串1 腿: EV = P_hit × payout − 1, EV<−0.05→裁剪, EV>+0.05→保留
+  - EV 使用竞彩自身去水概率 (竞彩市场自洽, 见 KB-13.8b)
+  - 2串1 1.65 底线保留 (数学推导: ¥25×1.65=错1场回血, 非任意阈值)
+- **⚠️ 竞彩数据源 (v3.10.0)**: 主源 500.com (trade页SPF + rangqiu页RQSPF)
+  - 交叉验证: sporttery.cn 官网 (SportteryAPI MCP 可用时对比)
+  - 数据源协议: `references/fundamentals/sporttery-protocol.md`
+- **⚠️ 穿盘风险前置检查 (v3.8.2)**: 让球深度≥1.5球的候选执行 1.1b
+- **⚠️ 单关可用性检查**: 核验 g=1 页面
 
 ### Step 12 — 报告生成
 - **详见下方 Step 12 章节**
@@ -689,7 +682,7 @@ assets/report-template.html 作为基础模板，注入以下模块：
 
 ### Changelog
 
-- **v3.9.4**: **全6类基本面补全 — 近期形态+H2H交锋**（2026-06-25）: (1) 新增 fundamentals/form-h2h-protocol.md — 从 shuju 页提取形态/H2H/预计阵容, 量化 form_score + h2h_score + 形态×ELO交互信号 (2) SKILL.md Step 0a 新增形态+H2H数据获取 (shuju页WebFetch) (3) Step 2 从四维度扩展为六维度: ELO+形态+H2H+伤病+赛程+形势 (4) 形态方向: form≥0.70强势/0.40-0.70一般/<0.40低迷 + 主客分裂 + 形态×ELO交互(逆势/悖论/共振) (5) H2H时效加权: <5年1.0x/5-10年0.5x/>10年0.2x (6) 量化强度规则更新: 新增 form_score 参与判定 (7) 版本 3.9.3→3.9.4
+- **v3.10.0**: **EV驱动串关筛选+竞彩官网数据源**（2026-06-25）: (1) 废除 3串1≥4.50/4串1≥8.00 任意赔率阈值, 替代为 EV 驱动筛选 — 3串1腿 EV = P_hit×payout−1, EV<−0.05→裁剪 (2) 新增 fundamentals/sporttery-protocol.md — 竞彩官网 (webapi.sporttery.cn) 数据源协议, 含 SportteryAPI MCP 部署指南 (3) KB-13.8b EV公式更新: 从 Pinnacle_deVigProb 切换到竞彩自身去水概率 (竞彩市场自洽) (4) betting-sop.md 1.5 完全重写为 1.5a(2串1底线)+1.5b(EV筛选)+1.5c(竞彩EV公式)+1.5d(阈值表) (5) 2串1 1.65 底线保留 (数学推导, 非任意) (6) 版本 3.9.4→3.10.0
 
 - **v3.9.3**: **积分榜通用化+双源交叉验证**（2026-06-25）: (1) standings-protocol.md v1.0→v2.0 — 适用范围扩展至所有含小组赛赛事 + WebSearch交叉验证 (2) URL通用化: zuqiu-{sid}/jifen-{jid}/ (3) 三重保障: 主源+数学自检+搜索对照
 
