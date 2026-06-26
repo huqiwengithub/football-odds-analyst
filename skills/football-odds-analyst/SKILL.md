@@ -1,23 +1,23 @@
 ---
 name: football-odds-analyst
-description: "Football odds analyst v3.10.4 — 竞彩官网主源(sporttery.cn)+哑铃组合+全6类基本面. 179场校准."
+description: "Football odds analyst v3.10.7 — 规则2无赔率门槛+伤病logit按角色分层+锁定出线降C类. 179场校准."
 allowed-tools: Read, Write, Bash, WebSearch, WebFetch
 agent_created: true
-version: "3.10.4"
-released: 2026-06-25
+version: "3.10.7"
+released: 2026-06-26
 references: references/knowledge-base.md, references/betting-sop.md, references/fundamentals/
 dependencies:
   - name: 500com-football-scraper
     required: true
     install_from: marketplace
-    description: "500.com deep data scraper — provides per-match 6-page deep analysis JSON"
+    description: "500.com deep data scraper — provides per-match 6-page deep analysis JSON + sporttery.cn fallback for 竞彩赔率"
 ---
 
-# Football Odds Analyst v3.10.4 — 哑铃组合 + 竞彩官网主源 + 全6类基本面 + 分界墙
+# Football Odds Analyst v3.10.6 — 市场共识方向 + 概率驱动哑铃组合 + 全6类基本面 + 分界墙
 
 > **⚠️ 三大铁律**:
-> 1. **分析用全球数据** (Steps 1-10.5): 只用 Pinnacle + 30 家博彩公司欧赔/亚盘/成交量
-> 2. **投注用竞彩赔率** (Step 11): 只用 rangqiu 页面"竞*官*"行提取的竞彩官方让球赔率
+> 1. **分析用全球数据** (Steps 1-10.5): 使用 30 家博彩公司平均值 (百家平均) + Pinnacle + 必发成交量做盘口分析
+> 2. **投注用竞彩官网赔率** (Step 11): 主源 sporttery.cn 页面抓取 (scripts/fetch_sporttery.py); 后备 500.com ouzhi/rangqiu 页"竞*官*"行
 > 3. **全报告基于主队视角**: 所有投注建议、方向描述都以主队为参照系
 
 > **文件分工**：
@@ -61,7 +61,7 @@ dependencies:
    （通过 Liansai API 或 trade 页面，轻量请求）
 2. 对 match_list 中的每场比赛 shuju_id:
    检查 .cache/shared-football/parsed/{date}_{shuju_id}.json
-   → 存在且 mtime < 12h: 标记 CACHED，直接读 JSON
+   → 存在且 mtime < 1h: 标记 CACHED，直接读 JSON
    → 不存在或过期: 标记 NEED_FETCH，传给 scraper
 3. 触发 500com-football-scraper Phase 0 Step 0c
    → 仅对 NEED_FETCH 的比赛逐场逐页抓取
@@ -109,16 +109,18 @@ dependencies:
 
 > ⚠️ **【必读】竞彩赔率数据源⚠️**
 > **分层使用原则**:
-> - **分析层 (Steps 1-10.5)**: 使用 Pinnacle + 30 家博彩公司的全球数据（来自 ouzhi/yazhi/shuju/touzhu 页面）做盘口分析、MBI、OCI
+> - **分析层 (Steps 1-10.5)**: 使用 Pinnacle + 30 家博彩公司的全球数据（来自 ouzhi/yazhi/shuju/touzhu 页面）做盘口分析、MBI
 > - **执行层 (Step 11)**: 使用竞彩官方赔率做投注建议和 EV 计算
 >
-> **竞彩官方赔率的正确提取 (v2.0 优先级反转)**:
-> - 🥇 **主源: 竞彩官网 API** → `https://webapi.sporttery.cn/gateway/jc/football/getMatchCalculatorV1.qry`
->   - SPF 赔率: had pool 的 home/draw/away.odds
->   - RQSPF 赔率: hhad pool 的 home/draw/away.odds + goalLine (让球数)
->   - 如被 567 拦截 → 自动降级到后备源
-> - 🥈 **后备: 500.com** → `https://trade.500.com/jczq/?playid=312&g=2` (SPF)
->   - RQSPF: `odds.500.com/fenxi/rangqiu-{id}.shtml` → "竞*官*" 行
+> **竞彩官方赔率的正确提取 (v3.10.7 webapi 优先)**:
+> - 🥇 **主源: sporttery.cn REST API** → `python3 scripts/fetch_sporttery.py --date {date} --json`
+>   - 调用 https://webapi.sporttery.cn/gateway/uniform/football/getMatchCalculatorV1.qry?channel=tycp
+>   - 解释: `m.sporttery.cn/mjc/jsq/zqspf/` 是 SPA 空壳页面，真实数据通过 AJAX 加载自 webapi REST API
+>   - SPF 赔率: JSON had 对象的 h(主胜)/d(平局)/a(客胜)
+>   - RQSPF 赔率: JSON hhad 对象的 goalLine(让球数)/h(让球主胜)/d(让球平)/a(让球客胜)
+>   - 缓存: `~/.cache/workbuddy/sporttery/{date}_jingcai.json`, 1 小时过期
+> - 🥈 **后备: 500.com** → scraper Phase 3 ouzhi 页 row 1 "竞*官*" (SPF) + rangqiu 页 row 1 "竞*官*" (RQSPF)
+>   - 仅在 sporttery.cn API 失败时使用
 > - **切勿**从 ouzhi 页面的"百家平均"列获取竞彩赔率
 >
 > **错误后果**：使用百家平均替代竞彩赔率，会导致赔率数量级错误（如1.92误为1.14），所有EV计算和串关方案全部失效。
@@ -141,7 +143,7 @@ dependencies:
   NORMAL (|MPC| < 0.2 → 不修正; 否则信度 × (1+MPC×0.10))
 ```
 
-## 14 步执行流程
+## 14 步执行流程 (Step 0 → Step 0a → Step 0.5 → Step 1 → ... → Step 13)
 
 > ⚠️ 每步必须输出结果。禁止"看起来简单就跳过"。每步标注要读取的 KB 章节。
 
@@ -187,8 +189,13 @@ dependencies:
    h2h_score = (W+0.5×D)/P (时效期内)
    无时效期内交锋 → null (无参考价值, 不影响判定)
 
-4. 伤病/停赛 (news-protocol.md 场景 1):
-   核心缺阵 → logit -0.15 | 双核缺阵 → -0.30 | 防线重组 → 对方+0.10
+4. 伤病/停赛 (news-protocol.md 场景 1, v3.10.7 按角色分层):
+   按角色分级 (news-protocol.md 规则2 详细表):
+     核心持球点/组织核心缺阵 → logit -0.25
+     核心射手/防线核心/门将缺阵 → logit -0.20
+     角色球员缺阵 → logit -0.10
+     轮换球员 → 不计入
+   双核同时缺阵 → logit -0.35 | 防线重组(2+人) → 对方进攻 +0.10
 
 5. 赛程体能 (Liansai API 比赛日期间隔):
    休息 <3 天 → 体能紧张 | 休息 3-4 天 → 一般 | 休息 ≥5 天 → 充分
@@ -266,37 +273,42 @@ dependencies:
   - **A 类（仓位型）**：机构被动调价，与基本面无关 → 降权/忽略
 - 输出：触发清单 + 分类 + 综合判定（计数阈值已废弃，以分类加权为准）
 
-### Step 9 — 方向判定 (v3.9.0: 量化动机修正 + Pin方向 + 平局分级 + 反投)
+### Step 9 — 方向判定 (v3.10.5: 共识方向 + 量化动机修正 + 平局分级 + 反投)
 
 > **v3.9.0 更新**: 动机修正从 AI 主观定性改为量化算法。
 > mot 值由 Step 2 输出的小组积分+ELO差距+赛程间隔自动计算 (KB-17.2.2)。
-> 基线准确率更新为 54.7% (179场全量), 分段见 KB-16。
+> 基线准确率: 54.7% (179场全量, 基于 Pinnacle 数据校准; 2022WC 验证 Pinnacle=市场均值)。分箱见 KB-16。
 
 ```
 方向判定逻辑 (三步):
 
-  1. Pin方向 = Pinnacle收盘赔率最低的那一方向 (H/D/A)
-     基线准确率: 54.7% (179场全量), 分段见 KB-16
+  1. 市场共识方向 = 30 家博彩公司收盘赔率平均值最低的那一方向 (H/D/A)
+     计算: ouzhi 页底部"平均值"行的收盘赔率 (30家算术平均)
+     基线准确率: 54.7% (179场全量, KB-16 分箱)
 
   2. 动机修正 (KB-17.2 量化算法):
      a. 判定轮次 (R1/R2/R3): Liansai API 同组比赛日期 → 推导
      b. 计算 mot: base_situation (小组积分榜查表) + elo_adjust + rest_adjust
-     c. 执行四规则 (优先级: 规则4 > 规则2 > 规则1 > 规则3):
-        规则4: Pin<1.50 + R3 + Pin方向方mot≥0.85 → ✅ 生死战Pin可靠 (覆盖1/2)
-        规则2: Pin方赔率<1.50 + Pin方向方mot<0.25 → 🚫 强制跳过 (可选反投)
-        规则1: Pin<1.50 + R1 → 🚫 跳过 (例外: 信号豁免→候选0.5x, 见 O-15)
-        规则3: Pin∈[1.80,2.20] + mot_gap<0.15 → ⚠️ 仅降仓0.5x
+     c. 执行五规则 (优先级: 规则4 > 规则2 > 规则1 > 规则3 — v3.10.7 规则2无赔率门槛+新增2b):
+        规则4: 赔率<1.50 + R3 + 共识方向方mot≥0.85 → ✅ 生死战可信 (覆盖1/2)
+        规则2: 共识方向方mot<0.25 → 按赔率分档 (见KB-17.2.4):
+          2a (赔率<1.50) → 🚫 强制跳过 (可选反投)
+          2b (赔率∈[1.50,2.00] + R3) → ⚠️ 降C类不入串关核心
+        规则1: 赔率<1.50 + R1 → 🚫 跳过 (例外: 信号豁免→候选0.5x, 见 O-15)
+        规则3: 赔率∈[1.80,2.20] + mot_gap<0.15 → ⚠️ 仅降仓0.5x
 
   3. 否定检查:
      a. KB-19偏离≥2条+动机冲突 → "跳过" (若对手赔率2-6→反投)
      b. KB-17平局二级信号≥3条 → "跳过"
-     c. Kelly(Pin方向)>1.05 → 仓位降0.5x
-     d. 必发方向≠Pin方向 → 仓位降0.5x
+     c. Kelly(共识方向)>1.05 → 仓位降0.5x
+     d. 必发方向≠共识方向 → 仓位降0.5x
      e. KB-17平局一级信号触发1条 → 仓位降0.5x + 不入核心链接 (v3.8.1)
         触发2条一级信号 → 强制"跳过"
+     f. R3 + 共识方向方mot<0.25 (规则2b触发) → 额外检查: 成交量信号降权50% (v3.10.7)
+        逻辑: 锁定出线格局下必发成交量可能由散户资金主导(机构已平仓), 信号失真
 
 反投规则 (KB-17b):
-  动机Pin冲突 + mot_gap>0.30 + 偏离≥2 + 对手赔率2.00~6.00
+  动机共识冲突 + mot_gap>0.30 + 偏离≥2 + 对手赔率2.00~6.00
   → 反投单关¥10, 不进入串关。单日≤1场, 仅R3可用。
 ```
 
@@ -304,7 +316,7 @@ dependencies:
 - **必须输出信号来源分解面板**：
   ```
   ┌─ 方向判定 ─────────────────────────────────────────┐
-  │ Pin方向: [H/D/A] (Pinnacle收盘赔率 X.XX最低)     │
+  │ 市场共识方向: [H/D/A] (30家平均收盘赔率 X.XX最低) │
   │ 动机修正: [无/深盘慢热(R1)/动机流失(mot=X.XX)/    │
   │           均衡对耗/生死战(R3+mot=X.XX)]             │
   │ 偏离信号: [N/6条] → [正常/降仓/跳过/反投]         │
@@ -312,7 +324,7 @@ dependencies:
   │ 最终方向: [H/跳过/A/🔄反投]                        │
   └──────────────────────────────────────────────────────┘
   ```
-- 输出：`[场次] 方向：[胜/跳过/负/反投]，依据：Pin+动机修正+否定检查`
+- 输出：`[场次] 方向：[胜/跳过/负/反投]，依据：共识方向+动机修正+否定检查`
 
 ### Step 10 — 比分预测引擎 (v3.8.0: OU+让球+Poisson量化)
 
@@ -337,7 +349,7 @@ dependencies:
 ### Step 10.5 — 信号可靠性检查 (KB-16 + KB-17, v3.7.0 校准)
 
 > **v3.7.0**: OCI五分位体系废除。替代为两步检查:
->   (1) Pin方向可靠性: 偏离信号计数 (KB-19)
+>   (1) 共识方向可靠性: 偏离信号计数 (KB-19)
 >   (2) 平局风险: 5条触发条件计数 (KB-17)
 > 详见 knowledge-base.md KB-16 信号可靠性矩阵。
 
@@ -358,12 +370,12 @@ dependencies:
   - 偏离≥3 → 不入 A 类 (降为 B 类或跳过)
 - 输出：每场档位归属 + deVig 值 + 偏离计数
 
-### Step 11 — 哑铃组合构建 + 仓位执行
+### Step 11 — 概率驱动哑铃组合构建 + 仓位执行
 
-> **v3.10.3 哑铃组合**: 不再把所有钱押在一个方向上。分层配置:
->   🛡️ 保本层 (¥60-70) — 高概率 2串1, 错了也回收部分
->   ⚡ 博上层 (¥20-30) — 低概率正EV, 轻仓单关, 以小博大
->   💰 现金缓冲 (¥10-20) — 永不全押, 亏损永远有梯度
+> **v3.10.5 概率驱动哑铃组合**: 保本层预算由 P(≥2/3正确) 反推 (capped ¥40-75), 非固定金额。
+>   🛡️ 保本层 (capped ¥40-75) — 高概率 3串3/2串1, 概率驱动分配
+>   ⚡ 博上层 (capped ¥30) — 低概率正EV, 轻仓单关, 以小博大
+>   💰 现金缓冲 (≥ ¥15) — 永不全押, 亏损永远有梯度
 
 - **⚠️ 必须先读 `references/betting-sop.md` 完整五步流程**
 - **⚠️ ⛔ 数据分界墙**: 投注只用竞彩赔率, Pinnacle/百家平均只用于分析层
@@ -671,6 +683,7 @@ assets/report-template.html 作为基础模板，注入以下模块：
   - ✅ 赔率底线: 3串4 2/3个2串1≥1.65 + 3串1≥4.50 / 4串11 4/6个2串1≥1.65 / 2串1回退 ≥1.80（详见betting-sop.md 1.5阈值速查表）
   - ✅ 每日最多 1 组 M串N | 滑点 3.5% 前置 | 防守底线 > 80% → 放弃
   - ✅ 空仓即赢：找不到正 EV or 防守底线算不过 → 跳过当日
+  - ✅ 保本层预算: P(≥2/3正确) 反推 (capped ¥40-75), 非固定金额
 - **报告规格**：
   - ✅ **亮色模式**：浅色背景（#f5f7fa / #ffffff），深色文字（#1a1a2e / #333），所有卡片用浅底+深色边框
   - ✅ **参考比分**：每场输出 Top 3 可能比分，必须附带"仅供参考，不构成投注依据"
@@ -689,6 +702,10 @@ assets/report-template.html 作为基础模板，注入以下模块：
 回测复盘统一使用 `football-backtest-workflow/` 子技能。详见 Step 13 赛后回测触发器。
 
 ### Changelog
+
+- **v3.10.7**: **规则2无赔率门槛 + 伤病logit按角色分层**（2026-06-26）: 基于2026WC D/E/F末轮回测. (1) **P0-1 KB-17.2.4 规则2重构**: 取消<1.50赔率限制, 按赔率分两档处理 — 2a(<1.50→跳过) + 2b(1.50-2.00+R3→C类不入串关核心); 修复美国(1.89)/德国(1.63)两场锁定出线漏检bug (2) **P0-2 伤病logit按角色分层**: news-protocol.md + SKILL.md Step 2 从统一-0.15改为持球核心-0.25/射手+防线-0.20/角色球员-0.10/双核-0.35 (3) **否定检查新增f条**: 规则2b触发时成交量信号降权50% (4) **四规则→五规则**: KB-17.2.4 标题更新 (5) 同步更新 betting-sop.md 1.2a 轮换风险分支
+
+- **v3.10.5**: **全技能14项冲突修复**（2026-06-25）: 基于跨文件审计报告修复 14 项冲突。(1) **P0-1 竞彩官网数据源落地**: sporttery.cn 页面抓取脚本 fetch_sporttery.py 创建; scraper 从 500.com-only → sporttery.cn主源+500.com后备; betting-sop.md 1.1 重写为页面抓取优先 (2) **P0-2 仓位系统统一**: betting-sop.md 附录旧三档(核心/跳过/冷门翻转)删除, 全系统统一为 A/B/C deVig (3) **P0-3 KB-5b 清理**: 删除 OCI权重表+所有[已废除]标记, 保留平局信号强度分级表, 指向 KB-17.3 (4) **P0-4 betting-sop 1.1b补写**: 深盘穿盘风险检查(亚盘交叉验证+三级响应), 区分 RQSPF≠SPF (5) **P1-1 保本层概率驱动**: 固定金额→P(≥2/3正确)反推, capped ¥40-75 (6) **P1-4 Kelly公式写入 betting-sop.md** (7) **P2-1 流程图更新**为哑铃组合 (8) **P2-2 KB-20a 信号数修正** 10→11 (9) **P2-4 步骤数统一** (10) 所有过期内容直接删除不留标记
 
 - **v3.10.4**: **全技能审计修复**（2026-06-25）: (1) 修复 21 个跨文件不一致 — 版本号统一/H1标题更新/KB索引补全/废除公式标注/重复标题合并/Step10.6冲突清理/fundamentals README补全/Step1数据路径更新/保本层金额一致化/KB-20a信号数修正 (2) sporttery-protocol v2.0→v2.1 双通道接入 (MCP+直连API, 四重降级) (3) 30min禁令统一为>1h前完成 (4) 版本 3.10.1→3.10.4 (含审计期间中间版本 3.10.2/3.10.3)
 
