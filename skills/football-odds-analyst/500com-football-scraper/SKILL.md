@@ -1,13 +1,13 @@
 ---
 name: 500com-football-scraper
-description: "Scrape full football odds data from 500.com. v2.7: 全六页结构化解析+GB2312编码规范+竞彩双源提取(ouzhi+rangqiu)."
+description: "Scrape full football odds data from 500.com. v2.8: sporttery.cn竞彩主源接入+500.com后备降级+全六页结构化解析+GB2312编码规范."
 agent_created: true
-version: "2.7"
+version: "2.8"
 ---
 
-# 500.com Football Odds Scraper v2.7
+# 500.com Football Odds Scraper v2.8
 
-> **v2.7 全六页结构化数据提取**: 新增 ouzhi 页凯利指数/概率%/返还率/离散度全量解析; yazhi/daxiao 页完整水位+盘口变动时间戳; touzhu 页必发成交+模拟盈亏+冷热指数; rangqiu 页让球赔率全量; GB2312 编码处理规范。
+> **v2.8 竞彩数据分层**: 竞彩赔率主源 → sporttery.cn 页面抓取 (scripts/fetch_sporttery.py); 后备源 → 500.com ouzhi/rangqiu 页"竞*官*"行。国际庄家数据 (Pinnacle/bet365 等) 仍从 500.com 获取。
 
 ## Triggers
 
@@ -78,7 +78,7 @@ python3 references/parser.py --date 2026-06-22 --quick --json
     shuju_id = match["shuju_id"]
     cache_path = .cache/shared-football/parsed/{date}_{shuju_id}.json
 
-    如果 cache_path 存在且 mtime < 12h:
+    如果 cache_path 存在且 mtime < 1h:
       → 标记为 CACHED（跳过后续全部抓取）
     如果不存在或过期:
       → 标记为 NEED_FETCH（后续逐场抓取）
@@ -128,7 +128,7 @@ python3 references/parser.py --date 2026-06-22 --quick --json
 1. 先取 ID (Step 0a)，再检缓存 (Step 0b)，最后抓取 (Step 0c)
 2. 缓存按 shuju_id 独立（非按日期聚合），一场的缓存不影响另一场
 3. 每页面独立检查 raw/，只抓缺失页，绝不重复
-4. 过期检查: 每个 shuju_id JSON 的 mtime < 12h
+4. 过期检查: 每个 shuju_id JSON 的 mtime < 1h
 5. 并发: 2-3 场同时处理，每场内串行抓 6 页
 6. 跨技能: 其他技能（analyst/backtest）发起时，同样走 Step 0a→Step 0b→Step 0c
 ```
@@ -171,14 +171,16 @@ python3 references/parser.py --date 2026-06-22 --quick --json
 
 ### Phase 3: Parse key data
 
-#### ouzhi parsing — 全量字段提取 (v2.7)
+#### ouzhi parsing — 全量字段提取 (v2.8)
 
 ```
 HTML 结构: 每行 = <td class="tb_plgs" title="公司名"> + 17 个数字单元格
 
 关键发现:
   ⭐ Row 1 = 竞彩官方 SPF 赔率 (title="竞*官*", country=中国, cid=1)
+       → 竞彩赔率后备源 (v2.8: 主源为 sporttery.cn 页面抓取)
   ⭐ Row ~12 = Pinnacle (title="Pi****le平*", cid=1055)
+       → 国际庄家分析数据 (始终从此获取)
 
 每行提取 17 个字段 (按顺序):
   [0-2]   开盘 SPF (主/平/客)
@@ -225,11 +227,11 @@ Pinnacle = title="Pi****le平*" (cid=1055), 共 17 家公司
 Direction: 升 = handicap deepens, 降 = handicap retreats, ↓ = water drops, ↑ = water rises
 ```
 
-#### rangqiu parsing
+#### rangqiu parsing — 竞彩后备源
 
 ```
-竞彩官方让球胜平负赔率（关键数据 — 用于投注建议）:
-  Row 1 = "竞*官*" — 竞彩官方赔率（唯一真实竞彩赔率源）
+竞彩官方让球胜平负赔率（v2.8 — 后备源，主源为 sporttery.cn 页面）:
+  Row 1 = "竞*官*" — 竞彩官方赔率
   行格式: 公司名 | [让球数][初盘主][初盘平][初盘客][即时主][即时平][即时客]
     数字连续无分隔符，按长度解析:
       让球数: 正负号+1位数字 (如 -1, 0, +2)
@@ -322,7 +324,7 @@ Standardized JSON schema (see ouzhi/yazhi/rangqiu/daxiao/shuju/touzhu sub-schema
 汇总JSON:  .cache/shared-football/parsed/{date}_deep.json  (可选)
   (全量汇总，仅用于需要全部场次时的批量读取)
 
-过期: 12小时（检查每个 shuju_id JSON 的 mtime）
+过期: 1小时（检查每个 shuju_id JSON 的 mtime）
 --no-cache: 强制刷新，覆盖某个 shuju_id 的缓存
 ```
 
@@ -333,19 +335,21 @@ Standardized JSON schema (see ouzhi/yazhi/rangqiu/daxiao/shuju/touzhu sub-schema
 1. **Encoding**: ⚠️ v2.7 关键修正 — **深分页全部使用 GB2312 编码**，不是 UTF-8。WebFetch 工具保存时可能导致中文字符损坏。使用 Python `urllib` 直接抓取 + `open("wb")` 保存原始字节 + `decode("gb2312")` 读取。详见上方 "GB2312 编码铁律" 章节。
 2. **shuju ID extraction**: From trade page links like `<a href="/fenxi/shuju-XXXXXXX.shtml">`.
 3. **Pinnacle**: ouzhi 页 row ~12 (title="Pi****le平*", cid=1055); yazhi/daxiao 页同样 cid=1055。
-4. **竞彩官方赔率双源提取 (v2.7)**:
-   - **SPF (胜平负)**: ouzhi 页 row 1 = "竞*官*" (title, country=中国, cid=1) → 竞彩官方 SPF
-   - **RQSPF (让球胜平负)**: rangqiu 页 row 1 = "竞*官*" → 竞彩官方 RQSPF (让球数+赔率)
-   - 深盘场次: 竞彩可能只开 RQSPF 不开 SPF (ouzhi 页仍有 row 1 但赔率不可用)
+4. **竞彩官方赔率数据分层 (v2.8)**:
+   - **主源**: sporttery.cn 页面抓取 (scripts/fetch_sporttery.py) → `.cache/sporttery/{date}_jingcai.json`
+   - **后备源**: 500.com ouzhi 页 row 1 "竞*官*" (SPF) + rangqiu 页 row 1 "竞*官*" (RQSPF)
+   - **国际庄家数据**: 始终从 500.com ouzhi/yazhi/daxiao 页获取 (Pinnacle/bet365/威廉希尔等, 不含"竞*官*"行)
+   - 深盘场次: 竞彩可能只开 RQSPF 不开 SPF
 5. **Not-yet-open**: RQSPF showing "未开售" → set field to null.
 6. **Network**: 6 pages × N matches = many pages. Fetch 2-3 pages concurrently with random delay (0.5-1.5s).
 7. **数据分层**:
    - 分析层数据: ouzhi(30家+Pinnacle+凯利+概率+离散) / yazhi(17家亚盘) / daxiao(18家大小球) / shuju(基本面) / touzhu(必发成交+模拟盈亏+冷热指数)
-     用于 football-odds-analyst 的盘口分析、MBI、OCI等全部分析步骤
-   - 执行层数据: ouzhi页 row 1 竞彩SPF + rangqiu页 row 1 竞彩RQSPF
+     用于 football-odds-analyst 的盘口分析、MBI等全部分析步骤
+   - 执行层数据: sporttery.cn 页面抓取 (主源) 或 ouzhi页 row 1 竞彩SPF + rangqiu页 row 1 竞彩RQSPF (后备)
      专供 football-odds-analyst 的 Step 11 (投注建议/EV计算) 使用
    - **数据源不能混淆**: 分析用全球数据，投注用竞彩赔率
 8. **集成解析脚本**: `scripts/fetch_and_parse.py` — 一次运行抓取+解析所有6页，输出结构化JSON到缓存。
+9. **竞彩抓取脚本 (v2.8 新增)**: `scripts/fetch_sporttery.py` — sporttery.cn 页面抓取，缓存1小时。
 
 ---
 
@@ -379,12 +383,12 @@ Standardized JSON schema (see ouzhi/yazhi/rangqiu/daxiao/shuju/touzhu sub-schema
 regex: ([\u4e00-\u9fff]+)\s*\|\s*\|\s*([\d.]+)\s*\|\s*\|\s*([\d.]+)% ...
 ```
 
-**竞彩双源**:
-| 赔率类型 | 页面 | 位置 | cid |
-|:---|:---|:---|:---|
-| SPF (胜平负) | ouzhi | row 1 `title="竞*官*"` | 1 |
-| RQSPF (让球) | rangqiu | row 1 `title="竞*官*"` | — |
-| 深盘未开 SPF | ouzhi row 1 存在但无赔率 | 仅 RQSPF 可用 | — |
+**竞彩数据流 (v2.8)**:
+| 层级 | 来源 | 内容 | 优先级 |
+|:---|:---|:---|:---:|
+| 🥇 主源 | sporttery.cn 页面 | SPF + RQSPF 赔率 | 优先 |
+| 🥈 后备 | 500.com ouzhi/rangqiu "竞*官*" | SPF + RQSPF 赔率 | 降级 |
+| 🔧 国际 | 500.com ouzhi/yazhi/daxiao | Pinnacle/bet365/威廉希尔等 | 分析用 |
 
 ### 踩过的坑
 

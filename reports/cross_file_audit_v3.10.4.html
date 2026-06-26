@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Football Odds Analyst — 全技能跨文件冲突审计报告 v3.10.4</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: #f0f2f5; color: #1a1a2e; line-height: 1.7; padding: 20px; }
+.container { max-width: 1200px; margin: 0 auto; }
+h1 { font-size: 1.8em; border-bottom: 3px solid #d32f2f; padding-bottom: 12px; margin-bottom: 8px; }
+.meta { color: #666; font-size: 0.9em; margin-bottom: 30px; }
+h2 { font-size: 1.3em; background: #d32f2f; color: #fff; padding: 10px 16px; margin: 30px 0 16px 0; border-radius: 6px; display: flex; align-items: center; gap: 10px; }
+h2 .badge { background: rgba(255,255,255,0.3); padding: 2px 10px; border-radius: 12px; font-size: 0.75em; }
+h3 { font-size: 1.05em; color: #c62828; margin: 20px 0 10px 0; padding-left: 12px; border-left: 4px solid #c62828; }
+.card { background: #fff; border-radius: 8px; padding: 20px; margin-bottom: 16px; box-shadow: 0 1px 4px rgba(0,0,0,0.08); }
+.card.p0 { border-left: 4px solid #d32f2f; }
+.card.p1 { border-left: 4px solid #f57c00; }
+.card.p2 { border-left: 4px solid #1976d2; }
+.card-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+.card-header .tag { padding: 3px 10px; border-radius: 12px; font-size: 0.8em; font-weight: 700; color: #fff; }
+.tag-p0 { background: #d32f2f; }
+.tag-p1 { background: #f57c00; }
+.tag-p2 { background: #1976d2; }
+.file-ref { font-family: "SF Mono", monospace; font-size: 0.82em; color: #555; background: #f5f5f5; padding: 3px 8px; border-radius: 4px; }
+.conflict-box { background: #fff3e0; border: 1px solid #ffcc80; border-radius: 6px; padding: 14px; margin: 10px 0; }
+.conflict-box .label { font-weight: 700; color: #e65100; margin-bottom: 6px; }
+.row { display: flex; gap: 12px; margin: 8px 0; }
+.col { flex: 1; padding: 10px; border-radius: 6px; font-size: 0.88em; }
+.col.old { background: #ffebee; border: 1px solid #ef9a9a; }
+.col.new { background: #e8f5e9; border: 1px solid #a5d6a7; }
+.col.col-title { font-weight: 700; margin-bottom: 4px; }
+.code { font-family: "SF Mono", monospace; font-size: 0.85em; background: #263238; color: #aed581; padding: 10px 14px; border-radius: 6px; overflow-x: auto; white-space: pre-wrap; margin: 8px 0; }
+table { width: 100%; border-collapse: collapse; margin: 12px 0; }
+th { background: #455a64; color: #fff; padding: 8px 12px; text-align: left; font-size: 0.88em; }
+td { padding: 8px 12px; border-bottom: 1px solid #e0e0e0; font-size: 0.88em; }
+tr:nth-child(even) td { background: #fafafa; }
+.summary-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin: 20px 0; }
+.summary-card { background: #fff; padding: 16px; border-radius: 8px; text-align: center; box-shadow: 0 1px 4px rgba(0,0,0,0.08); }
+.summary-card .num { font-size: 2em; font-weight: 800; }
+.num-red { color: #d32f2f; }
+.num-orange { color: #f57c00; }
+.num-blue { color: #1976d2; }
+.summary-card .label { font-size: 0.85em; color: #666; }
+.impact { font-weight: 700; }
+.consequence { background: #fce4ec; border-left: 3px solid #e91e63; padding: 8px 12px; border-radius: 4px; margin: 10px 0; font-size: 0.9em; }
+.highlight { background: #fff9c4; padding: 2px 6px; border-radius: 3px; }
+</style>
+</head>
+<body>
+<div class="container">
+
+<h1>🔍 全技能跨文件冲突审计报告</h1>
+<div class="meta">
+  <strong>目标技能</strong>: football-odds-analyst v3.10.4<br>
+  <strong>审计范围</strong>: 16 个文件（SKILL.md ×5, references/*.md ×7, scraper SKILL.md, fundamentals/*.md ×5, backtest-workflow SKILL.md, methodology-diagnostic SKILL.md）<br>
+  <strong>审计时间</strong>: 2026-06-25 22:41<br>
+  <strong>发现冲突</strong>: P0=4, P1=4, P2=6, 合计 14 项
+</div>
+
+<div class="summary-grid">
+  <div class="summary-card">
+    <div class="num num-red">4</div>
+    <div class="label">🔴 P0 — 会导致错误投注决策</div>
+  </div>
+  <div class="summary-card">
+    <div class="num num-orange">4</div>
+    <div class="label">🟠 P1 — 会导致执行不一致</div>
+  </div>
+  <div class="summary-card">
+    <div class="num num-blue">6</div>
+    <div class="label">🔵 P2 — 术语/描述不一致</div>
+  </div>
+</div>
+
+<!-- ──────────────────────────────────────────────────── -->
+<!-- P0-1 -->
+<!-- ──────────────────────────────────────────────────── -->
+<h2>🔴 P0 级 — 会导致错误投注决策 <span class="badge">4 项</span></h2>
+
+<div class="card p0">
+  <div class="card-header">
+    <strong>P0-1: 竞彩官网数据源未接入 Scraper 数据管道</strong>
+    <span class="tag tag-p0">P0</span>
+  </div>
+  <p><strong>影响文件</strong>:
+    <span class="file-ref">SKILL.md (analyst) Step 0</span> →
+    <span class="file-ref">references/fundamentals/sporttery-protocol.md v2.1</span> ←✗→
+    <span class="file-ref">500com-football-scraper/SKILL.md v2.7</span>
+    （这是你提到的核心问题）
+  </p>
+
+  <div class="conflict-box">
+    <div class="label">冲突描述</div>
+    <div class="row">
+      <div class="col old">
+        <div class="col-title">📖 analyst SKILL.md / betting-sop.md 声称：</div>
+        "🥇 主源: 竞彩官网 API → webapi.sporttery.cn"<br>
+        "🥈 后备: 500.com"<br>
+        "四重降级: MCP → HTTP → 直连API → 500.com"
+      </div>
+      <div class="col new">
+        <div class="col-title">🔧 scraper SKILL.md (v2.7) 实际执行：</div>
+        "竞彩官方赔率双源提取:<br>
+        &nbsp;&nbsp;SPF: ouzhi 页 row 1 = '竞*官*'<br>
+        &nbsp;&nbsp;RQSPF: rangqiu 页 row 1 = '竞*官*'"<br>
+        <b>从未提及 sporttery.cn</b>
+      </div>
+    </div>
+  </div>
+
+  <div class="consequence">
+    <strong>实际后果</strong>: analyst 告诉 AI "主源是 sporttery.cn"，但 scraper（数据管道的唯一入口）<b>只支持从 500.com 提取</b>。每次执行时，AI 可能徒劳地尝试 sporttery.cn API（无 Python 脚本支持），也可能退回到 500.com 提取（与声明矛盾）。<b>竞彩赔率的实际来源永远是 500.com，不是竞彩官网。</b>
+  </div>
+
+  <p style="margin-top:12px;"><strong>根因</strong>: v3.10.0 引入了 sporttery-protocol.md 和竞彩官网主源的概念，但从未实际编写接入 scraper 的代码或指令。这是一个"声明级"改动，而非"执行级"改动。</p>
+</div>
+
+<!-- P0-2 -->
+<div class="card p0">
+  <div class="card-header">
+    <strong>P0-2: 旧三档仓位（v3.5.3）残留在 betting-sop.md 附录中</strong>
+    <span class="tag tag-p0">P0</span>
+  </div>
+  <p><strong>影响文件</strong>: <span class="file-ref">references/betting-sop.md</span> 内部自相矛盾</p>
+
+  <div class="conflict-box">
+    <div class="label">同一文件内的两套仓位系统共存</div>
+    <div class="row">
+      <div class="col old">
+        <div class="col-title">⚠️ 附录（旧，v3.5.3，已废除但未删除）:</div>
+        "三档仓位（v3.5.3 重构：模式驱动核心仓位）"<br>
+        🔥 核心仓位 (OCI4=CONVERGE+OCI1≠RISE+OCI5=SYNC)<br>
+        🚫 跳过<br>
+        🔄 冷门翻转 (偏离≥3)
+      </div>
+      <div class="col new">
+        <div class="col-title">✅ 正文 1.2（新，v3.10.2）:</div>
+        "比赛分级（A/B/C）"<br>
+        A类(重仓): deVig ≥ 0.65<br>
+        B类(中仓): deVig 0.55-0.65<br>
+        C类(轻仓): deVig < 0.55 + EV>0
+      </div>
+    </div>
+  </div>
+
+  <div class="consequence">
+    <strong>实际后果</strong>: AI 在执行时如果读到了附录，可能应用 OCI4_CONVERGE/OCI5_SYNC 这些已在 v3.7.0 废除的模式来判定仓位，覆盖 A/B/C deVig 规则。
+  </div>
+</div>
+
+<!-- P0-3 -->
+<div class="card p0">
+  <div class="card-header">
+    <strong>P0-3: KB-5b 平局专项 OCI 权重与 [已废除] 标记自相矛盾</strong>
+    <span class="tag tag-p0">P0</span>
+  </div>
+  <p><strong>影响文件</strong>: <span class="file-ref">references/knowledge-base.md</span> KB-5b</p>
+
+  <div class="conflict-box">
+    <div class="label">KB-5b 章节结构</div>
+    <div class="code">### 平局专项 OCI 权重（基于 179 场历史库）
+
+| OCI 模式 | 含义 | 平局命中率 | 权重 |
+|:---|:---|---:|:---:|
+| OCI-4_CONVERGE + 平赔<3.50 | 机构共识平局 | 58.3% | +0.15 |
+| OCI-1_DROP + OCI-4_CONVERGE | Pinnacle 降赔 + 机构共识 | 54.2% | +0.10 |
+
+### 与 Step 9 方向判定的接口
+[已废除 — v3.7.0]
+...
+### 平局方向输出条件
+[已废除 — v3.7.0]
+...
+### 与 knowledge-base.md 其他 KB 的关系
+[已废除 — v3.7.0]</div>
+  </div>
+
+  <div class="consequence">
+    <strong>实际后果</strong>: OCI 权重表在顶部（未标注废除），底部三个子章节全部标注 [已废除 — v3.7.0]。AI 读到权重表时无法判断是否应使用。如果应用了 OCI-4_CONVERGE +0.15 的权重，会覆盖 v3.7.0+ 的 Pin方向+否定检查规则。
+  </div>
+</div>
+
+<!-- P0-4 -->
+<div class="card p0">
+  <div class="card-header">
+    <strong>P0-4: betting-sop.md 缺少 1.1b 穿盘风险检查章节</strong>
+    <span class="tag tag-p0">P0</span>
+  </div>
+  <p><strong>影响文件</strong>: 
+    <span class="file-ref">SKILL.md Step 11</span> vs 
+    <span class="file-ref">SKILL.md changelog v3.8.2</span> vs
+    <span class="file-ref">references/betting-sop.md</span>
+  </p>
+
+  <div class="conflict-box">
+    <div class="label">声明 vs 实际</div>
+    <strong>SKILL.md Step 11:</strong> "⚠️ 穿盘风险: 让球深度≥1.5球执行 1.1b"<br>
+    <strong>SKILL.md changelog v3.8.2:</strong> "betting-sop.md 新增1.1b深盘穿盘风险前置检查 — 让球深度≥1.5球时读取Poisson穿盘概率, &lt;60%剔除让球胜, &lt;50%剔除该场"<br><br>
+    <strong>betting-sop.md 实际内容:</strong> 1.1 (竞彩可用性检查) → 1.2 (比赛分级) → <b>无 1.1b</b><br>
+  </div>
+
+  <div class="consequence">
+    <strong>实际后果</strong>: 让球深度 ≥1.5 球时，AI 按 Step 11 指引"执行 1.1b"但找不到对应章节，穿盘风险检查被跳过。
+  </div>
+</div>
+
+<!-- ──────────────────────────────────────────────────── -->
+<!-- P1 -->
+<!-- ──────────────────────────────────────────────────── -->
+<h2>🟠 P1 级 — 会导致执行不一致 <span class="badge">4 项</span></h2>
+
+<div class="card p1">
+  <div class="card-header">
+    <strong>P1-1: 保本层金额范围三处表述不一致</strong>
+    <span class="tag tag-p1">P1</span>
+  </div>
+  <table>
+    <tr><th>位置</th><th>表述</th><th>金额</th></tr>
+    <tr><td><span class="file-ref">betting-sop.md 核心原则</span></td><td>"60-70% 本金"</td><td><strong>¥60-70</strong></td></tr>
+    <tr><td><span class="file-ref">betting-sop.md 哑铃组合构建</span></td><td>"保本层 (¥50-75)"</td><td><strong>¥50-75</strong></td></tr>
+    <tr><td><span class="file-ref">SKILL.md Step 11</span></td><td>"保本层 (¥60-70)"</td><td><strong>¥60-70</strong></td></tr>
+    <tr><td><span class="file-ref">SKILL.md Changelog v3.10.3</span></td><td>"保本层¥50-75"</td><td><strong>¥50-75</strong></td></tr>
+  </table>
+  <div class="consequence">
+    <strong>后果</strong>: 读不同位置得到不同的保本层预算，导致注码分配在 ¥50~¥75 之间漂移。
+  </div>
+</div>
+
+<div class="card p1">
+  <div class="card-header">
+    <strong>P1-2: Scraper 声称"竞彩官方 row 1"但无法区分 500.com 镜像 vs sporttery.cn 直连</strong>
+    <span class="tag tag-p1">P1</span>
+  </div>
+  <p>这是 P0-1 的衍生问题。scraper Phase 3 ouzhi parsing 说 "Row 1 = 竞彩官方 SPF 赔率"，但这是 500.com 的镜像数据。500.com 镜像与竞彩官网直连是否存在延迟/差异？差异量级多大？从未量化。</p>
+  <div class="consequence">
+    <strong>后果</strong>: 数据源不透明。AI 无法区分"从 500.com 镜像间接获取的竞彩赔率"和"从 sporttery.cn 直连获取的竞彩赔率"。
+  </div>
+</div>
+
+<div class="card p1">
+  <div class="card-header">
+    <strong>P1-3: sporttery.cn API 调用无任何 Python 脚本实现</strong>
+    <span class="tag tag-p1">P1</span>
+  </div>
+  <p>所有 scraper Python 脚本（fetch_deep_data.py, parse_ouzhi.py, parser.py）只处理 500.com 数据。sporttery-protocol.md 中描述的 API 调用（MCP/HTTP/直连）全部依赖 AI 手动 WebFetch，无自动化实现。</p>
+  <div class="consequence">
+    <strong>后果</strong>: sporttery.cn 接入纯靠 AI 执行 WebFetch。不可靠、无法审计、无法批量处理。
+  </div>
+</div>
+
+<div class="card p1">
+  <div class="card-header">
+    <strong>P1-4: Kelly 注码速查表引用的公式不在 betting-sop.md 中</strong>
+    <span class="tag tag-p1">P1</span>
+  </div>
+  <p>betting-sop.md "Kelly注码速查" 列出 Kelly%（如 "14.1%"），但 betting-sop.md 中无Kelly计算公式。公式在 knowledge-base.md KB-8（简版 Kelly）和 KB-16.3（分箱版 Kelly）。AI 只读 betting-sop.md 时无法复现计算。</p>
+  <div class="consequence">
+    <strong>后果</strong>: 跨文件引用断裂。Step 11 要求"必须先读 betting-sop.md"，但 betting-sop.md 的 Kelly 表依赖 knowledge-base.md 才能理解。
+  </div>
+</div>
+
+<!-- ──────────────────────────────────────────────────── -->
+<!-- P2 -->
+<!-- ──────────────────────────────────────────────────── -->
+<h2>🔵 P2 级 — 术语/描述不一致 <span class="badge">6 项</span></h2>
+
+<div class="card p2">
+  <div class="card-header">
+    <strong>P2-1: betting-sop.md 执行流程图未更新为哑铃组合</strong>
+    <span class="tag tag-p2">P2</span>
+  </div>
+  <p>betting-sop.md 底部流程图仍是旧五步 SOP（信号筛选→物理拆分→EV计算→账户状态→独立复盘），没有体现保本层/博上层/现金缓冲的哑铃分层。</p>
+</div>
+
+<div class="card p2">
+  <div class="card-header">
+    <strong>P2-2: KB-20a 信号数与标题矛盾</strong>
+    <span class="tag tag-p2">P2</span>
+  </div>
+  <p>KB-20a 标题"11信号引擎"，内容说"10个聚合信号"，实际列出 11 个（信号1-11）。changelog v3.8.0 说"信号11新增, 原10信号扩充"但标题未更新。</p>
+</div>
+
+<div class="card p2">
+  <div class="card-header">
+    <strong>P2-3: backtest-workflow 不了解竞彩数据分层</strong>
+    <span class="tag tag-p2">P2</span>
+  </div>
+  <p>backtest-workflow Phase 2 调用 analyst 做赛前预测。但回测场景下 sporttery.cn 无历史数据，只能用 500.com。backtest SKILL.md 没有说明这一约束，可能导致回测报告中混用数据源。</p>
+</div>
+
+<div class="card p2">
+  <div class="card-header">
+    <strong>P2-4: 三处"步骤数"表述矛盾</strong>
+    <span class="tag tag-p2">P2</span>
+  </div>
+  <table>
+    <tr><th>位置</th><th>表述</th></tr>
+    <tr><td>SKILL.md 执行纪律</td><td>"13 步 + Step 13（赛后回测触发）"</td></tr>
+    <tr><td>SKILL.md 标题</td><td>"14 步执行流程"</td></tr>
+    <tr><td>backtest-workflow Phase 2</td><td>"13 步流程" (Step 0→12)</td></tr>
+    <tr><td>SKILL.md 自检清单</td><td>列出 ~16 个检查项（含 Step 0/0a/0.5）</td></tr>
+  </table>
+</div>
+
+<div class="card p2">
+  <div class="card-header">
+    <strong>P2-5: OCI 维度数在 working memory 和代码中不一致</strong>
+    <span class="tag tag-p2">P2</span>
+  </div>
+  <p>Working memory 说"OCI指标体系包含5个维度：OCI1赔率变动、OCI2共识度、OCI3成交量、OCI4离散度、OCI5亚盘"。knowledge-base.md KB-5b 引用了 OCI-4_CONVERGE/OCI-1_DROP/OCI-5_SYNC。但 OCI 体系已在 v3.7.0 废除。working memory 未同步更新。</p>
+</div>
+
+<div class="card p2">
+  <div class="card-header">
+    <strong>P2-6: scraper v2.7 changelog 不完整</strong>
+    <span class="tag tag-p2">P2</span>
+  </div>
+  <p>scraper 仅标注 v2.7 改动。但 analyst changelog 提到多次 scraper 同步更新（v3.5.5 单关检查、v3.5.7 共享缓存协议、v3.10.0 竞彩官网数据源等），scraper changelog 未记录这些随 analyst 版本迭代的增量变更。</p>
+</div>
+
+<!-- ──────────────────────────────────────────────────── -->
+<!-- 总结 -->
+<!-- ──────────────────────────────────────────────────── -->
+<h2>📊 审计总结</h2>
+
+<div class="card">
+  <h3 style="color:#1a1a2e;border-color:#455a64;">核心根因模式</h3>
+  <p>14 项冲突中有 <strong>9 项</strong> 属于同一模式：</p>
+  <div class="consequence" style="background:#e3f2fd;border-color:#1976d2;">
+    <strong>"声明级改动 ✗ 执行级落地"</strong> — analyst SKILL.md 在 changelog 中声明了某项改动，但改动没有穿透到 scraper/betting-sop/knowledge-base 的执行层面。
+  </div>
+  
+  <table style="margin-top:16px;">
+    <tr><th>冲突</th><th>声明位置</th><th>未穿透到的文件</th></tr>
+    <tr><td>P0-1: 竞彩官网主源</td><td>SKILL.md v3.10.0 / sporttery-protocol.md</td><td>scraper SKILL.md / Python scripts</td></tr>
+    <tr><td>P0-2: 三档仓位 A/B/C</td><td>SKILL.md v3.10.2 / betting-sop.md 1.2</td><td>betting-sop.md 附录（旧系统未删除）</td></tr>
+    <tr><td>P0-3: OCI废除</td><td>knowledge-base.md KB-5b "已废除"标记</td><td>KB-5b 权重表（内容未删除）</td></tr>
+    <tr><td>P0-4: 穿盘风险 1.1b</td><td>SKILL.md changelog v3.8.2</td><td>betting-sop.md（章节未创建）</td></tr>
+    <tr><td>P1-1: 保本层金额</td><td>多个位置引入</td><td>各位置未统一</td></tr>
+    <tr><td>P1-3: API 脚本</td><td>sporttery-protocol.md</td><td>Python 脚本</td></tr>
+    <tr><td>P2-1: 哑铃流程图</td><td>SKILL.md v3.10.3</td><td>betting-sop.md 底部流程图</td></tr>
+    <tr><td>P2-3: 回测数据源</td><td>SKILL.md v3.10.0</td><td>backtest-workflow SKILL.md</td></tr>
+    <tr><td>P2-5: OCI废除</td><td>knowledge-base.md v3.7.0</td><td>working memory</td></tr>
+  </table>
+</div>
+
+<div class="card">
+  <h3 style="color:#1a1a2e;border-color:#d32f2f;">最关键的单一修复</h3>
+  <p><strong>P0-1（竞彩官网数据源未接入 Scraper）</strong> 是用户明确提到的核心痛点。修复此问题需要决策：是真正实现 sporttery.cn API 接入（写 Python 脚本），还是承认当前只能从 500.com 提取并撤销"主源"声明。</p>
+  <p>目前的状态是 <span class="highlight">最危险的中间态</span>：声明了 sporttery.cn 为主源但从未实现，实际从 500.com 提取但 AI 不知道自己用的是 500.com 镜像。</p>
+</div>
+
+</div>
+</body>
+</html>

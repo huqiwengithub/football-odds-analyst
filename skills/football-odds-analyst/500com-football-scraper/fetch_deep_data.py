@@ -9,7 +9,7 @@ from urllib.request import Request, urlopen
 from urllib.parse import urljoin
 from html.parser import HTMLParser
 
-CACHE_DIR = os.path.expanduser("~/.workbuddy/2026-06-24-03-46-34/.cache/shared-football")
+CACHE_DIR = os.path.expanduser("/Users/tracy/WorkBuddy/2026-06-24-23-14-33/.cache/shared-football")
 USER_AGENT = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
 HEADERS = {"User-Agent": USER_AGENT, "Referer": "https://odds.500.com/"}
 

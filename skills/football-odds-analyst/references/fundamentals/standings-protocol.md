@@ -103,7 +103,7 @@ WebFetch https://liansai.500.com/zuqiu-{sid}/jifen-{jid}/
 ```
 standings 数据有时效性:
   - 比赛日之内: standings 在每场结束后更新
-  - 策略: 每次执行分析时重新抓取 (缓存 ≤ 2h)
+  - 策略: 每次执行分析时重新抓取 (缓存 ≤ 1h)
   - 抓取时间戳 + 数据源 URL 必须记录
   - 如果抓取失败 (网站不可用), 回退到 WebSearch 结果
 ```
